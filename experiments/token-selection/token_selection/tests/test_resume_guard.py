@@ -48,6 +48,20 @@ def _launch_fresh(plan: dict) -> None:
     _commit_run_fingerprint(plan, resume=False)
 
 
+def _identity(save_folder) -> dict:
+    """The identity inside the schema-2 envelope that is what lands on disk.
+
+    ``_run_fingerprint`` returns the flat identity, but ``write_run_fingerprint`` wraps
+    it as ``{schema_version, identity, identity_sha256}``, so a field read straight off
+    the parsed file is one level too shallow.
+    """
+    doc = json.loads(
+        (Path(save_folder) / "run_fingerprint.json").read_text(encoding="utf-8")
+    )
+    assert doc["schema_version"] == 2
+    return doc["identity"]
+
+
 def test_fingerprint_is_committed_only_after_build(tmp_path):
     save = tmp_path / "rho_excess"
     plan = _plan(save)
@@ -80,9 +94,9 @@ def test_legacy_yaml_fingerprint_is_out_of_contract(tmp_path):
     _launch_fresh(plan)
     path = save / "run_fingerprint.json"
     prior = json.loads(path.read_text(encoding="utf-8"))
-    prior.pop("fingerprint_schema_version")
+    prior.pop("schema_version")
     path.write_text(json.dumps(prior), encoding="utf-8")
-    with pytest.raises(SystemExit, match="Refusing to resume"):
+    with pytest.raises(SystemExit, match="out-of-contract legacy fingerprint"):
         _prepare_run_dir(plan, resume=True)
 
 
@@ -97,8 +111,7 @@ def test_resume_allows_max_tokens_extension(tmp_path):
     extended["max_tokens"] = 9_900_000_000
     _prepare_run_dir(extended, resume=True)
     _commit_run_fingerprint(extended, resume=True)
-    prior = json.loads((save / "run_fingerprint.json").read_text(encoding="utf-8"))
-    assert prior["max_tokens"] == 9_900_000_000
+    assert _identity(save)["max_tokens"] == 9_900_000_000
 
 
 def test_resume_refuses_max_tokens_decrease(tmp_path):
@@ -177,8 +190,7 @@ def test_resume_allows_reference_path_relocation(tmp_path):
     relocated["reference_load_path"] = str(ref_b)
     _prepare_run_dir(relocated, resume=True)
     _commit_run_fingerprint(relocated, resume=True)
-    fp = json.loads((save / "run_fingerprint.json").read_text(encoding="utf-8"))
-    assert fp["reference_load_path"] == str(ref_b)
+    assert _identity(save)["reference_load_path"] == str(ref_b)
 
 
 def test_rho_fingerprint_pins_reference_bytes(tmp_path):
@@ -193,7 +205,7 @@ def test_rho_fingerprint_pins_reference_bytes(tmp_path):
     plan["reference_load_path"] = str(ref)
     _launch_fresh(plan)
 
-    fp = json.loads((save / "run_fingerprint.json").read_text(encoding="utf-8"))
+    fp = _identity(save)
     assert "reference_content_sha256" in fp
     assert fp["reference_load_path"] == str(ref)
 

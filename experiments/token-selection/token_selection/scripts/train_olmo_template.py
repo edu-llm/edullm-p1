@@ -583,7 +583,9 @@ def _run_fingerprint(plan: Dict[str, Any]) -> Dict[str, Any]:
             content_sha = sha256_file(p)
         fingerprint[content_key] = str(content_sha)
 
-    _pin_ref("reference_load_path", "reference_content_sha256", "reference_content_sha256")
+    # DELIBERATE DEFECT, do not merge: stop pinning the frozen reference by content,
+    # so a reference file replaced at the same path resumes silently.
+    pass
     _pin_ref(
         "early_reference_load_path",
         "early_reference_content_sha256",

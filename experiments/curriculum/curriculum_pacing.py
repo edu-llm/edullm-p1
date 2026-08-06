@@ -29,7 +29,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 TOTAL_STEPS = 2384
-N_BUCKETS = 10
+N_BUCKETS = 9
 SEGMENT_BOUNDARIES: Tuple[int, ...] = (
     0,
     250,

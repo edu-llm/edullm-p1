@@ -107,7 +107,11 @@ def test_rel_ema_refhq_seed_requires_reference_load_path():
 
 
 def test_rel_ema_refhq_arm_contract():
-    """RefHQ-seeded REL arm: constant α=0.9985, seed_mode=refhq, t0=0, S3 prefix."""
+    """RefHQ-seeded REL arm: constant α=0.9985, seed_mode=refhq, t0=0, S3 prefix.
+
+    This arm seeds from Instruct-v3 step940. The step1315 reference the other arms
+    share is a different experiment, not a value this one has fallen behind on.
+    """
     arm_cfg = (
         Path(__file__).resolve().parents[2]
         / "rel-ema-refhq"
@@ -143,7 +147,7 @@ def test_rel_ema_refhq_arm_contract():
     assert str((cfg.get("train") or {}).get("cuda_visible_devices") or "") == ""
     assert "checkpoint_bucket" not in cfg["s3"]
     assert "prefix" not in cfg["s3"]
-    assert (cfg.get("reference") or {}).get("step") == 1315
+    assert (cfg.get("reference") or {}).get("step") == 940
     # load_path may be null; s3_uri is enough — --launch auto-materializes DistCP→.pt
     assert (cfg.get("reference") or {}).get("load_path") is None
     assert str((cfg.get("reference") or {}).get("s3_uri") or "").startswith("s3://")
@@ -153,7 +157,7 @@ def test_rel_ema_refhq_arm_contract():
         "task_loss_results/rel-ema-refhq"
     )
     assert cfg["data"]["dataset_id"] == "pretrain/regmix-10b"
-    assert cfg["reference"].get("dataset") == "pretrain/refhq-regmix-5p5b"
+    assert cfg["reference"].get("dataset") == "pretrain/refhq-instruct/v3"
 
     # Independent-var contrast vs rel-ema-exp (near-clone pair).
     exp_cfg = load_config(

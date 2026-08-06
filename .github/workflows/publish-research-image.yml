@@ -1,7 +1,45 @@
 name: Publish platform research image
 
+# A thin caller and nothing else. Every decision that matters lives in edu-llm/platform;
+# this file exists to satisfy the two obligations a call site cannot inherit, and to say
+# when a build is allowed to fire. Both obligations fail as an AssumeRole denial that reads
+# like a broken role ARN rather than like its cause:
+#
+#   1. `id-token: write` has to be granted on the calling job below. A called workflow can
+#      only downgrade the permissions its caller hands it, so the id-token grant on the
+#      platform's publish job cannot create itself.
+#   2. The `uses:` reference has to be `@main`. The publisher role's trust policy matches
+#      job_workflow_ref with StringEquals against `@refs/heads/main`, so a SHA-pinned or
+#      tag-pinned reference mints a claim the role will never accept. This is the one place
+#      where pinning a ref makes things worse rather than better.
 on:
   workflow_dispatch:
+  # THIS FILE HAD NO PUSH TRIGGER AT ALL UNTIL 2026-08-06, AND IT WAS THE ONLY ONE OF THE
+  # SIX. It was `on: workflow_dispatch:` and nothing else, so no merge to main and no branch
+  # of any name ever published an image by itself: all four runs in its history are hand
+  # dispatches and two of those failed. Meanwhile edullm-p1 is registered -- repository id
+  # 1314176548 is in the platform's config/repositories.yaml and it is one of the six options
+  # in the submission form's dropdown -- so the platform accepts a submission naming this
+  # repository and then refuses it for want of an image built from the commit. That is a
+  # wrong answer handed to a researcher rather than clutter for anybody.
+  #
+  # The branch list is the other five callers' rather than a new one. A deliberate opt-in
+  # namespace rather than every branch: every accepted push spends runner time and publishes
+  # an immutable ECR tag that cannot be rewritten, so a build fires only from a branch whose
+  # name says it was meant to. push and workflow_dispatch are also the only events the
+  # reusable workflow accepts, because on anything else github.ref names the default branch
+  # rather than the pushed commit and the run would publish something other than what the
+  # caller meant.
+  #
+  # main is here for the opposite reason to the namespace rather than as an exception to it,
+  # and the reasoning is OLMo-core#43's. The platform's submission form takes a branch name,
+  # resolves it to a commit, and refuses a commit with no published image, so every merge to
+  # main that nobody happened to build leaves the most obvious thing a researcher can type
+  # failing for a reason that names the image rather than the merge.
+  push:
+    branches:
+      - "edullm/**"
+      - main
 
 permissions:
   contents: read
@@ -15,4 +53,48 @@ jobs:
     with:
       repository: edullm-p1
       publisher_role_arn: ${{ vars.AWS_ECR_PUBLISHER_ROLE_ARN }}
-      aws_region: us-east-1
+      # `aws_region: us-east-1` was passed here and is not passed by any of the other five.
+      # It is the reusable workflow's own default, so it changed nothing while it agreed --
+      # and the day the platform moves the sandbox region, five callers would follow the new
+      # default and this one would keep asserting the old one. Dropped for that reason and
+      # not for tidiness.
+      #
+      # THIS REPOSITORY PUBLISHED WITH NO TEST GATE AT ALL, WHICH THE OTHER FIVE ALL HAVE.
+      # Eleven people can push here and every one of them could publish an image of whatever
+      # was in the tree. The gate runs in the platform's job, which holds no AWS identity and
+      # only `contents: read`; that is why code chosen by whoever pushed the branch is
+      # acceptable here, since it runs before anything can reach AWS, with nothing to steal.
+      #
+      # The command is `.github/workflows/tests.yml`'s, from the pull request that wrote it,
+      # rather than a second opinion about how this project's tests are run. CPU torch from
+      # PyTorch's own index because the default wheel is about 2.5 GB of CUDA this runner
+      # cannot use and the CPU one is about 200 MB, pinned so a torch release cannot fail a
+      # build on a day nobody changed anything. pytest, numpy and pyyaml are everything the
+      # seven test directories import. edullm-data is deliberately not installed: three of
+      # the nine failures that pull request fixed were that package being imported before the
+      # work that needs it, and installing it here would turn those three green whether or
+      # not the import ordering regressed.
+      #
+      # Bare pytest rather than a list of directories, because the list is `testpaths` in
+      # pyproject.toml and a copy of it here is a copy that can differ. **That is also why
+      # this cannot merge before that pull request.** There is no pyproject.toml on main, so
+      # bare pytest collects from the root, reaches
+      # scripts/runpod/smollm2_colmlm/tests/test_colmlm_masking.py, and dies importing
+      # zstandard before it runs a single test; and nine of the 360 tests in the seven
+      # directories fail on main today, which was measured rather than assumed.
+      #
+      # A virtualenv rather than a bare `pip install`, as in edullm-data's caller. The
+      # runner's system Python is externally managed and the failure mode of ignoring that is
+      # an install that half succeeds. `--no-cache-dir`, a venv outside the checkout and
+      # `-p no:cacheprovider` keep the tree clean: the platform's source-identity check runs
+      # `git status` and refuses a dirty work tree. It runs before this command, so a cache
+      # left here would not fail this build -- it would fail the next thing to read the tree,
+      # which is worse for being deferred.
+      test_command: |
+        venv="$(mktemp -d)/tests"
+        python3 -m venv "${venv}"
+        "${venv}/bin/pip" install --quiet --disable-pip-version-check --no-cache-dir \
+          --index-url https://download.pytorch.org/whl/cpu torch==2.13.0
+        "${venv}/bin/pip" install --quiet --disable-pip-version-check --no-cache-dir \
+          pytest numpy pyyaml
+        "${venv}/bin/python" -m pytest -q -rs -p no:cacheprovider

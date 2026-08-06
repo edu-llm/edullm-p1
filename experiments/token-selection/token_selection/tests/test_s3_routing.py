@@ -42,13 +42,16 @@ def _fake_resolved(**overrides):
 
 
 def test_resolve_tokens_s3_rejects_legacy_and_missing_id():
-    with pytest.raises(ValueError, match="edullm-datasets"):
+    # Match the reason, not the URI. Every refusal echoes the offending value back, so
+    # a pattern like "edullm-datasets" also matches the catch-all "cannot derive an id"
+    # message and would stay green with the specific check deleted.
+    with pytest.raises(ValueError, match="points at legacy"):
         rtd_mod.resolve_tokens_s3(
             {"data": {"tokens_s3": "s3://edullm-datasets/regmix/regmix-10b/tokenized"}}
         )
-    with pytest.raises(ValueError, match="dataset_id"):
+    with pytest.raises(ValueError, match="is required"):
         rtd_mod.resolve_tokens_s3({"data": {}})
-    with pytest.raises(ValueError, match="REPLACE_ME|placeholder"):
+    with pytest.raises(ValueError, match="still the placeholder"):
         rtd_mod.resolve_tokens_s3({"data": {"tokens_s3": "s3://REPLACE_ME/tokens"}})
 
 

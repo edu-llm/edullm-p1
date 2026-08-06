@@ -326,13 +326,14 @@ def test_manifest_requires_n_tokens_and_shards(tmp_path):
 
 
 def test_tokens_uri_placeholder_is_refused():
-    with pytest.raises(ValueError, match="placeholder|REPLACE_ME"):
+    # Match the reason, not the URI echoed back inside it -- see test_s3_routing.py.
+    with pytest.raises(ValueError, match="still the placeholder"):
         resolve_tokens_s3({"data": {"tokens_s3": "s3://REPLACE_ME/tokens"}})
-    with pytest.raises(ValueError, match="edullm-datasets"):
+    with pytest.raises(ValueError, match="points at legacy"):
         resolve_tokens_s3(
             {"data": {"tokens_s3": "s3://edullm-datasets/regmix/regmix-10b/tokenized"}}
         )
-    with pytest.raises(ValueError, match="dataset_id"):
+    with pytest.raises(ValueError, match="is required"):
         resolve_tokens_s3({"data": {}})
 
 

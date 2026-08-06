@@ -1,0 +1,28 @@
+# No [project] table on purpose. Nothing installs this repository as a distribution:
+# .edullm/Dockerfile copies the tree and puts experiments/skill-dag/mixlaw,
+# experiments/token-selection and experiments/curriculum on PYTHONPATH, and
+# .edullm/verify_image.py imports mixlaw_runtime, platform_array_entrypoint and their
+# siblings as top-level modules from there. There is no single package root to build
+# from, and a name/version nothing has ever installed is a declaration that cannot be
+# checked. Runtime dependencies stay in requirements.txt and, for the CUDA image,
+# .edullm/requirements-linux-cu128.lock.
+#
+# What this file is for is pytest, which had no configuration at all: the seven
+# directories below were named in CI and nowhere else, so `pytest` from the repository
+# root collected a different set from the one that gated a pull request.
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+# scripts/runpod/smollm2_colmlm/tests is the eighth test directory and is deliberately
+# absent. Its 11 tests pass but need transformers and zstandard and take just under six
+# minutes, which is the owner's call to put on every run rather than a default. Name it
+# explicitly to run it: pytest scripts/runpod/smollm2_colmlm/tests
+testpaths = [
+  "datasets/p3math/tests",
+  "datasets/refhq/tests",
+  "datasets/refhq_new/tests",
+  "experiments/curriculum/tests",
+  "experiments/skill-dag/mixlaw/tests",
+  "experiments/skill-dag/skillit/tests",
+  "experiments/token-selection/token_selection/tests",
+]

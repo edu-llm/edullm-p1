@@ -2,7 +2,14 @@ name: Tests
 
 # Nothing ran these before. 372 tests across eight directories, no automation of any kind:
 # the only other workflow here publishes an image on workflow_dispatch and passes no
-# test_command. Nine of the 372 have been failing for an unknown length of time.
+# test_command. Nine of the 372 had been failing for an unknown length of time, four of
+# them the token-selection resume guard. All nine are fixed; this job has no deselections
+# and no exclusions inside the seven directories it runs.
+#
+# `pull_request` is unrestricted on purpose rather than `branches: [main]`. The restricted
+# form is what OLMo-core and open-instruct-scored-rewards inherited from upstream, and it
+# gives a pull request between two feature branches no CI at all. Copy the reasoning, not
+# the shape.
 
 on:
   pull_request:
@@ -36,54 +43,23 @@ jobs:
           python -m pip install --disable-pip-version-check \
             --index-url https://download.pytorch.org/whl/cpu torch==2.13.0
 
-      # Everything else these seven directories import. transformers, datasets, accelerate,
-      # tokenizers, huggingface_hub and boto3 from requirements.txt are NOT installed --
-      # nothing outside scripts/runpod/smollm2_colmlm needs them (see below).
+      # Everything else these seven directories import.
+      #
+      # edullm-data is deliberately NOT installed even though requirements.txt now declares
+      # it. Three of the nine failures were that package being imported before the work that
+      # needs it -- config validation that reads cfg alone, and a staging function handed its
+      # own S3 client -- so running without it is what keeps those three honest. Installing it
+      # here would turn them green whether or not the import ordering regressed.
       - name: Install test dependencies
         run: python -m pip install --disable-pip-version-check pytest numpy pyyaml
 
-      # One invocation over seven directories. There is no root pytest configuration and the
-      # test modules insert their own parents onto sys.path, so this was checked rather than
-      # assumed: collected together they do not collide, and 351 pass in under three seconds.
+      # Bare pytest: the seven directories are testpaths in pyproject.toml, so this and a
+      # developer running `pytest` from the root now collect the same 360 tests. Before, the
+      # list lived in this file only and the two could differ.
       #
-      # scripts/runpod/smollm2_colmlm/tests is the eighth directory and is deliberately absent.
-      # Its 11 tests pass, but only after installing transformers and zstandard -- and
-      # zstandard is not in requirements.txt at all -- and they take just under six minutes.
-      # That is a real cost to put on every pull request, and it is the owner's call, not a
-      # thing to smuggle in with the rest.
-      #
-      # THE NINE DESELECTIONS BELOW ARE FAILURES, NOT EXCLUSIONS OF CONVENIENCE. Each fails on
-      # main today and none is environment-dependent. They are named individually rather than
-      # skipped by directory so that the other 351 stay covered and so this list reads as the
-      # to-do it is: delete a line as each is fixed.
-      #
-      #   test_readme_and_launch_scrub_legacy_bucket
-      #     asserts 'edullm-data' appears in the curriculum README; it no longer does.
-      #   test_selected_stage_deletes_temporary_shards
-      #     ModuleNotFoundError: edullm_data. This repository imports that package and does
-      #     not declare it anywhere -- not in requirements.txt, and there is no pyproject.
-      #   the two test_experiment_contract cases, the four test_resume_guard cases and
-      #   test_resolve_tokens_s3_rejects_legacy_and_missing_id
-      #     the checkpoint/resume contract drifted away from the tests asserting it, e.g.
-      #     `KeyError: 'max_tokens'` reading a fingerprint that no longer carries the key.
-      #
-      # Anything that starts failing OUTSIDE this list fails this job, which is the point.
+      # scripts/runpod/smollm2_colmlm/tests is the eighth directory and is deliberately
+      # absent, for cost rather than health: its 11 tests pass but need transformers and
+      # zstandard and take just under six minutes. That is the owner's call to put on every
+      # pull request, and pyproject.toml says how to run it.
       - name: Run tests
-        run: |
-          python -m pytest -q -rs \
-            --deselect experiments/curriculum/tests/test_training_defaults.py::test_readme_and_launch_scrub_legacy_bucket \
-            --deselect experiments/skill-dag/mixlaw/tests/test_platform_array.py::test_selected_stage_deletes_temporary_shards \
-            --deselect experiments/token-selection/token_selection/tests/test_experiment_contract.py::test_rel_ema_refhq_arm_contract \
-            --deselect experiments/token-selection/token_selection/tests/test_experiment_contract.py::test_tokens_uri_placeholder_is_refused \
-            --deselect experiments/token-selection/token_selection/tests/test_resume_guard.py::test_legacy_yaml_fingerprint_is_out_of_contract \
-            --deselect experiments/token-selection/token_selection/tests/test_resume_guard.py::test_resume_allows_max_tokens_extension \
-            --deselect experiments/token-selection/token_selection/tests/test_resume_guard.py::test_resume_allows_reference_path_relocation \
-            --deselect experiments/token-selection/token_selection/tests/test_resume_guard.py::test_rho_fingerprint_pins_reference_bytes \
-            --deselect experiments/token-selection/token_selection/tests/test_s3_routing.py::test_resolve_tokens_s3_rejects_legacy_and_missing_id \
-            datasets/p3math/tests \
-            datasets/refhq/tests \
-            datasets/refhq_new/tests \
-            experiments/curriculum/tests \
-            experiments/skill-dag/skillit/tests \
-            experiments/skill-dag/mixlaw/tests \
-            experiments/token-selection/token_selection/tests
+        run: python -m pytest -q -rs

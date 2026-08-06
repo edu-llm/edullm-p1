@@ -273,9 +273,10 @@ def stage_pool(
     skip_concat: bool = False,
     s3: Any | None = None,
 ) -> dict[str, Any]:
-    from edullm_data.s3 import Boto3S3
+    if s3 is None:
+        from edullm_data.s3 import Boto3S3
 
-    s3 = s3 or Boto3S3.default()
+        s3 = Boto3S3.default()
     dataset_id, version = resolve_dataset(dataset_id, dataset_version, s3=s3)
     peak = (
         arm_tokens_from_mixtures(mixtures_json, budget_tokens, mix_name)

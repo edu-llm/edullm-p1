@@ -126,9 +126,12 @@ def resolve_train_dataset(
     Returns ``dataset_id``, ``version``, ``tokens_uri``, ``paths``, ``dtype``,
     ``numpy_dtype``, ``rows``, ``header_bytes``, ``byte_order``, and ``resolved``.
     """
+    # Refuse a malformed config before reaching for edullm-data: a placeholder or a
+    # legacy bucket is answerable from cfg alone, and gating that answer behind an
+    # optional import reports a missing package for what is a one-line config typo.
+    dataset_id = resolve_train_dataset_id(cfg)
     dataset_paths, _, Boto3S3 = _require_edullm_data()
     client = s3 if s3 is not None else Boto3S3.default()
-    dataset_id = resolve_train_dataset_id(cfg)
     version = resolve_train_dataset_version(cfg, s3=client)
     resolved = dataset_paths(
         dataset_id,

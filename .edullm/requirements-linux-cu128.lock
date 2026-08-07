@@ -1,6 +1,22 @@
 # Direct runtime lock for the platform's Linux amd64 / CUDA 12.8 image.
 # Git requirements are immutable commits; the FlashAttention wheel is the
 # CPython 3.12, torch 2.8, CUDA 12 binary used by the validated 8xA100 runtime.
+#
+# INSTALL THIS FILE WITH pip, WHICH IS WHAT .edullm/Dockerfile ALREADY DOES. uv reads it
+# and fails, and the failure names the wrong culprit. Under uv's default index strategy
+# only the first index carrying a name is consulted, to head off dependency confusion --
+# so torchmetrics is resolved against download.pytorch.org, which mirrors it at versions
+# stopping well short of the 1.9.0 pinned below, and PyPI is never asked:
+#
+#   × No solution found when resolving dependencies:
+#   ╰─▶ Because there is no version of torchmetrics==1.9.0 and you require
+#       torchmetrics==1.9.0, we can conclude that your requirements are unsatisfiable.
+#
+# That reads as a bad pin and is not one. pip queries every index and takes the highest
+# version, so the pin is satisfiable and the image builds; torchmetrics is simply the one
+# name here that the extra index shadows today, and which name that is will change as
+# that index adds mirrors. To resolve this file with uv, ask for pip's behaviour:
+# `uv pip install --index-strategy unsafe-best-match -r`.
 --extra-index-url https://download.pytorch.org/whl/cu128
 
 torch==2.8.0+cu128

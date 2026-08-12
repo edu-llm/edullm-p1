@@ -138,3 +138,85 @@ MTLD beats both other metrics under linear pacing.
 ## Conclusions
 
 Difficulty-ordered curricula can help at this scale, especially **a single linear easy→hard pass with MTLD**. That combination significantly outperforms both alternate Flesch pacings and both alternate linear-paced metrics. Interleaving still beats random shuffle; warmup (naive sequential easy→hard prefix) and learnability improve the EMA point estimate without clear significance vs random shuffle.
+
+---
+
+## Extension: MTLD pacing on OLMoE-1B-7B (cosine LR)
+
+This section is an **extension** of the 370M dense curriculum study above. It keeps the MTLD easy→hard document order and the one-epoch ~10B token budget, but scales the test to **OLMoE-1B-7B** and switches the optimizer schedule to **cosine LR decay** (the same family used by the dense random-shuffle control). The goal is narrower than the original five-arm matrix: hold the difficulty metric fixed at MTLD and ablate **pacing** only, including two schedules that were not part of the dense 370M campaign (pure quadratic and warmup-quadratic).
+
+Unlike the dense curriculum arms above, these runs do **not** use constant LR + late EMA. Finals are raw last-checkpoint macro task-loss, and uncertainty comes from residual-bootstrap power-law fits restricted to **step ≥ 1000** (matching the dense study’s late-window convention). Runs live in W&B `eduLLM/curriculum-moe` (not the dense `eduLLM/curriculum` project). Hyperparameters were **not** retuned; this is curriculum-only.
+
+### Setup deltas vs the dense study
+
+| Knob | Dense curriculum (above) | This extension |
+|------|--------------------------|----------------|
+| Architecture | OLMo-2 370M dense | OLMoE-1B-7B (\(d=2048\), 16 layers / 16 heads, 64 experts, top-\(k=8\), expert FFN 1024) |
+| Parent corpus | Mixing Laws Dataset 10B | `pretrain/opt-with-synthetic-10b` (~10B tokens) |
+| Difficulty order | Flesch / MTLD / Learnability | **MTLD only** (`curriculum/opt-with-synthetic-10b` MTLD token order) |
+| LR schedule | Constant after 24-step warmup + late EMA | **Cosine** after 24-step warmup (peak \(4\times10^{-4}\)); raw final checkpoint |
+| Global batch / seq | 4,194,304 / 2048 | Same |
+| Steps / seed | 2384 / (dense campaign) | 2384 / 42 |
+| Search / HPO | None | None |
+
+### Pacing arms
+
+| Arm | Pacing | Manipulation |
+|-----|--------|--------------|
+| Stock control | Shuffled / full-pool | Flat shuffle over the parent corpus (no MTLD order) |
+| Linear + MTLD | `linear_n10` | Same 10 equal-mass easy→hard staircase as the dense Linear (\(n=10\)) arm |
+| Quadratic + MTLD | `quadratic_n10` | Same MTLD buckets, but segment lengths grow with weights \(1\ldots10\) (largest-remainder to 2384) |
+| Warmup + MTLD | `warmup_1000` | Naive sequential easy→hard for steps 0–999, then full-pool shuffle |
+| Warmup-quadratic + MTLD | `warmup_quadratic_n10_1000` | Quadratic MTLD warmup over the first 1000 steps, then full-pool shuffle for the remainder |
+
+All four curriculum arms share the same immutable MTLD order, model, token budget, seed, peak LR, and 4 Mi-token global batch. Warmup-quadratic used a 32 Ki rank microbatch; the others used 16 Ki. That changes accumulation geometry only, not the nominal optimizer batch.
+
+### Evaluation and uncertainty
+
+1. Fit \(y = a + b/\mathrm{step}^{\alpha}\) on finite `eval/macro_bpb` checkpoints with **step ≥ 1000 and ≤ 2384** (\(n=12\) points per curve; \(\alpha \in [0.001, 3]\), \(a,b \ge 0\)).
+2. Residual bootstrap (5k for endpoint CIs; 10k for null \(p\)-values): center residuals, resample with replacement, refit, and take percentile intervals at step 2384.
+3. Pairwise \(\Delta = \mathrm{arm} - \mathrm{control}\) from independent bootstraps of both curves. Negative \(\Delta\) favors the curriculum arm.
+4. One-sided and two-sided \(p\)-values use 10k residual resamples under a constrained null in which the two compared curves share the same fitted endpoint. One-sided \(p\) is the probability of a fitted difference at least as favorable to the first-named arm.
+
+**Warmup-quadratic step-2384 note.** W&B history for that run logs the final macro at `_step=2385`, but the durable eval artifact is `eval-step0002384` (`step2384_task_loss.json`) with the same macro **1.5139**. There is no separate EMA eval. Analyses below treat that point as the raw step-2384 final.
+
+**Caveats.** These intervals quantify trajectory-fit uncertainty for a **single seed**, not seed-to-seed variance. Restricting to step ≥ 1000 matches the dense curriculum CI window and drops early-training noise, but leaves only 12 points per curve. The cosine schedule also means this extension is **not** a pure scale-up of the constant-LR dense curriculum protocol.
+
+### Results
+
+#### Raw and fitted final macro task-loss (bpb)
+
+| Arm | Observed final | Fitted final [95% CI] | Observed \(\Delta\) | Fitted \(\Delta\) [95% CI] | \(p_{\mathrm{one}}\) | \(p_{\mathrm{two}}\) |
+|-----|---------------:|-----------------------|--------------------:|----------------------------|---------------------:|---------------------:|
+| Stock control | 1.5288 | 1.5206 [1.5063, 1.5335] | — | — | — | — |
+| Linear + MTLD | 1.5605 | 1.5511 [1.5402, 1.5606] | +0.0317 | +0.0305 [+0.0135, +0.0484] | 0.998 | 0.0050 |
+| Quadratic + MTLD | 1.5895 | 1.5816 [1.5661, 1.6055] | +0.0606 | +0.0609 [+0.0416, +0.0886] | 1.000 | 0.0002 |
+| Warmup + MTLD | 1.5364 | 1.5376 [1.5244, 1.5488] | +0.0075 | +0.0170 [−0.0013, +0.0352] | 0.954 | 0.091 |
+| **Warmup-quadratic + MTLD** | **1.5139** | **1.5105** [1.5018, 1.5190] | **−0.0149** | **−0.0101** [−0.0263, +0.0061] | **0.113** | **0.226** |
+
+Lower is better. \(\Delta\) is curriculum minus control. One-sided \(p\) favors the curriculum arm (smaller fitted endpoint); values near 1 mean the arm is worse than control.
+
+#### Pacing ablation: warmup-quadratic vs warmup (fixed MTLD order)
+
+Both arms share the same MTLD ranking and the same post-warmup full-pool shuffle phase; the only manipulation is whether the first 1000 steps use **naive sequential** easy→hard (`warmup_1000`) or a **quadratic decile staircase** (`warmup_quadratic_n10_1000`).
+
+| Comparison | Observed \(\Delta\) | Fitted \(\Delta\) | 95% \(\Delta\) CI | \(p_{\mathrm{one}}\) | \(p_{\mathrm{two}}\) |
+|------------|--------------------:|------------------:|-------------------|---------------------:|---------------------:|
+| Warmup-quadratic − Warmup | **−0.0224** | **−0.0271** | **[−0.0420, −0.0112]** | **0.0002** | **0.0004** |
+
+\(\Delta\) is warmup-quadratic minus warmup; negative favors the quadratic warmup. Same ≥1000-step residual-bootstrap / equal-endpoint-null construction (5k CI, 10k \(p\)).
+
+**Reading.** Under the late-window fit, quadratic warmup beats naive warmup on both the raw endpoint (−0.022 bpb) and the fitted trajectory (−0.027 bpb), with a 95% CI entirely below zero and \(p_{\mathrm{two}}=0.0004\). That is the cleanest evidence in this extension that **quadratic pacing inside the warmup phase helps** relative to a naive sequential warmup, holding MTLD order and stock HPs fixed.
+
+### Takeaways
+
+1. **Warmup-quadratic + MTLD is the only schedule that beats control** on both raw (−0.0149 bpb) and fitted (−0.0101) endpoints, but the control comparison is still not significant at \(\alpha=0.05\) (\(p_{\mathrm{one}}=0.113\), \(p_{\mathrm{two}}=0.226\); CI crosses zero).
+2. **Versus naive warmup, quadratic warmup is a clear win** under the ≥1000-step fit: fitted \(\Delta = -0.0271\), 95% CI [−0.0420, −0.0112], \(p_{\mathrm{two}}=0.0004\).
+3. **Warmup + MTLD does not beat control** once early steps are excluded from the fit (fitted \(\Delta = +0.0170\), \(p_{\mathrm{two}}=0.091\)).
+4. **Pure quadratic pacing is clearly harmful**: fitted \(\Delta = +0.0609\) with CI entirely above zero (\(p_{\mathrm{two}}=0.0002\)).
+5. **Linear + MTLD also fails to transfer**: significantly worse than control under the late-window fit (\(p_{\mathrm{two}}=0.005\)).
+6. **Pacing remains schedule-sensitive at MoE scale.** Ranking on late fitted endpoints: warmup-quadratic ≻ control ≳ warmup ≻ linear ≫ quadratic. The decisive positive claim is the matched warmup-quadratic vs warmup ablation, not the control comparison.
+
+### Extension conclusions
+
+Scaling MTLD curricula to OLMoE-1B-7B under cosine LR decay does **not** reproduce the dense Linear + MTLD win: linear and pure quadratic pacing are significantly worse than shuffle. The best stock-HP MoE schedule is still **warmup-quadratic MTLD**, which improves on control without conventional significance, but **does** significantly beat naive warmup under the same late-window residual bootstrap (\(p_{\mathrm{two}}=0.0004\)). Together with the dense study, the practical reading is: MTLD ordering can help, the useful pacing is architecture- and LR-schedule-dependent, and at MoE scale a quadratic warmup prefix is preferable to a naive sequential warmup when HPs are held fixed.

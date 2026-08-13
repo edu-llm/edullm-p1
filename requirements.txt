@@ -8,3 +8,18 @@ tqdm>=4.66.0
 tokenizers>=0.15.0
 huggingface_hub>=0.21.0
 boto3>=1.34.0
+
+# Imported by experiments/token-selection (train_data_resolve, refhq_materialize),
+# experiments/skill-dag/mixlaw (stage_validation_pool_from_edullm_data) and the p3math
+# publish scripts. Not on PyPI, so the git URL is the only way to name it. Same commit
+# .edullm/requirements-linux-cu128.lock pins, which is what the CUDA image installs and
+# what .edullm/verify_image.py asserts the version of; that lock stays the authority for
+# the image and this line is what a laptop or FarmShare venv should install to match.
+edullm-data @ git+https://github.com/edu-llm/edullm-data.git@f0254ddb7aba589aa27e5a84ebaa95cb152edcfa
+
+# Every .jsonl.zst / .jsonl.zstd reader in datasets/ and scripts/runpod/ needs this:
+# top-level import in datasets/p3math/{filter_corpus,tokenize_p3math_bytes}.py and
+# scripts/runpod/**, imported inside the decompress branch everywhere else. Absent from
+# the CUDA image lock on purpose -- the Batch array stages pre-tokenized .bin shards and
+# never reaches a zstd path, so this is a data-preparation dependency, not a runtime one.
+zstandard>=0.21.0

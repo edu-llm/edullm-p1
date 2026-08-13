@@ -1,0 +1,65 @@
+name: Tests
+
+# Nothing ran these before. 372 tests across eight directories, no automation of any kind:
+# the only other workflow here publishes an image on workflow_dispatch and passes no
+# test_command. Nine of the 372 had been failing for an unknown length of time, four of
+# them the token-selection resume guard. All nine are fixed; this job has no deselections
+# and no exclusions inside the seven directories it runs.
+#
+# `pull_request` is unrestricted on purpose rather than `branches: [main]`. The restricted
+# form is what OLMo-core and open-instruct-scored-rewards inherited from upstream, and it
+# gives a pull request between two feature branches no CI at all. Copy the reasoning, not
+# the shape.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # CPU torch from PyTorch's own index: the default wheel is ~2.5 GB of CUDA this runner
+      # cannot use, the CPU one is ~200 MB. Pinned so a torch release cannot fail this job on
+      # a day nobody changed anything.
+      - name: Install torch (CPU)
+        run: |
+          python -m pip install --disable-pip-version-check \
+            --index-url https://download.pytorch.org/whl/cpu torch==2.13.0
+
+      # Everything else these seven directories import.
+      #
+      # edullm-data is deliberately NOT installed even though requirements.txt now declares
+      # it. Three of the nine failures were that package being imported before the work that
+      # needs it -- config validation that reads cfg alone, and a staging function handed its
+      # own S3 client -- so running without it is what keeps those three honest. Installing it
+      # here would turn them green whether or not the import ordering regressed.
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest numpy pyyaml
+
+      # Bare pytest: the seven directories are testpaths in pyproject.toml, so this and a
+      # developer running `pytest` from the root now collect the same 360 tests. Before, the
+      # list lived in this file only and the two could differ.
+      #
+      # scripts/runpod/smollm2_colmlm/tests is the eighth directory and is deliberately
+      # absent, for cost rather than health: its 11 tests pass but need transformers and
+      # zstandard and take just under six minutes. That is the owner's call to put on every
+      # pull request, and pyproject.toml says how to run it.
+      - name: Run tests
+        run: python -m pytest -q -rs

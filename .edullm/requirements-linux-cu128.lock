@@ -13,7 +13,11 @@ boto3==1.43.60
 datasets==5.0.0
 omegaconf==2.3.0
 PyYAML==6.0.3
-rich==15.0.0
+# Reached only through cached-path, which both ai2-olmo and ai2-olmo-core require
+# and which caps rich below 14 at every release it has ever published. This is that
+# ceiling rather than a preference; the 15.0.0 that stood here made the lock
+# unsatisfiable, so no commit of this repository could build an image.
+rich==13.9.4
 safetensors==0.8.0
 scikit-learn==1.9.0
 tokenizers==0.22.2

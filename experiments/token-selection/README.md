@@ -85,7 +85,7 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 | Arm | Analytic FLOPs (x10^18) | Relative to control |
 | --- | --- | --- |
 | Random control | 26.03 | 0.99x |
-| Attention top-k | 26.12 | 0.99x |
+| Attention top-k | 26.11 | 0.99x |
 | **Control (full-CE)** | **26.30** | **1.00x** |
 | REL-EMA (exponential) | 34.71 | 1.32x |
 | rho-1 | 45.08 | 1.71x |
@@ -149,6 +149,27 @@ arm**. They quantify only how well a power law pins down the endpoint of one obs
 loss trajectory. They contain **no seed-to-seed variance** whatsoever: no arm was run
 at more than one seed, so nothing here bounds run-to-run spread. Treat any between-arm
 gap smaller than a plausible seed effect as unresolved.
+
+**A quantitative seed floor.** Companion 370M runs in this repo
+(`experiments/curriculum`, seeds 42/69, same OLMo2-370M architecture, same macro-bpb
+metric, same saturating-power-law fitted-final estimator at step 2384) measured a
+**pooled per-run SD of 0.0199 bpb** across two two-seed pairs. Taking that as the
+per-run SD, a single-seed difference between two arms carries a standard error of
+about `0.0199 * sqrt(2) = 0.028` bpb. Against that floor:
+
+| Gap vs full-CE control | Delta | Multiples of 0.028 | Survives seed floor? |
+| ---------------------- | ----- | ------------------ | -------------------- |
+| REL-EMA                | +0.2727 | 9.7x | yes |
+| Middle-PPL             | +0.2574 | 9.2x | yes |
+| BLADE                  | +0.0617 | 2.2x | marginal |
+| Attention top-k        | +0.0518 | 1.8x | no |
+| Random control         | +0.0384 | 1.4x | no |
+| rho-1                  | +0.0351 | 1.3x | no |
+
+So the *ordering* is robust for Middle-PPL and REL-EMA, and the four near-control arms
+are separated from the control by less than single-seed noise. That does not rescue
+them -- none is *better* than full CE either -- but the honest reading of rho-1,
+random, Attention, and BLADE is "no improvement detected," not "worse by this much."
 
 p-values against the full-CE control are omitted because **no selection arm beat
 control** -- there is no positive claim to test.
@@ -233,7 +254,7 @@ is incomplete.
 | Arm | In-run FLOPs (x10^18) | With reference pretraining (x10^18) | Relative to control |
 | --- | --- | --- | --- |
 | Random control | 26.03 | 26.03 | 0.99x |
-| Attention top-k | 26.12 | 26.12 | 0.99x |
+| Attention top-k | 26.11 | 26.11 | 0.99x |
 | **Control (full-CE)** | **26.30** | **26.30** | **1.00x** |
 | REL-EMA (exponential) | 34.71 | 34.71 | 1.32x |
 | rho-1 | 34.71 | 45.08 | 1.71x |

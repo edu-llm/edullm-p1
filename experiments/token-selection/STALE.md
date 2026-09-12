@@ -11,16 +11,23 @@ deletion.
 
 ---
 
-## 1. Superseded results directory
+## 1. `task_loss_results/` — DELETED (2026-09-12)
 
-- **`task_loss_results/`** — superseded generation of task-loss evals, and the first
-  thing a reader following the paper's repo URL lands on. It is on the **nats scale**
-  (not bits-per-byte), uses a **250-step grid** (not the 125-step permanent ladder), its
-  `ce-regmix` values **increase over training** (`summary.csv`: 5.059 @ step 250 ->
-  5.212 @ step 2384, i.e. the control appears to get *worse*, which is not a real
-  training curve), and its `rel-ema` rows sit at **steps 2375 and 2386**, which match no
-  reported run (the reported REL-EMA arm ends at 2360). It directly contradicts Table 1
-  in `README.md`.
+Removed. This directory held a superseded evaluation generation that directly
+contradicted Table 1 and was the first thing a reader following the paper's code URL
+encountered. Evidence recorded here for the record:
+
+- Values were nats-scale per-token CE (`core7_avg` 3.3-5.3, `mmlu_avg` 5.0-5.3), not the
+  bits-per-byte the paper reports (control final 1.6487).
+- The `ce-regmix` full-CE control got *worse* over training: `core7_avg` 3.311 at step
+  250, 3.503 at 500, 3.566 at 750, 3.638 at 2384.
+- `rel-ema` carried `step2375` and `step2386`, which match neither the 2360-step arms nor
+  the control's 2384 steps.
+- The grid was 250-step, not the 125-step permanent-checkpoint ladder the arms used.
+
+The authoritative inputs to Table 1 are now committed alongside it:
+`token_selection_370m_wandb_curves.json`, `token_selection_370m_bootstrap_results.json`,
+`token_selection_370m_final_numbers.json`, and `fit_and_plot.py`.
 
 ## 2. Arm directories not among the paper's seven
 

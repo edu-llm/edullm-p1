@@ -14,8 +14,6 @@ def test_standalone_trainers_share_permanent_checkpoint_contract():
     trainers = [
         "control/train_ce_regmix_olmo_370m.py",
         "blade/train_blade_olmo_370m.py",
-        "middle-ppl-doc/train_ce_middle_ppl_doc.py",
-        "learnability-doc/train_ce_learnability_doc_olmo_370m.py",
     ]
     for trainer in trainers:
         text = _text(trainer)
@@ -33,13 +31,9 @@ def test_launchers_declare_strict_synchronous_eval_resources():
     launchers = [
         "control/launch_control.sh",
         "blade/launch_train.sh",
-        "middle-ppl-doc/launch_train.sh",
-        "learnability-doc/launch_train.sh",
         "attention/launch.sh",
-        "learnability-token/launch.sh",
         "middle-ppl-token/launch_train.sh",
         "rel-ema-exp/launch_train.sh",
-        "rel-ema-refhq/launch_train.sh",
         "rho-1/launch.sh",
     ]
     for launcher in launchers:
@@ -54,10 +48,8 @@ def test_template_launchers_forward_wandb_resume_artifacts():
     )
     launchers = [
         "attention/launch.sh",
-        "learnability-token/launch.sh",
         "middle-ppl-token/launch_train.sh",
         "rel-ema-exp/launch_train.sh",
-        "rel-ema-refhq/launch_train.sh",
         "rho-1/launch.sh",
     ]
     for launcher in launchers:

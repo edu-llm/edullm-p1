@@ -11,9 +11,9 @@ Top-60% token selection by RHO-1 excess loss `L_curr − L_ref` on RegMix 10B.
 | GBS / microbatch | `4_194_304` / `65_536` (tune microbatch for GPU memory) |
 | LR / warmup / `alpha_f` | `4e-4` / 24 / 0.1 |
 | Compile | `compile_model=true` (YAML + FarmShare default) |
-| Steps | **2360** (`9900000000 // 4_194_304`; one epoch under ~9.989B published train) |
+| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens; one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
 | Permanent ckpts | `{0, 125, …, 2125, 2360}` (omit 2250); `max_checkpoints=None`; no ephemeral |
-| Frozen reference | RefHQ 370M **step1315** |
+| Frozen reference | Instruct-v3 (`refhq-instruct`) 370M **step940** |
 | `run_id` | `rho-1-regmix10b-v1` |
 | Train corpus | `pretrain/regmix-10b` via `s3://edullm-data/` (stage each job) |
 | Artifact durability | Runtime scratch + W&B |
@@ -34,17 +34,16 @@ Config: [`configs/run_rho_10b.yaml`](configs/run_rho_10b.yaml).
 
 ```bash
 python experiments/token-selection/reference/export_refhq_reference.py \
-  --s3-uri s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-5p5b/checkpoints/step1315/ \
+  --s3-uri s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/ \
   --work-dir /path/to/ref_work \
-  --output /path/to/refhq_step1315_model.pt
+  --output /path/to/refhq_instruct_v3_step940_model.pt
 ```
 
 Then set `reference.load_path` in the runtime YAML (FarmShare / `launch.sh` do this automatically) to that `.pt` path (or a directory containing `model.pt`).
 
 Provenance (not loaded by the trainer):
 
-- S3: `s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-5p5b/checkpoints/step1315/`
-- Planned end of RefHQ 5.5B CE (`planned_total_steps=1314`)
+- S3: `s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/`
 
 ## Launch (hardware-agnostic)
 
@@ -57,7 +56,7 @@ GBS must divide evenly by `world_size * rank_microbatch_size`. No hardcoded devi
 export PYTHONPATH=experiments/token-selection
 export CUDA_VISIBLE_DEVICES=0   # or 0,1,... ; required unless Slurm sets it
 export OLMO_ROOT=/path/to/OLMo-core
-export REFERENCE_LOAD_PATH=/path/to/refhq_step1315_model.pt
+export REFERENCE_LOAD_PATH=/path/to/refhq_instruct_v3_step940_model.pt
 export TOKEN_SELECTION_TASK_LOSS_EVAL_SCRIPT=experiments/token-selection/rho-1/farmshare/enqueue_task_loss.sh
 
 # Convenience launcher (writes a runtime YAML with reference.load_path filled)

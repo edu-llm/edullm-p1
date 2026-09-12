@@ -1,6 +1,14 @@
 # REL no-init exponential-α (`rel-ema-exp`)
 
-Online token selection: keep top **60%** by `REL = L_hist − L_curr`.
+Online token selection: keep top **60%** by `REL = L_curr − L_hist`.
+
+**Polarity corrected 2026-09-05.** This arm was originally documented and run with
+`REL = L_hist − L_curr`, which is inverted relative to the `rho_excess` / BLADE convention
+(current minus reference/history) and therefore selected the tokens the live model had already
+*mastered* relative to its own history. The scorer computes `current − history`, and the arm was
+re-run on 2026-09-05 with the fixed polarity. **Only that polarity-corrected re-run is reported**
+(W&B `eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e`); the earlier inverted-polarity
+A100 run `89db0d5b…` is superseded and must not be cited.
 
 | Knob | Value |
 |------|--------|
@@ -9,7 +17,7 @@ Online token selection: keep top **60%** by `REL = L_hist − L_curr`.
 | `t0` | **0** (selection from step 0) |
 | `k` / γ | 0.6 |
 | Arch | `olmo2_370M` (RefHQ-matched) |
-| Data | RegMix one-epoch (`pretrain/regmix-10b` on `s3://edullm-data/`) → **2360** steps |
+| Data | `pretrain/regmix-10b` v1 on `s3://edullm-data/` — realized **10,004,807,041** tokens — one epoch → **2360** steps = 9,898,557,440 tokens, no wrap |
 | Checkpoints | `{0, 125, …, 2125, 2360}` (skip 2250) |
 | Eval | Full 20-label `task_loss_bpb` on every permanent save |
 | `run_id` | `rel-ema-exp-10b-scratch-v1` (**not** `rel-ema-10b-scratch-v1`) |

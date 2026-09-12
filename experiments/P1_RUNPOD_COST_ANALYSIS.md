@@ -110,12 +110,65 @@ These are **W&B** `_runtime` **× 8 GPUs** for finished canonical runs, plus imp
 | middle-ppl mask precompute    | **~2.0**   | measured 15-min 8-GPU benchmark (chat); not a separate W&B run                                                                                                                                                  |
 | **ρ-1 (RefHQ step1315)**      | **56.56**  | **W&B deleted** (`d889eb3…`, pod `xw8xu5i7nim10j`). Full optimized run to step 2361 on `edullm-370M-refhq-5p5b` reference. A100-hours imputed from measured instruct-v3 sibling (same recipe, same step count). |
 | **ρ-1 (instruct-v3 step940)** | **56.56**  | measured — `[rho-1-regmix10b-v1](https://wandb.ai/eduLLM/token-selection/runs/ebf1fa33048b3459f768cd471c2a8917)`, pod `ksdd38tuvye23h`, finished step 2361                                                      |
-| refhq-instruct bootstrap      | 19.19      | measured (reference CE train for instruct-v3; also used by BLADE/rel-ema)                                                                                                                                       |
+| refhq-instruct bootstrap      | 19.19      | measured (reference CE train for instruct-v3; used as the frozen reference by rho-1, and as BLADE's K-update corpus)                                                                                                                                       |
 | BLADE                         | **~70.5**  | **primary run deleted** (`5766dcf8…`); training finished step 2360/2361 per chat. Imputed from skillit-deriv (similar sync/eval overhead).                                                                      |
 | **Subtotal**                  | **~365.8** |                                                                                                                                                                                                                 |
 
 
-**ρ-1 note:** These are intentionally counted as **two separate essential arms** — one frozen-reference experiment with legacy RefHQ (`s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-5p5b/checkpoints/step1315/`) and one with the new instruct reference (`s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/`). The pre-optimization ρ-1 attempt on the slow weight-shadow path (~40 steps, W&B `6bfbddbd…`, also deleted) is **not** counted as efficient work.
+**ρ-1 note:** These are intentionally counted as **two separate essential arms** — one frozen-reference experiment with legacy RefHQ (`s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-5p5b/checkpoints/step1315/`) and one with the new instruct reference (`s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/`). The pre-optimization ρ-1 attempt on the slow weight-shadow path (~40 steps, W&B `6bfbddbd…`, also deleted) is **not** counted as efficient work. **Only the instruct-v3 arm is the reported RHO-1 run** (`rho-1-regmix10b-v1`, W&B `ebf1fa33048b3459f768cd471c2a8917`); `arms.py` pins `RHO_REFERENCE_CHECKPOINT` to the instruct-v3 step940 path. The legacy refhq-5p5b step1315 row is sunk cost on a deleted run and must not be cited as the paper's RHO-1 reference.
+
+> **The reported rel-ema-exp arm uses NO reference model.** `arms.py` configures it with
+> `ema_seed="zero"` and no `reference_contract` -- the "history" model is a
+> bias-corrected EMA of the student itself. Any statement that rel-ema consumes the
+> instruct-v3 reference is wrong.
+
+### Token selection: A100-hours are not comparable across arms
+
+**Do not compare the A100-hour column across token-selection arms.** Five arms ran on
+**8xA100-80GB** (rho-1, BLADE, Attention, Middle-PPL, and the full-loss control); the
+**Random control and REL-EMA ran on 4xL40S**. Hours on those two platforms are not
+interchangeable, and the L40S entries in an A100-hours column are conversions rather
+than measurements. Compounding this, the **logged throughput FLOPs counter excludes the
+scoring forward passes**, so it reports an identical 2.63e19 for a full-CE run and for a
+run that additionally evaluates a frozen reference on every token.
+
+Use these analytic FLOPs for any cross-arm comparison.
+
+**Model.** Forward cost per token = `2N + 4*L*T*d`, with `N = 371,195,904` matmul
+parameters (**including the untied output head**), `L = 16` layers, `T = 2048` sequence
+length, `d = 1024` model width. Forward+backward = **3x** forward. This reproduces the
+logged W&B throughput counter to within **0.05%**, which is what licenses using it for
+the arms whose counter is incomplete.
+
+| Arm | In-run (x10^18) | With reference pretraining (x10^18) | Relative to full-loss control |
+| --- | --- | --- | --- |
+| Random control | 26.03 | 26.03 | 0.99x |
+| Attention | 26.12 | 26.12 | 0.99x |
+| **Control (full-loss)** | **26.30** | **26.30** | **1.00x** |
+| REL-EMA | 34.71 | 34.71 | 1.32x |
+| RHO-1 | 34.71 | 45.08 | 1.71x |
+| BLADE | 39.71 | 47.98 | 1.83x |
+| Perplexity (Middle-PPL) | 34.71 | 49.21 | 1.87x |
+
+**BLADE K-update overhead, itemized.** 5 syncs x 75 K-steps x 2 streams (proxy and
+reference) = **750 full batches** of 4,194,304 tokens = **3,145,728,000 tokens** of
+forward+backward, on top of the 2360 training steps. That is the 39.71 vs 34.71 in-run
+difference.
+
+### Token selection: two provenance defects in the cost rows above
+
+**BLADE `005xjces` did not produce the curve attributed to it.** That W&B run has a
+**7-second runtime** and logs **no throughput and no keep-rate metrics**. Its loss curve
+was therefore backfilled or resumed into that record, not generated by it. The BLADE
+cost figure (~70.5 A100-h) is already flagged as imputed; this is a separate point
+about the *metrics* record.
+
+**The 59.40 A100-h REL-EMA figure is the wrong run.** It corresponds to the **OLD
+inverted-polarity A100 run `89db0d5b...`**, which is superseded. The REL-EMA run used in
+Table 1 is the polarity-corrected `cc52d5537a03ad8e57cc87a025668b2e`, which ran
+**21.39 h on 4xL40S**. The 59.40 figure should be read as sunk cost on a discarded
+polarity, not as the cost of the reported arm.
+
 
 ### Efficient totals
 

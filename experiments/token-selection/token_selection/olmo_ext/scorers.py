@@ -161,8 +161,14 @@ def rel_ema_mask(
     *,
     valid: Optional[Tensor] = None,
 ) -> Tensor:
-    """Keep tokens with highest ``REL = L_hist − L_curr``."""
-    return top_k_mask(history_loss - current_loss, k, valid=valid)
+    """Keep tokens with highest ``REL = L_curr − L_hist``.
+
+    Polarity matches RHO-1 style excess loss: keep tokens the training model
+    still does worse on than its own history. The inverted form
+    (``L_hist − L_curr``) was used by the superseded 2026-08-03 run and
+    corrected on 2026-09-05; the reported REL-EMA arm uses this sign.
+    """
+    return top_k_mask(current_loss - history_loss, k, valid=valid)
 
 
 def rho_excess_mask(

@@ -72,9 +72,9 @@ def test_top_k_row_all_invalid_or_single():
 def test_rel_mask_is_per_sequence():
     curr = torch.tensor([[1.0, 2.0, 3.0, 4.0], [4.0, 3.0, 2.0, 1.0]])
     hist = torch.tensor([[4.0, 3.0, 2.0, 1.0], [1.0, 2.0, 3.0, 4.0]])
-    # REL = hist - curr -> row0: [3,1,-1,-3] keep top2 = idx0,1; row1: [-3,-1,1,3] keep idx2,3.
+    # REL = curr - hist -> row0: [-3,-1,1,3] keep top2 = idx2,3; row1: [3,1,-1,-3] keep idx0,1.
     mask = build_mask(method="rel_ema", k=0.5, current_loss=curr, history_loss=hist)
-    assert mask.tolist() == [[True, True, False, False], [False, False, True, True]]
+    assert mask.tolist() == [[False, False, True, True], [True, True, False, False]]
 
 
 def test_normalize_rel_per_row_monotonic_no_op_for_selection():
@@ -112,8 +112,9 @@ def test_warmup_mask():
 def test_rel_mask():
     curr = torch.tensor([1.0, 2.0, 3.0, 4.0])
     hist = torch.tensor([4.0, 3.0, 2.0, 1.0])
+    # REL = curr - hist -> [-3, -1, 1, 3]; top 50% keeps the two highest (idx 2, 3).
     rel = build_mask(method="rel_ema", k=0.5, current_loss=curr, history_loss=hist)
-    assert rel.tolist() == [True, True, False, False]
+    assert rel.tolist() == [False, False, True, True]
 
 
 def test_rel_warmup_falls_back_to_full():

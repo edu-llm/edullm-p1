@@ -1,0 +1,18 @@
+{
+ "n": 13,
+ "fields": {
+  "arc_challenge": "question",
+  "arc_easy": "question",
+  "boolq": "passage + question (both shown in the RC prompt)",
+  "csqa": "question",
+  "hellaswag": "ctx (activity_label + context shown as the prompt)",
+  "mmlu_*": "question",
+  "openbookqa": "question_stem",
+  "piqa": "goal",
+  "socialiqa": "context + question",
+  "winogrande": "sentence"
+ },
+ "normalization": "lowercase; non-alphanumeric -> separator; whitespace tokens",
+ "items": 26123,
+ "grams": 732288
+}

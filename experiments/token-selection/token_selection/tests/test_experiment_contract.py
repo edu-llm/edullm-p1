@@ -83,92 +83,6 @@ def test_learnability_requires_dual_reference_paths_or_s3():
     validate_scratch_config(cfg, method="learnability")
 
 
-def test_rel_ema_refhq_seed_requires_reference_load_path():
-    cfg = _config()
-    cfg["methods"] = ["rel_ema"]
-    cfg["ema"] = {"seed_mode": "refhq", "schedule": "linear"}
-    with pytest.raises(ValueError, match="seed_mode='refhq'"):
-        validate_scratch_config(cfg, method="rel_ema")
-
-    cfg["reference"] = {"load_path": "/tmp/refhq.pt"}
-    validate_scratch_config(cfg, method="rel_ema")
-
-    cfg["reference"] = {
-        "load_path": None,
-        "s3_uri": "s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-5p5b/checkpoints/step1315/",
-    }
-    validate_scratch_config(cfg, method="rel_ema")
-
-    # Zero-seed REL does not need a reference path.
-    cfg2 = _config()
-    cfg2["methods"] = ["rel_ema"]
-    cfg2["ema"] = {"seed_mode": "zero", "schedule": "exp", "tau": 300}
-    validate_scratch_config(cfg2, method="rel_ema")
-
-
-def test_rel_ema_refhq_arm_contract():
-    """RefHQ-seeded REL arm: constant α=0.9985, seed_mode=refhq, t0=0, S3 prefix."""
-    arm_cfg = (
-        Path(__file__).resolve().parents[2]
-        / "rel-ema-refhq"
-        / "configs"
-        / "run_rel_ema_refhq_10b.yaml"
-    )
-    cfg = load_config(arm_cfg)
-    assert cfg["methods"] == ["rel_ema"]
-    assert cfg["run_id"] == "rel-ema-refhq-10b-scratch-v1"
-    assert cfg["run_id"] != "rel-ema-10b-scratch-v1"
-    assert int(cfg["t0_steps"]) == 0
-    assert float(cfg.get("t0_frac", 0.0)) == 0.0
-    assert float(cfg["k"]) == 0.6
-    assert float(cfg["alpha_start"]) == 0.9985
-    assert float(cfg["alpha_end"]) == 0.9985
-    assert str(cfg.get("alpha_schedule") or "linear") == "linear"
-    ema = cfg.get("ema") or {}
-    assert str(ema.get("seed_mode")) == "refhq"
-    assert str(ema.get("schedule") or "linear") == "linear"
-    assert cfg["model"]["arch"] == "olmo2_370M"
-    assert cfg["model"]["init_mode"] == "scratch"
-    assert cfg["model"].get("load_path") is None
-    assert int(cfg["train"]["checkpoint_every_steps"]) == 125
-    assert cfg["train"].get("checkpoint_keep_last") is None
-    assert cfg["train"].get("ephemeral_checkpoint_every_steps") is None
-    assert cfg["train"]["dp_type"] == "hsdp"
-    assert cfg["train"]["optim_type"] == "skip_step_adamw"
-    assert bool(cfg["train"]["compile_model"]) is True
-    assert float(cfg["train"]["lr"]) == 4.0e-4
-    assert int(cfg["train"]["warmup_steps"]) == 24
-    assert float(cfg["train"]["lr_alpha_f"]) == 0.1
-    assert int(cfg["train"]["global_batch_size"]) == 4_194_304
-    assert str((cfg.get("train") or {}).get("cuda_visible_devices") or "") == ""
-    assert "checkpoint_bucket" not in cfg["s3"]
-    assert "prefix" not in cfg["s3"]
-    assert (cfg.get("reference") or {}).get("step") == 1315
-    # load_path may be null; s3_uri is enough — --launch auto-materializes DistCP→.pt
-    assert (cfg.get("reference") or {}).get("load_path") is None
-    assert str((cfg.get("reference") or {}).get("s3_uri") or "").startswith("s3://")
-    validate_scratch_config(cfg, method="rel_ema")
-    assert (cfg.get("eval") or {}).get("task_loss", {}).get("enabled") is True
-    assert (cfg.get("eval") or {}).get("task_loss", {}).get("results_dir") == (
-        "task_loss_results/rel-ema-refhq"
-    )
-    assert cfg["data"]["dataset_id"] == "pretrain/regmix-10b"
-    assert cfg["reference"].get("dataset") == "pretrain/refhq-regmix-5p5b"
-
-    # Independent-var contrast vs rel-ema-exp (near-clone pair).
-    exp_cfg = load_config(
-        Path(__file__).resolve().parents[2]
-        / "rel-ema-exp"
-        / "configs"
-        / "run_rel_ema_exp_10b.yaml"
-    )
-    assert (exp_cfg.get("ema") or {}).get("seed_mode") == "zero"
-    assert str(exp_cfg.get("alpha_schedule") or "") == "exp"
-    assert cfg["run_id"] != exp_cfg["run_id"]
-    assert cfg["arm"] != exp_cfg["arm"]
-    assert exp_cfg["data"]["dataset_id"] == "pretrain/regmix-10b"
-
-
 def test_validate_experiment_refuses_missing_rho_reference(tmp_path, monkeypatch):
     """Preflight must fail closed on a typo'd reference path, not only on null."""
     import json
@@ -414,7 +328,10 @@ def test_rho_1_arm_contract():
     assert float(rho["train"].get("max_grad_norm", 0)) == 1.0
     assert float(rho["train"].get("z_loss_multiplier", 0)) == 1e-5
     assert rho["model"]["arch"] == "olmo2_370M"
-    assert rho["reference"]["step"] == 1315
+    # Instruct-v3 step940 is the reference the reported rho-1 run actually used
+    # (arms.py RHO_REFERENCE_CHECKPOINT; W&B eduLLM/token-selection/ebf1fa33...).
+    # The old step1315 RefHQ-5p5b pin belonged to a superseded, deleted run.
+    assert rho["reference"]["step"] == 940
     assert str((rho.get("train") or {}).get("cuda_visible_devices") or "") == ""
     assert (rho.get("eval") or {}).get("task_loss", {}).get("enabled") is True
     assert (rho.get("eval") or {}).get("task_loss", {}).get("results_dir") == (
@@ -424,56 +341,12 @@ def test_rho_1_arm_contract():
     assert "prefix" not in rho["s3"]
 
 
-def test_learnability_token_arm_contract():
-    """Learnability-token: dual RefHQ early−late, t0=0, S3 token-sel/learnability-token."""
-    from token_selection.scripts import derive_steps
-
-    arm_cfg = (
-        Path(__file__).resolve().parents[2]
-        / "learnability-token"
-        / "configs"
-        / "run_learnability_10b.yaml"
-    )
-    cfg = load_config(arm_cfg)
-    assert cfg["methods"] == ["learnability"]
-    assert cfg["run_id"] == "learnability-token-10b-scratch-v1"
-    assert int(cfg["t0_steps"]) == 0
-    assert float(cfg.get("t0_frac", 1.0)) == 0.0
-    assert float(cfg["k"]) == 0.6
-    total, t0 = derive_steps(cfg)
-    assert total == 2360
-    assert t0 == 0
-    assert int(cfg["train"]["checkpoint_every_steps"]) == 125
-    assert cfg["train"].get("checkpoint_keep_last") is None
-    assert cfg["train"].get("ephemeral_checkpoint_every_steps") is None
-    assert bool(cfg["train"].get("pre_train_checkpoint")) is True
-    assert cfg["model"]["arch"] == "olmo2_370M"
-    assert cfg["model"]["init_mode"] == "scratch"
-    assert cfg["reference"]["early"]["step"] == 250
-    assert cfg["reference"]["late"]["steps"] == [1000, 1125, 1315]
-    # load_path may be null; S3 provenance is enough for --launch auto-materialize.
-    assert cfg["reference"]["early"]["load_path"] is None
-    assert cfg["reference"]["late"]["load_path"] is None
-    assert str(cfg["reference"]["early"].get("s3_uri") or "").startswith("s3://")
-    validate_scratch_config(cfg, method="learnability")
-    assert str((cfg.get("train") or {}).get("cuda_visible_devices") or "") == ""
-    assert (cfg.get("eval") or {}).get("task_loss", {}).get("enabled") is True
-    assert cfg["eval"]["task_loss"]["results_dir"] == "task_loss_results/learnability-token"
-    assert "checkpoint_bucket" not in cfg["s3"]
-    assert "prefix" not in cfg["s3"]
-    assert cfg["data"]["dataset_id"] == "pretrain/regmix-10b"
-    assert "edullm-datasets" not in str(cfg.get("data") or {})
-    assert cfg["reference"].get("dataset") == "pretrain/refhq-regmix-5p5b"
-
-
 def test_all_yaml_arms_use_strict_2360_permanent_contract():
     root = Path(__file__).resolve().parents[2]
     config_paths = [
         root / "attention/configs/run_attention_10b.yaml",
-        root / "learnability-token/configs/run_learnability_10b.yaml",
         root / "middle-ppl-token/configs/run_middle_ppl_token_10b.yaml",
         root / "rel-ema-exp/configs/run_rel_ema_exp_10b.yaml",
-        root / "rel-ema-refhq/configs/run_rel_ema_refhq_10b.yaml",
         root / "rho-1/configs/run_rho_10b.yaml",
     ]
     for path in config_paths:

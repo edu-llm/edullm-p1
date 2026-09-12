@@ -609,7 +609,7 @@ class TokenSelectLoop:
         mean_kept = mean_dropped = None
         score: Optional[Tensor] = None
         if rel_active and current_loss is not None and history_loss is not None:
-            score = history_loss - current_loss
+            score = current_loss - history_loss
         elif rho_active and current_loss is not None and reference_loss is not None:
             score = current_loss - reference_loss
         elif middle_active and reference_loss is not None:
@@ -1074,7 +1074,7 @@ class TokenSelectTrainModule(TransformerTrainModule if _HAS_OLMO else object):  
                 selected_seen += n_tokens
                 score = None
                 if rel_active and history_loss is not None and current_loss is not None:
-                    score = history_loss - current_loss
+                    score = current_loss - history_loss
                 elif rho_active and reference_loss is not None and current_loss is not None:
                     score = current_loss - reference_loss
                 elif middle_active and reference_loss is not None:

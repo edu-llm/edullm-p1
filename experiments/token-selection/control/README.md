@@ -45,7 +45,7 @@ python prepare_control_data.py --work /tmp/control-stage
 # → work/train_tokenized/paths_train.txt
 ```
 
-Budget: **9.9B** tokens (`9900000000`) → **2360** optimizer steps (one epoch under ~9.989B published train; no forced 10B wrap).
+Budget: **9.9B** tokens (`9900000000`) → **2360** optimizer steps = 9,898,557,440 tokens. That is one epoch of `pretrain/regmix-10b` v1, whose realized size is **10,004,807,041** tokens, so there is no second-epoch wrap. The *reported* full-loss control run (`full-loss-control-regmix10b-v2`) instead ran **2384** steps = 9,999,220,736 tokens — still under 10,004,807,041, so it does not wrap either. All seven arms train on this same published dataset.
 
 ## Permanent checkpoint ladder
 

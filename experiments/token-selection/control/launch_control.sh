@@ -25,7 +25,9 @@
 #   DATASET_VERSION   — pin version (default: resolve_latest)
 #   NPROC             — processes per node (default: 1, or WORLD_SIZE if set)
 #   NAME              — run id (default: control-regmix10b-v2)
-#   LENGTH_TOKENS     — default 9900000000 → 2360 steps (one-epoch matrix)
+#   LENGTH_TOKENS     — default 9900000000 -> 2360 steps = 9,898,557,440 tokens
+#                       (one epoch of pretrain/regmix-10b v1, realized
+#                        10,004,807,041 tokens; no second-epoch wrap)
 #   FRESH=1           — ignore any local checkpoints
 #   LOAD_PATH         — explicit local resume dir
 #   ALLOW_LOCAL_RESUME=1 — same-job local auto-resume only (not across wiped scratch)

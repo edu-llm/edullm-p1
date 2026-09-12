@@ -1,7 +1,12 @@
 # REL no-init exponential-α arm (Arm 2).
-# Selection: top 60% by REL = L_hist − L_curr from step 0 (t0=0).
+# Selection: top 60% by REL = L_curr − L_hist from step 0 (t0=0).
+# Polarity corrected 2026-09-05: this was originally L_hist − L_curr, inverted
+# relative to the rho_excess/BLADE convention. The scorer computes
+# current − history; only the 2026-09-05 polarity-corrected re-run is reported
+# (W&B eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e).
 # EMA: bias-corrected from zero (NO RefHQ / θ0 seed); α(t)=1−exp(−t/300).
-# Architecture: RefHQ-matched olmo2_370M. Corpus: RegMix one-epoch (~9.9B → 2360 steps).
+# Architecture: RefHQ-matched olmo2_370M. Corpus: RegMix one-epoch
+# (pretrain/regmix-10b v1, realized 10,004,807,041 tokens; 9.9B budget → 2360 steps).
 # New run_id — do NOT reuse rel-ema-10b-scratch-v1.
 #
 # Near-clone of rel-ema-refhq: only EMA seed_mode + α schedule should differ.
@@ -48,15 +53,28 @@ model:
   name: OLMo-2-370M-scratch
   arch: olmo2_370M
   init_mode: scratch
+  # NOTE (2026-09-12): this 42 did NOT govern the reported runs. recipe.py sets
+  # INIT_SEED = 6198 and the reported runs used 6198; the launch path goes through
+  # recipe.py, not this YAML. The value is left at 42 on purpose: the shared
+  # contract (token_selection/scripts/experiment_contract.py) requires
+  # model.init_seed == the top-level `seed`, and both are fingerprinted for resume,
+  # so changing one here would invalidate resume of the existing runs. Treat
+  # recipe.py's INIT_SEED = 6198 as authoritative for what actually ran.
   init_seed: 42
   load_path: null
 
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
-  revision: 99e0009ed67679c90da970ec5ba439c9459e3757
+  # Branch head of edullm/token-selection-370m on the edu-llm/OLMo-core fork.
+  # Repinned 2026-09-12: the previous pin 99e0009ed67679c90da970ec5ba439c9459e3757 does NOT contain
+  # .edullm/token_selection_370m/selection.py, so no selection arm could have
+  # run at that revision.
+  revision: 98ea67c948fd93ccbfd2633e1ae818c3ae1d2ad7
 
 train:
-  # One epoch under published train (~9.989B catalog rows); 9.9B → 2360 steps at GBS.
+  # One epoch of published pretrain/regmix-10b v1 (realized 10,004,807,041
+  # tokens); 9.9B budget -> 2360 steps at GBS = 9,898,557,440 tokens, so no
+  # second-epoch wrap. Same dataset for all seven arms.
   max_tokens: 9900000000
   global_batch_size: 4194304
   lr: 4.0e-4

@@ -24,7 +24,7 @@ weights (no full-matrix materialization during FlashAttention).
 |------|--------|
 | Arch | `olmo2_370M` (RefHQ-matched) |
 | Data | `pretrain/regmix-10b` via `data.dataset_id` → `s3://edullm-data/` (staged per job) |
-| Steps | **2360** (`9900000000 // 4_194_304`) |
+| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens; one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
 | Keep rate `k` | 0.6 |
 | Masking warmup | `t0_steps=0` (selection from step 0) |
 | Permanent ckpts | `{0, 125, …, 2125, 2360}` (omit 2250) |

@@ -48,7 +48,10 @@ fi
 RUN_DIR="${RUN_DIR:-$WORK}"
 WORK="${WORK:-$RUN_DIR}"
 OLMO_CORE_DIR="${OLMO_CORE_DIR:-${OLMO_ROOT:-$WORK/OLMo-core}}"
-OLMO_CORE_REVISION="${OLMO_CORE_REVISION:-99e0009ed67679c90da970ec5ba439c9459e3757}"
+# Branch head of edullm/token-selection-370m on the edu-llm/OLMo-core fork.
+# Repinned 2026-09-12: the previous pin 99e0009ed67679c90da970ec5ba439c9459e3757 does not carry
+# .edullm/token_selection_370m/selection.py.
+OLMO_CORE_REVISION="${OLMO_CORE_REVISION:-98ea67c948fd93ccbfd2633e1ae818c3ae1d2ad7}"
 RANK_MICROBATCH_SIZE="${RANK_MICROBATCH_SIZE:-}"
 NUM_WORKERS="${NUM_WORKERS:-}"
 RDZV_PORT="${RDZV_PORT:-29531}"

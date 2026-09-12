@@ -77,9 +77,12 @@ if [[ -n "${TRAIN_DATA_S3:-}" ]]; then
   echo "  Set data.dataset_id in the YAML (pretrain/regmix-10b); staging uses edullm-data." >&2
   exit 2
 fi
-REF_CKPT_S3="${REF_CKPT_S3:-s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-5p5b/checkpoints/step1315/}"
+REF_CKPT_S3="${REF_CKPT_S3:-s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/}"
 OLMO_CORE_DIR="${OLMO_CORE_DIR:-$WORK/OLMo-core}"
-OLMO_CORE_REVISION="${OLMO_CORE_REVISION:-99e0009ed67679c90da970ec5ba439c9459e3757}"
+# Branch head of edullm/token-selection-370m on the edu-llm/OLMo-core fork.
+# Repinned 2026-09-12: the previous pin 99e0009ed67679c90da970ec5ba439c9459e3757 does not carry
+# .edullm/token_selection_370m/selection.py.
+OLMO_CORE_REVISION="${OLMO_CORE_REVISION:-98ea67c948fd93ccbfd2633e1ae818c3ae1d2ad7}"
 CFG_REL="${CFG_REL:-rho-1/configs/run_rho_10b.yaml}"
 EXPORT_REF_PY="${EXPORT_REF_PY:-$TS_ROOT/reference/export_refhq_reference.py}"
 ENQUEUE_TASK_LOSS="${ENQUEUE_TASK_LOSS:-$SCRIPT_DIR/enqueue_task_loss.sh}"
@@ -89,7 +92,7 @@ OUT_DIR="$WORK/data/rho_10b"
 TOK_DIR="$OUT_DIR/tokens"
 CKPT_LOCAL="$OUT_DIR/checkpoints/rho_excess"
 REF_DIR="$WORK/reference"
-REF_PT="$REF_DIR/refhq_step1315_model.pt"
+REF_PT="$REF_DIR/refhq_instruct_v3_step940_model.pt"
 RUNTIME_CFG="$WORK/run_rho_10b.runtime.yaml"
 LOG_DIR="$WORK/logs"
 PROGRESS_DIR="$WORK/progress"

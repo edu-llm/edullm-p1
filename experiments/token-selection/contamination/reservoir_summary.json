@@ -1,0 +1,655 @@
+{
+ "eval_items_total": 40087,
+ "by_domain": {
+  "reservoir_127b/algebraic-stack": {
+   "tasks": 117,
+   "docs": 2828873,
+   "ngrams": 5980070032,
+   "gram_hits": 24628,
+   "items_matched": 1395,
+   "item_rate_pct": 3.4799,
+   "self_contained_pct": 0.7187,
+   "per_task": {
+    "arc_challenge_test": [
+     78,
+     1171,
+     6.661
+    ],
+    "arc_challenge_val": [
+     7,
+     299,
+     2.3411
+    ],
+    "arc_easy_test": [
+     5,
+     2374,
+     0.2106
+    ],
+    "arc_easy_val": [
+     4,
+     570,
+     0.7018
+    ],
+    "boolq_val": [
+     0,
+     3270,
+     0.0
+    ],
+    "csqa_val": [
+     7,
+     1220,
+     0.5738
+    ],
+    "hellaswag_val": [
+     19,
+     10042,
+     0.1892
+    ],
+    "mmlu_test": [
+     1129,
+     13916,
+     8.113
+    ],
+    "mmlu_val": [
+     142,
+     1519,
+     9.3483
+    ],
+    "openbookqa_test": [
+     2,
+     462,
+     0.4329
+    ],
+    "openbookqa_val": [
+     0,
+     463,
+     0.0
+    ],
+    "piqa_val": [
+     1,
+     1560,
+     0.0641
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     1,
+     1267,
+     0.0789
+    ]
+   }
+  },
+  "reservoir_127b/arxiv": {
+   "tasks": 194,
+   "docs": 3947737,
+   "ngrams": 11385311750,
+   "gram_hits": 35336,
+   "items_matched": 440,
+   "item_rate_pct": 1.0976,
+   "self_contained_pct": 0.6023,
+   "per_task": {
+    "arc_challenge_test": [
+     10,
+     1171,
+     0.854
+    ],
+    "arc_challenge_val": [
+     9,
+     299,
+     3.01
+    ],
+    "arc_easy_test": [
+     9,
+     2374,
+     0.3791
+    ],
+    "arc_easy_val": [
+     2,
+     570,
+     0.3509
+    ],
+    "boolq_val": [
+     0,
+     3270,
+     0.0
+    ],
+    "csqa_val": [
+     27,
+     1220,
+     2.2131
+    ],
+    "hellaswag_val": [
+     11,
+     10042,
+     0.1095
+    ],
+    "mmlu_test": [
+     310,
+     13916,
+     2.2277
+    ],
+    "mmlu_val": [
+     31,
+     1519,
+     2.0408
+    ],
+    "openbookqa_test": [
+     4,
+     462,
+     0.8658
+    ],
+    "openbookqa_val": [
+     1,
+     463,
+     0.216
+    ],
+    "piqa_val": [
+     3,
+     1560,
+     0.1923
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     23,
+     1267,
+     1.8153
+    ]
+   }
+  },
+  "reservoir_127b/dclm": {
+   "tasks": 345,
+   "docs": 22675718,
+   "ngrams": 22028297566,
+   "gram_hits": 190935,
+   "items_matched": 1298,
+   "item_rate_pct": 3.238,
+   "self_contained_pct": 0.2875,
+   "per_task": {
+    "arc_challenge_test": [
+     12,
+     1171,
+     1.0248
+    ],
+    "arc_challenge_val": [
+     0,
+     299,
+     0.0
+    ],
+    "arc_easy_test": [
+     21,
+     2374,
+     0.8846
+    ],
+    "arc_easy_val": [
+     5,
+     570,
+     0.8772
+    ],
+    "boolq_val": [
+     2,
+     3270,
+     0.0612
+    ],
+    "csqa_val": [
+     1,
+     1220,
+     0.082
+    ],
+    "hellaswag_val": [
+     423,
+     10042,
+     4.2123
+    ],
+    "mmlu_test": [
+     755,
+     13916,
+     5.4254
+    ],
+    "mmlu_val": [
+     78,
+     1519,
+     5.135
+    ],
+    "openbookqa_test": [
+     0,
+     462,
+     0.0
+    ],
+    "openbookqa_val": [
+     0,
+     463,
+     0.0
+    ],
+    "piqa_val": [
+     1,
+     1560,
+     0.0641
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     0,
+     1267,
+     0.0
+    ]
+   }
+  },
+  "reservoir_127b/open-web-math": {
+   "tasks": 117,
+   "docs": 2891922,
+   "ngrams": 6542476977,
+   "gram_hits": 19372,
+   "items_matched": 290,
+   "item_rate_pct": 0.7234,
+   "self_contained_pct": 0.2259,
+   "per_task": {
+    "arc_challenge_test": [
+     4,
+     1171,
+     0.3416
+    ],
+    "arc_challenge_val": [
+     2,
+     299,
+     0.6689
+    ],
+    "arc_easy_test": [
+     6,
+     2374,
+     0.2527
+    ],
+    "arc_easy_val": [
+     6,
+     570,
+     1.0526
+    ],
+    "boolq_val": [
+     0,
+     3270,
+     0.0
+    ],
+    "csqa_val": [
+     7,
+     1220,
+     0.5738
+    ],
+    "hellaswag_val": [
+     6,
+     10042,
+     0.0597
+    ],
+    "mmlu_test": [
+     218,
+     13916,
+     1.5665
+    ],
+    "mmlu_val": [
+     33,
+     1519,
+     2.1725
+    ],
+    "openbookqa_test": [
+     0,
+     462,
+     0.0
+    ],
+    "openbookqa_val": [
+     2,
+     463,
+     0.432
+    ],
+    "piqa_val": [
+     0,
+     1560,
+     0.0
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     6,
+     1267,
+     0.4736
+    ]
+   }
+  },
+  "reservoir_127b/pes2o": {
+   "tasks": 226,
+   "docs": 7943723,
+   "ngrams": 18921613588,
+   "gram_hits": 12823,
+   "items_matched": 256,
+   "item_rate_pct": 0.6386,
+   "self_contained_pct": 0.4997,
+   "per_task": {
+    "arc_challenge_test": [
+     2,
+     1171,
+     0.1708
+    ],
+    "arc_challenge_val": [
+     10,
+     299,
+     3.3445
+    ],
+    "arc_easy_test": [
+     9,
+     2374,
+     0.3791
+    ],
+    "arc_easy_val": [
+     18,
+     570,
+     3.1579
+    ],
+    "boolq_val": [
+     0,
+     3270,
+     0.0
+    ],
+    "csqa_val": [
+     11,
+     1220,
+     0.9016
+    ],
+    "hellaswag_val": [
+     13,
+     10042,
+     0.1295
+    ],
+    "mmlu_test": [
+     152,
+     13916,
+     1.0923
+    ],
+    "mmlu_val": [
+     18,
+     1519,
+     1.185
+    ],
+    "openbookqa_test": [
+     6,
+     462,
+     1.2987
+    ],
+    "openbookqa_val": [
+     1,
+     463,
+     0.216
+    ],
+    "piqa_val": [
+     0,
+     1560,
+     0.0
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     16,
+     1267,
+     1.2628
+    ]
+   }
+  },
+  "reservoir_127b/starcoder": {
+   "tasks": 229,
+   "docs": 15598404,
+   "ngrams": 6841275801,
+   "gram_hits": 13383,
+   "items_matched": 49,
+   "item_rate_pct": 0.1222,
+   "self_contained_pct": 0.0342,
+   "per_task": {
+    "arc_challenge_test": [
+     0,
+     1171,
+     0.0
+    ],
+    "arc_challenge_val": [
+     0,
+     299,
+     0.0
+    ],
+    "arc_easy_test": [
+     0,
+     2374,
+     0.0
+    ],
+    "arc_easy_val": [
+     0,
+     570,
+     0.0
+    ],
+    "boolq_val": [
+     0,
+     3270,
+     0.0
+    ],
+    "csqa_val": [
+     3,
+     1220,
+     0.2459
+    ],
+    "hellaswag_val": [
+     0,
+     10042,
+     0.0
+    ],
+    "mmlu_test": [
+     36,
+     13916,
+     0.2587
+    ],
+    "mmlu_val": [
+     8,
+     1519,
+     0.5267
+    ],
+    "openbookqa_test": [
+     0,
+     462,
+     0.0
+    ],
+    "openbookqa_val": [
+     0,
+     463,
+     0.0
+    ],
+    "piqa_val": [
+     0,
+     1560,
+     0.0
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     2,
+     1267,
+     0.1579
+    ]
+   }
+  },
+  "reservoir_127b/wiki": {
+   "tasks": 32,
+   "docs": 6171250,
+   "ngrams": 2606542981,
+   "gram_hits": 13056,
+   "items_matched": 185,
+   "item_rate_pct": 0.4615,
+   "self_contained_pct": 0.0068,
+   "per_task": {
+    "arc_challenge_test": [
+     0,
+     1171,
+     0.0
+    ],
+    "arc_challenge_val": [
+     0,
+     299,
+     0.0
+    ],
+    "arc_easy_test": [
+     1,
+     2374,
+     0.0421
+    ],
+    "arc_easy_val": [
+     0,
+     570,
+     0.0
+    ],
+    "boolq_val": [
+     0,
+     3270,
+     0.0
+    ],
+    "csqa_val": [
+     0,
+     1220,
+     0.0
+    ],
+    "hellaswag_val": [
+     1,
+     10042,
+     0.01
+    ],
+    "mmlu_test": [
+     168,
+     13916,
+     1.2072
+    ],
+    "mmlu_val": [
+     15,
+     1519,
+     0.9875
+    ],
+    "openbookqa_test": [
+     0,
+     462,
+     0.0
+    ],
+    "openbookqa_val": [
+     0,
+     463,
+     0.0
+    ],
+    "piqa_val": [
+     0,
+     1560,
+     0.0
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     0,
+     1267,
+     0.0
+    ]
+   }
+  }
+ },
+ "by_corpus": {
+  "reservoir_127b": {
+   "docs": 62057627,
+   "ngrams": 74305588695,
+   "tasks": 1260,
+   "gram_hits": 309533,
+   "items_matched": 2995,
+   "item_rate_pct": 7.4713,
+   "self_contained_pct": 1.9165,
+   "per_task": {
+    "arc_challenge_test": [
+     98,
+     1171,
+     8.3689
+    ],
+    "arc_challenge_val": [
+     23,
+     299,
+     7.6923
+    ],
+    "arc_easy_test": [
+     36,
+     2374,
+     1.5164
+    ],
+    "arc_easy_val": [
+     32,
+     570,
+     5.614
+    ],
+    "boolq_val": [
+     2,
+     3270,
+     0.0612
+    ],
+    "csqa_val": [
+     41,
+     1220,
+     3.3607
+    ],
+    "hellaswag_val": [
+     461,
+     10042,
+     4.5907
+    ],
+    "mmlu_test": [
+     2030,
+     13916,
+     14.5875
+    ],
+    "mmlu_val": [
+     224,
+     1519,
+     14.7465
+    ],
+    "openbookqa_test": [
+     7,
+     462,
+     1.5152
+    ],
+    "openbookqa_val": [
+     2,
+     463,
+     0.432
+    ],
+    "piqa_val": [
+     3,
+     1560,
+     0.1923
+    ],
+    "socialiqa_val": [
+     0,
+     1954,
+     0.0
+    ],
+    "winogrande_val": [
+     36,
+     1267,
+     2.8414
+    ]
+   }
+  }
+ }
+}

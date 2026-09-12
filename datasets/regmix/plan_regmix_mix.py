@@ -17,7 +17,29 @@ from pathlib import Path
 
 import boto3
 
-# RegMix-optimized Pile weights mapped onto OLMo-mix domains.
+# Data Mixing Laws (Ye et al. 2024, arXiv:2403.16952) **Pilot-01** weights, mapped
+# onto the OLMo-mix / OLMoHQ domain names below.
+#
+# These are NOT "RegMix-optimized Pile weights": the domain set is the RedPajama-style
+# one used by Data Mixing Laws, not the Pile's 22 subsets, and the numbers are the
+# paper's Pilot-01 reference mixture, not a RegMix regression optimum. See
+# experiments/skill-dag/mixlaw/README.md ("Data Mixing Laws paper | pilot") for the
+# authoritative weight table:
+#   dclm 0.375  arxiv 0.250  starcoder 0.141  pes2o 0.094
+#   open-web-math 0.064  algebraic-stack 0.061  wiki 0.016
+#
+# The weights are **quantized to multiples of 1/64** for whole-shard allocation, which
+# is why the targets below are round numbers rather than exact fractions of the budget:
+#   dclm 24/64, arxiv 16/64, starcoder 9/64, pes2o 6/64,
+#   open-web-math 4/64, algebraic-stack 4/64, wiki 1/64   (sums to 64/64)
+# open-web-math and algebraic-stack are the two that the paper's 3-decimal weights
+# (0.064 / 0.061) do not hit exactly; both quantize to 4/64 = 0.0625, and the small
+# residual is absorbed by document-level trim.
+#
+# The realized published corpus (pretrain/regmix-10b v1) came out at
+# 10,004,807,041 tokens: dclm 3,752,801,841; arxiv 2,500,162,905;
+# starcoder 1,406,986,385; pes2o 938,157,310; open-web-math 635,098,778;
+# algebraic-stack 615,239,017; wiki 156,360,805.
 DOMAIN_TARGETS: dict[str, int] = {
     "dclm": 3_750_000_000,
     "arxiv": 2_500_000_000,

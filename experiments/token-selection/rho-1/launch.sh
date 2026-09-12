@@ -5,7 +5,7 @@
 #   OLMO_ROOT              — pinned edu-llm/OLMo-core checkout (revision in the YAML)
 #
 # Optional env:
-#   REFERENCE_LOAD_PATH    — local RefHQ step1315 .pt; if unset, --launch auto-materializes
+#   REFERENCE_LOAD_PATH    — local refhq-instruct v3 step940 .pt; if unset, --launch auto-materializes
 #                            from YAML reference.s3_uri into TOKEN_SELECTION_REF_CACHE
 #   NPROC                 — torchrun nproc_per_node (default: # of visible GPUs, else 1)
 #   CUDA_VISIBLE_DEVICES  — physical GPU pin (required outside Slurm unless YAML sets it)
@@ -23,7 +23,7 @@
 # Examples (from experiments/token-selection/):
 #   CUDA_VISIBLE_DEVICES=0 NPROC=1 OLMO_ROOT=/path/OLMo-core bash rho-1/launch.sh
 #   CUDA_VISIBLE_DEVICES=0 NPROC=1 \
-#     REFERENCE_LOAD_PATH=/path/refhq_step1315_model.pt \
+#     REFERENCE_LOAD_PATH=/path/refhq_instruct_v3_step940_model.pt \
 #     OLMO_ROOT=/path/OLMo-core bash rho-1/launch.sh
 set -euo pipefail
 

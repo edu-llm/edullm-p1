@@ -8,7 +8,7 @@ the shared RefHQ-matched OLMo-2 370M contract.
 |------|-------|
 | Architecture | `TransformerConfig.olmo2_370M` (full attn) |
 | GBS / seq / LR | `4_194_304` / 2048 / `4e-4` (warmup 24, `alpha_f=0.1`) |
-| `total_steps` | **2360** (`9900000000 // 4194304`; shared one-epoch matrix budget under ~9.989B published train) |
+| `total_steps` | **2360** (`9900000000 // 4194304`) = 9,898,557,440 tokens; shared one-epoch budget under `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
 | `blade_start` | **500** (steps `0..499` proxy-only full CE) |
 | `tau` / `K` / `γ` / `λ` | **375** / **75** / **0.6** / **1.0** |
 | Sync steps | **500, 875, 1250, 1625, 2000** then hold ref → end |

@@ -15,7 +15,7 @@ config, launch scripts, and artifacts.
 | Keep rate `k` | 0.6 |
 | Masking warmup | `t0_steps=0` (selection from step 0) |
 | Arch | `olmo2_370M` (RefHQ-matched) |
-| Corpus | RegMix one-epoch (`pretrain/regmix-10b` on `s3://edullm-data/`) → **2360** steps (`9900000000 // GBS`) |
+| Corpus | `pretrain/regmix-10b` v1 on `s3://edullm-data/` — realized **10,004,807,041** tokens — one epoch → **2360** steps (`9900000000 // GBS`) = 9,898,557,440 tokens, no wrap |
 | Permanent ckpts | `{0, 125, …, 2125, 2360}` (skip 2250) |
 | `run_id` | `middle-ppl-token-10b-v2` |
 | Task loss | full 20-label RC 5-shot `task_loss_bpb` on every permanent ckpt |

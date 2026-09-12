@@ -179,8 +179,9 @@ class EMAHistory:
     the single heaviest ingredient for the first ~1/(1−α) optimizer steps. That is
     unusable for from-scratch pretraining: a weight-space blend of a random init and a
     trained model is not an older model but an off-manifold point whose per-token loss is
-    nearly flat, which collapses ``REL = L_hist − L_curr`` into ``constant − L_curr`` and
-    makes top-k keep the *easiest* tokens instead of the most learnable ones. Warmup does
+    nearly flat, which collapses ``REL = L_curr − L_hist`` into ``L_curr − constant`` and
+    degenerates top-k into plain highest-current-loss selection rather than picking the
+    most learnable tokens. Warmup does
     not rescue it, because warmup delays when the history is read, not what is in it.
 
     History tensors live on the same device/dtype/layout as the source parameters and are

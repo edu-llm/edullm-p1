@@ -74,41 +74,28 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 
 ### Arms actually run
 
-> **A100-hours below are NOT comparable across arms.** Five arms ran on
-> **8xA100-80GB** (rho-1, BLADE, Attention, Middle-PPL, full-loss control); the
-> **Random control and REL-EMA ran on 4xL40S**, and their "A100-h" entries are
-> conversions, not measurements. The `FLOPs` column is the **logged W&B throughput
-> counter**, which **excludes every scoring forward pass** and therefore reports the
-> same 2.63e19 for a full-CE run as for an arm that also evaluates a frozen reference
-> on every token. For a like-for-like comparison use the analytic FLOPs in
-> [Cost and FLOPs](#cost-and-flops), where the arms span 26.03e18 to 49.21e18
-> (0.99x-1.87x the control).
+> **Compute is reported as analytic FLOPs only.** Wall-clock hours are not comparable
+> across these runs: five arms ran on **8xA100-80GB** (rho-1, BLADE, Attention,
+> Middle-PPL, full-loss control) while the **Random control and REL-EMA ran on 4xL40S**.
+> The logged W&B throughput counter is also incomplete: it **excludes every scoring
+> forward pass**, so it reports the same 2.63e19 for a full-CE run as for an arm that
+> additionally evaluates a frozen reference on every token. See
+> [Cost and FLOPs](#cost-and-flops) for the model and the in-run/with-reference split.
 
+| Arm | Analytic FLOPs (x10^18) | Relative to control |
+| --- | --- | --- |
+| Random control | 26.03 | 0.99x |
+| Attention top-k | 26.12 | 0.99x |
+| **Control (full-CE)** | **26.30** | **1.00x** |
+| REL-EMA (exponential) | 34.71 | 1.32x |
+| rho-1 | 45.08 | 1.71x |
+| BLADE | 47.98 | 1.83x |
+| Middle-PPL | 49.21 | 1.87x |
 
-
-| Arm                        | A100-h    | FLOPs                                                                                   |
-| -------------------------- | --------- | --------------------------------------------------------------------------------------- |
-| REL-EMA (exponential)      | 59.40     | 2.63\times10^{19}                                                                       |
-| Attention top-k            | 58.55     | 2.63\times10^{19}                                                                       |
-| Middle-PPL (training)      | 42.99     | 2.63\times10^{19}                                                                       |
-| Middle-PPL mask precompute | 2.0       | —                                                                                       |
-| ρ-1                        | 56.56     | 2.63\times10^{19}                                                                       |
-| BLADE                      | 70.5      | 3.04\times10^{19}                                                                       |
-| **Total (A100 arms)**      | **290.0** | **\approx 1.36\times10^{20}** (5× Mixing Laws Dataset arms; mask precompute negligible) |
-| Control (full-CE)†         | 52.4      | 2.63\times10^{19}                                                                       |
-| Random control‡            | 44.1      | 2.63\times10^{19}                                                                       |
-
-† Not part of the "Total (A100 arms)" row above, which is specifically the six token-selection arms; the control and random-control costs are reported separately since they aren't selection arms.
-
-Control cost (52.4 A100-h) is the `a100_hours` value logged directly on the run itself (`eduLLM/token-selection/hh19uatg`, run name `full-loss-control-regmix10b-v2`, created 2026-09-05).
-
-‡ Random-control ran on 4×L40S (FarmShare) rather than A100. Its A100-h figure (44.1) is an independent simplification and was not independently measured.
-
-**REL-EMA's 59.40 A100-h is the wrong run.** That figure belongs to the OLD
-inverted-polarity A100 run `89db0d5b...`, which is superseded. The run actually used in
-Table 1 is the polarity-corrected `cc52d5537a03ad8e57cc87a025668b2e`, which ran
-**21.39 h on 4xL40S**. Do not report 59.40 A100-h as the cost of the reported REL-EMA
-arm.
+The rho-1, BLADE and Middle-PPL totals include pretraining their reference models.
+Middle-PPL's figure also covers precomputing its masks with one forward pass over the
+whole corpus, which is why it is the most expensive arm despite adding no scoring cost
+during training itself.
 
 **BLADE's W&B record does not contain its own curve.** Run `005xjces` has a **7-second
 runtime** and logs **no throughput and no keep-rate metrics**, so its loss curve was
@@ -117,9 +104,9 @@ are usable but their provenance is one hop removed from the run ID they are attr
 to.
 
 
-Control is `eduLLM/token-selection/hh19uatg` (`full-loss-control-regmix10b-v2`), created 2026-09-05, `eval/macro_bpb` final 1.6487, `a100_hours` 52.43. This replaces the earlier control, which was reused from the `mixlaw-1` project. Per this run's own logged config, it is itself cloned from `eduLLM/hpo-ladder` (group `hpo-ladder-batch-ablation`, run `library-4mi`), **not** from the curriculum project. Its config also carries this note verbatim: *"actual nested model.init_seed logged by the source run's config was 0 (init_seed did not propagate into TransformerConfig) rather than 6199 or the standard 6198 used by the other token-selection arms."* So the weight-init-seed confound described in the paper's Section 3 is unchanged by this re-run — only the source project changed, not the underlying seed/step mismatch. Data-loader seed remains 6199 (vs. the other six arms' 42), and step count remains 2384 (vs. 2360). Its eval grid is also ~119 steps rather than the 125-step permanent ladder the selection arms use, and the run is tagged `cloned`.
+Control is `eduLLM/token-selection/hh19uatg` (`full-loss-control-regmix10b-v2`), created 2026-09-05, `eval/macro_bpb` final 1.6487. This replaces the earlier control, which was reused from the `mixlaw-1` project. Per this run's own logged config, it is itself cloned from `eduLLM/hpo-ladder` (group `hpo-ladder-batch-ablation`, run `library-4mi`), **not** from the curriculum project. Its config also carries this note verbatim: *"actual nested model.init_seed logged by the source run's config was 0 (init_seed did not propagate into TransformerConfig) rather than 6199 or the standard 6198 used by the other token-selection arms."* So the weight-init-seed confound described in the paper's Section 3 is unchanged by this re-run — only the source project changed, not the underlying seed/step mismatch. Data-loader seed remains 6199 (vs. the other six arms' 42), and step count remains 2384 (vs. 2360). Its eval grid is also ~119 steps rather than the 125-step permanent ladder the selection arms use, and the run is tagged `cloned`.
 
-**This control is being superseded.** A matched rerun `full-loss-control-regmix10b-v3`
+**A matched rerun is in flight.** `full-loss-control-regmix10b-v3`
 is in flight (FarmShare job **1719708**, 4xL40S, **2360** steps, **125**-step ladder,
 `method="full"` with `keep_fraction=1.0` routed to the stock train module). Once it
 lands, the control is seed-, step- and grid-matched to the selection arms and the
@@ -134,8 +121,7 @@ A random-60% selection control (`random-control-regmix10b-v1`: keep-rate 60% cho
 ### Fitting and bootstrap procedure
 
 Every fitted-final number and every CI in this README comes from the following
-procedure. It is the matched protocol; earlier (Aug-12) intervals in this file used a
-narrower alpha grid and are superseded.
+procedure. It is the matched protocol used for every number in this file.
 
 1. **Model.** `y = a + b * step^(-alpha)` fitted to the macro task-loss curve.
 2. **Fit window.** Only steps **>= 1000** are used; earlier points are dominated by the
@@ -228,16 +214,13 @@ is expected and is not evidence of a different keep rate.
 
 ### Cost and FLOPs
 
-**A100-hours are NOT comparable across arms.** Five arms (rho-1, BLADE, Attention,
-Middle-PPL, and the full-loss control) ran on **8xA100-80GB**; the **Random control and
-REL-EMA ran on 4xL40S**. Wall-clock hours on those two platforms are not
-interchangeable, and the L40S figures appearing in an A100-hours column are
-conversions, not measurements. Separately, the **logged throughput FLOPs counter
-excludes the scoring forward passes**, so it reports the same 2.63e19 for a full-CE run
-and for a run that additionally evaluates a frozen reference on every token -- an
-understatement of up to ~1.9x.
-
-Use the analytic FLOPs instead.
+Wall-clock hours are not a usable cost measure here: five arms (rho-1, BLADE,
+Attention, Middle-PPL, and the full-loss control) ran on **8xA100-80GB** while the
+**Random control and REL-EMA ran on 4xL40S**, and hours on those two platforms are not
+interchangeable. The **logged throughput FLOPs counter** is also incomplete, because it
+**excludes the scoring forward passes** and so reports the same 2.63e19 for a full-CE
+run as for a run that additionally evaluates a frozen reference on every token, an
+understatement of up to ~1.9x. We therefore report analytic FLOPs throughout.
 
 **Model.** Forward cost per token = `2N + 4*L*T*d`, with `N = 371,195,904` matmul
 parameters (**including the untied output head**), `L = 16` layers, `T = 2048` sequence

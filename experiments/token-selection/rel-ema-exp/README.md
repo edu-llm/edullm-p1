@@ -6,9 +6,9 @@ Online token selection: keep top **60%** by `REL = L_curr − L_hist`.
 `REL = L_hist − L_curr`, which is inverted relative to the `rho_excess` / BLADE convention
 (current minus reference/history) and therefore selected the tokens the live model had already
 *mastered* relative to its own history. The scorer computes `current − history`, and the arm was
-re-run on 2026-09-05 with the fixed polarity. **Only that polarity-corrected re-run is reported**
-(W&B `eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e`); the earlier inverted-polarity
-A100 run `89db0d5b…` is superseded and must not be cited.
+re-run on 2026-09-05 with the fixed polarity. **The reported arm is W&B
+`eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e`**, which ran on 4xL40S; cite only
+that run.
 
 | Knob | Value |
 |------|--------|

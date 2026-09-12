@@ -330,7 +330,6 @@ def test_rho_1_arm_contract():
     assert rho["model"]["arch"] == "olmo2_370M"
     # Instruct-v3 step940 is the reference the reported rho-1 run actually used
     # (arms.py RHO_REFERENCE_CHECKPOINT; W&B eduLLM/token-selection/ebf1fa33...).
-    # The old step1315 RefHQ-5p5b pin belonged to a superseded, deleted run.
     assert rho["reference"]["step"] == 940
     assert str((rho.get("train") or {}).get("cuda_visible_devices") or "") == ""
     assert (rho.get("eval") or {}).get("task_loss", {}).get("enabled") is True

@@ -5,7 +5,7 @@ Reference architecture source of truth: [`reference/`](reference/) (RefHQ CE, le
 
 | Arm | Directory | Selection | Status |
 |-----|-----------|-----------|--------|
-| Full-loss control | [`control/`](control/) | none (full CE on every valid target token) | `full-loss-control-regmix10b-v2` — W&B [`eduLLM/token-selection/hh19uatg`](https://wandb.ai/eduLLM/token-selection/runs/hh19uatg), tagged `cloned`; **being superseded**, see below |
+| Full-loss control | [`control/`](control/) | none (full CE on every valid target token) | `full-loss-control-regmix10b-v2` — W&B [`eduLLM/token-selection/hh19uatg`](https://wandb.ai/eduLLM/token-selection/runs/hh19uatg), tagged `cloned`; matched rerun in flight, see below |
 | Control (random 60%) | [`control/`](control/) | uniform random keep 60% | Standalone trainer; `random-control-regmix10b-v1` (W&B `fa841187ff07e9164da282efd353c217`) |
 | BLADE | [`blade/`](blade/) | top-60% `L_proxy − L_ref` | RegMix proxy/penalty stream + pinned `pretrain/refhq-instruct/v3` HQ updates; syncs 500/875/1250/1625/2000; K=75, τ=375, γ=0.6, λ=1.0; blade_start=500; pre/post-sync checkpoints |
 | RHO-1 | [`rho-1/`](rho-1/) | top-60% `L_curr − L_ref` | Frozen refhq-instruct v3 step940; `t0=0`; YAML spine |
@@ -66,7 +66,7 @@ load-bearing for how Table 1 is read.
 | Steps | **2384** (the other arms run 2360) |
 | Eval grid | ~**119**-step spacing (the other arms use the 125-step permanent ladder) |
 
-**Being superseded.** A matched rerun `full-loss-control-regmix10b-v3` is in flight: FarmShare job
+**Matched rerun in flight.** `full-loss-control-regmix10b-v3`: FarmShare job
 **1719708**, 4×L40S, **2360** steps, **125**-step checkpoint ladder, `method="full"` with
 `keep_fraction=1.0` routed through the stock train module (not the selection path). Once it lands,
 the control is seed-, step- and grid-matched to the selection arms and the confound described in

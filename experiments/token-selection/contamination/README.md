@@ -11,17 +11,12 @@ regenerable and would dominate the repo: the eval-side index `eval_index.pkl`
 `res_hits/`, `hits_*`, and `logs/`. Re-running `build_eval_index.py` plus the
 `*.sbatch` array jobs reproduces them.
 
-> **Superseded run.** An earlier scan, `contam-20260910-060952` (Sep 10), is
-> superseded and must not be cited. Its own output directory is named
-> `hits_INVALID_unseeded_062501` — the scan hashed n-grams with CPython's
-> built-in `hash()` without pinning `PYTHONHASHSEED`, so hashes were not stable
-> across array tasks and hits did not reduce. The Sep-11 pipeline exports
-> `PYTHONHASHSEED=0` in every sbatch wrapper (see `strict.sbatch`, `res.sbatch`)
-> and that is what the paper reports. The Sep-10 run is still referenced as the
-> *provider* of two immutable inputs — the strict eval index
-> `eval_ngrams_strict.pkl` and the scanner `contam_scan.py` — which were reused
-> unchanged so the new numbers remain directly comparable to the previously
-> published 0.89%.
+> **Hash stability is required.** Every sbatch wrapper exports
+> `PYTHONHASHSEED=0` (see `strict.sbatch`, `res.sbatch`). Without it, CPython's
+> built-in `hash()` is salted per process, n-gram hashes are not stable across
+> array tasks, and hits fail to reduce. The strict eval index
+> `eval_ngrams_strict.pkl` and the scanner `contam_scan.py` are reused unchanged
+> so these numbers stay directly comparable to the published 0.89%.
 
 ## Methodology
 

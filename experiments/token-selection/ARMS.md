@@ -81,4 +81,3 @@ See each arm’s `README.md` for launch commands. Do not submit AWS workloads un
 
 Full experiment plan: [README.md](README.md).  
 Contamination audit (paper Section 4): [contamination/](contamination/).  
-Artifacts believed stale but deliberately NOT removed: [STALE.md](STALE.md).

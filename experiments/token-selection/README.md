@@ -21,8 +21,7 @@
 
 
 Arm-by-arm contract table: [ARMS.md](ARMS.md). Contamination audit (paper Section 4):
-[contamination/](contamination/). Artifacts believed stale but deliberately not removed:
-[STALE.md](STALE.md).
+[contamination/](contamination/).
 
 Shared contract: same architecture, batch, LR, and step budget. The manipulation is **which tokens receive gradient** on each step (full CE vs a scored subset). Sequences still come from the same shuffled corpus; selection is per-token inside the batch.
 

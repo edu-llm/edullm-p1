@@ -281,7 +281,7 @@ class EMAHistory:
         recurrence; with constant α and ``correction=1``, the correction stays at 1
         and the shadow is a textbook EMA starting from the seed.
 
-        **Only** the RefHQ-init REL arm (``rel-ema-refhq``) should call this. The
+        **Only** a RefHQ-initialized REL arm should call this. The
         bias-corrected zero-init path used by ``rel-ema-exp`` must leave the
         accumulator at zero and never seed from an external checkpoint.
         """

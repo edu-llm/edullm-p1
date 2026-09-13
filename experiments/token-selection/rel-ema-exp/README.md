@@ -26,7 +26,7 @@ that run.
 **Ephemeral scratch:** set `RUN_DIR` empty; stage edullm-data each job; durable
 export via the shared spine. `--resume` fetches from S3 when local is empty.
 
-Near-clone of [`../rel-ema-refhq/`](../rel-ema-refhq/): only EMA seed + α schedule
+Only the EMA seed mode and α schedule
 should differ. Shared package: [`../token_selection/`](../token_selection/).
 Config: [`configs/run_rel_ema_exp_10b.yaml`](configs/run_rel_ema_exp_10b.yaml).
 
@@ -53,7 +53,7 @@ ema:
   seed_mode: zero
 ```
 
-`linear` remains the default for other REL arms; `seed_mode: refhq` is only for `rel-ema-refhq`.
+`linear` remains the default for other REL arms.
 
 ## Controlled stack (shared spine)
 

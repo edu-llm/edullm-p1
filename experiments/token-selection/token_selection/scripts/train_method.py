@@ -2,7 +2,7 @@
 """Train shared YAML methods via ``train_olmo_template``.
 
 Supported: ``full``, ``rel_ema``, ``rho_excess``, ``middle_ppl``,
-``attention_topk``, ``learnability``. This entry point validates the config and
+``attention_topk``. This entry point validates the config and
 reports derived training parameters.
 """
 
@@ -33,7 +33,6 @@ _ALL: list[MethodName] = [
     "rho_excess",
     "middle_ppl",
     "attention_topk",
-    "learnability",
 ]
 
 
@@ -53,8 +52,6 @@ def main() -> None:
         method: MethodName = args.method  # type: ignore[assignment]
     elif len(methods) == 1:
         method = str(methods[0])  # type: ignore[assignment]
-    elif "learnability" in methods:
-        method = "learnability"
     elif "attention_topk" in methods:
         method = "attention_topk"
     elif "middle_ppl" in methods:

@@ -177,31 +177,6 @@ def test_middle_ppl_mask_and_warmup():
     )
     assert warm.all()
 
-
-def test_learnability_mask_polarity():
-    """Larger L_early − L_late = larger improvement → kept (top-k)."""
-    # Token 0 improved a lot (early hard, late easy); token 3 got worse.
-    early = torch.tensor([4.0, 3.0, 2.0, 1.0])
-    late = torch.tensor([1.0, 1.5, 1.5, 3.0])
-    # scores = [3.0, 1.5, 0.5, -2.0] → top 50% keeps indices 0,1
-    mask = build_mask(method="learnability", k=0.5, early_loss=early, late_loss=late)
-    assert mask.tolist() == [True, True, False, False]
-
-
-def test_learnability_warmup_falls_back_to_full():
-    early = torch.tensor([4.0, 3.0, 2.0, 1.0])
-    late = torch.zeros(4)
-    m = build_mask(
-        method="learnability",
-        k=0.5,
-        early_loss=early,
-        late_loss=late,
-        shape_ref=early,
-        warmup=True,
-    )
-    assert m.all()
-
-
 def test_random_mask_keep_ratio_and_seed():
     shape = torch.zeros(2, 8)
     valid = torch.ones_like(shape, dtype=torch.bool)
@@ -222,10 +197,3 @@ def test_random_mask_per_sequence():
     assert not mask[0, 3]
     assert int(mask[0].sum()) == 2
     assert int(mask[1].sum()) == 2
-
-
-def test_learnability_requires_both_losses():
-    import pytest
-
-    with pytest.raises(ValueError, match="early_loss"):
-        build_mask(method="learnability", k=0.5, late_loss=torch.zeros(2))

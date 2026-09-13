@@ -1,4 +1,4 @@
-"""Loss masks for full-token, random, REL, RHO-1, middle-PPL, attention, and learnability.
+"""Loss masks for full-token, random, REL, RHO-1, middle-PPL, and attention.
 
 Polarity matches OLMo-core ``label_mask``: ``True`` = token contributes to loss.
 """
@@ -17,7 +17,6 @@ MethodName = Literal[
     "rho_excess",
     "middle_ppl",
     "attention_topk",
-    "learnability",
 ]
 
 def _per_row_keep_counts(valid2d: Tensor, k: float) -> tuple[Tensor, Tensor]:
@@ -190,20 +189,6 @@ def middle_ppl_mask(
     return middle_k_mask(reference_loss, k, valid=valid)
 
 
-def learnability_mask(
-    early_loss: Tensor,
-    late_loss: Tensor,
-    k: float,
-    *,
-    valid: Optional[Tensor] = None,
-) -> Tensor:
-    """Keep tokens with highest learnability ``L_early − L_late``.
-
-    Larger score = larger early→late improvement under frozen RefHQ refs.
-    """
-    return top_k_mask(early_loss - late_loss, k, valid=valid)
-
-
 def attention_topk_mask(
     attention_score: Tensor,
     k: float,
@@ -225,8 +210,6 @@ def build_mask(
     current_loss: Optional[Tensor] = None,
     history_loss: Optional[Tensor] = None,
     reference_loss: Optional[Tensor] = None,
-    early_loss: Optional[Tensor] = None,
-    late_loss: Optional[Tensor] = None,
     attention_score: Optional[Tensor] = None,
     shape_ref: Optional[Tensor] = None,
     valid: Optional[Tensor] = None,
@@ -242,8 +225,6 @@ def build_mask(
                     shape_ref,
                     current_loss,
                     reference_loss,
-                    early_loss,
-                    late_loss,
                     attention_score,
                     history_loss,
                 )
@@ -280,12 +261,7 @@ def build_mask(
             raise ValueError("attention_topk mask requires attention_score")
         return attention_topk_mask(attention_score, k, valid=valid)
 
-    if method == "learnability":
-        if early_loss is None or late_loss is None:
-            raise ValueError("learnability mask requires early_loss and late_loss")
-        return learnability_mask(early_loss, late_loss, k, valid=valid)
-
     raise ValueError(
         f"Unknown method {method!r}; expected 'full', 'random', 'rel_ema', 'rho_excess', "
-        f"'middle_ppl', 'attention_topk', or 'learnability'"
+        f"'middle_ppl', or 'attention_topk'"
     )

@@ -60,7 +60,7 @@ def test_alpha_exp_rejects_bad_tau():
 
 
 def test_alpha_for_half_life_refhq_constant():
-    """rel-ema-refhq pins α≈0.9985 ≈ 20% half-life on a 2360-step run."""
+    """RefHQ-seeded REL pins α≈0.9985 ≈ 20% half-life on a 2360-step run."""
     a = alpha_for_half_life(0.2 * 2360)
     assert abs(a - 0.9985) < 5e-5
     # Constant schedule with start==end returns α at every step.

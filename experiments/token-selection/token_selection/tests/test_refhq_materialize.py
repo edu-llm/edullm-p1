@@ -17,28 +17,6 @@ def test_step_slug_from_uri():
     assert _step_slug("s3://bucket/checkpoints/step1315/") == "step1315"
     assert _step_slug("s3://bucket/checkpoints/step250") == "step250"
 
-
-def test_reference_source_ok_rho_and_learnability():
-    assert not reference_source_ok({"methods": ["rho_excess"]}, method="rho_excess")
-    assert reference_source_ok(
-        {
-            "methods": ["rho_excess"],
-            "reference": {"s3_uri": "s3://edullm-checkpoints/x/step1315/"},
-        },
-        method="rho_excess",
-    )
-    assert reference_source_ok(
-        {
-            "methods": ["learnability"],
-            "reference": {
-                "early": {"s3_uri": "s3://b/step250/"},
-                "late": {"steps": [1000, 1125, 1315]},
-            },
-        },
-        method="learnability",
-    )
-
-
 def test_ensure_reference_paths_reuses_local(tmp_path, monkeypatch):
     ref_pt = tmp_path / "ref.pt"
     ref_pt.write_bytes(b"fake")

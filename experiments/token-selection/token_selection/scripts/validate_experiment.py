@@ -45,18 +45,6 @@ def _reference_local_ok(cfg: dict, *, method: str | None) -> bool:
         if not path.is_absolute():
             path = ROOT / path
         return path.is_file()
-    if method == "learnability":
-        for key in ("early", "late"):
-            block = ref.get(key) or {}
-            raw = str(block.get("load_path") or "")
-            if not raw or raw in {"null", "None", "REPLACE_ME"}:
-                return False
-            path = Path(raw)
-            if not path.is_absolute():
-                path = ROOT / path
-            if not path.is_file():
-                return False
-        return True
     return True
 
 
@@ -71,12 +59,6 @@ def _reference_remote_ok(cfg: dict, *, method: str | None) -> bool:
         ema = cfg.get("ema") or {}
         seed = str(ema.get("seed_mode") or cfg.get("ema_seed_mode") or "zero").lower()
         return seed != "refhq" or str(ref.get("s3_uri") or "").startswith("s3://")
-    if method == "learnability":
-        early = ref.get("early") or {}
-        late = ref.get("late") or {}
-        return str(early.get("s3_uri") or "").startswith("s3://") and bool(
-            late.get("s3_uris")
-        ) and bool(late.get("steps"))
     return True
 
 
@@ -114,7 +96,7 @@ def main() -> None:
 
     # Refs: accept local .pt *or* S3 provenance (materialized at --launch). Do not
     # require a pre-existing scratch/laptop cache of RefHQ weights.
-    if method in ("rho_excess", "rel_ema", "learnability", "middle_ppl"):
+    if method in ("rho_excess", "rel_ema", "middle_ppl"):
         if not reference_source_ok(cfg, method=method):
             raise SystemExit(
                 f"{method} requires reference.load_path (local .pt) or S3 provenance "

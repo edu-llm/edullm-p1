@@ -11,7 +11,7 @@ config, launch scripts, and artifacts.
 | Knob | Value |
 |------|-------|
 | Method | `middle_ppl` |
-| Reference | RefHQ avg(steps 1000, 1125, 1315) — same late ref as `middle-ppl-doc` |
+| Reference | RefHQ avg(steps 1000, 1125, 1315) |
 | Keep rate `k` | 0.6 |
 | Masking warmup | `t0_steps=0` (selection from step 0) |
 | Arch | `olmo2_370M` (RefHQ-matched) |

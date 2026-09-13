@@ -9,7 +9,7 @@
 # (pretrain/regmix-10b v1, realized 10,004,807,041 tokens; 9.9B budget → 2360 steps).
 # New run_id — do NOT reuse rel-ema-10b-scratch-v1.
 #
-# Near-clone of rel-ema-refhq: only EMA seed_mode + α schedule should differ.
+# Only the EMA seed_mode and α schedule distinguish this arm.
 
 run_id: rel-ema-exp-10b-scratch-v1
 seed: 42
@@ -34,7 +34,7 @@ ema:
   tau: 300
   seed_mode: zero   # bias-corrected empty accumulator; never seed from RefHQ
 
-# No frozen reference for this arm (unlike RHO / rel-ema-refhq).
+# No frozen reference for this arm (unlike RHO).
 reference:
   load_path: null
 

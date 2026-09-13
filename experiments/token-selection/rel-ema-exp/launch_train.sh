@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hardware-agnostic launch for REL no-init exp-α (rel-ema-exp).
-# Near-clone of rel-ema-refhq/launch_train.sh — only EMA seed + α schedule differ
+# Only the EMA seed and α schedule distinguish this arm
 # (wired via YAML). This arm must NOT set REF_PT / ema.seed_mode=refhq.
 #
 # Ephemeral empty-scratch contract:

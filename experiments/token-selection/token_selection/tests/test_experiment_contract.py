@@ -59,30 +59,6 @@ def test_rho_requires_reference_load_path_or_s3():
     }
     validate_scratch_config(cfg, method="rho_excess")
 
-
-def test_learnability_requires_dual_reference_paths_or_s3():
-    cfg = _config()
-    cfg["methods"] = ["learnability"]
-    with pytest.raises(ValueError, match="early|late|S3|s3"):
-        validate_scratch_config(cfg, method="learnability")
-
-    cfg["reference"] = {"early": {"load_path": "/tmp/early.pt"}}
-    with pytest.raises(ValueError, match="late|S3|s3"):
-        validate_scratch_config(cfg, method="learnability")
-
-    cfg["reference"]["late"] = {"load_path": "/tmp/late.pt"}
-    validate_scratch_config(cfg, method="learnability")
-
-    cfg["reference"] = {
-        "early": {
-            "load_path": None,
-            "s3_uri": "s3://edullm-checkpoints/x/step250/",
-        },
-        "late": {"load_path": None, "steps": [1000, 1125, 1315]},
-    }
-    validate_scratch_config(cfg, method="learnability")
-
-
 def test_validate_experiment_refuses_missing_rho_reference(tmp_path, monkeypatch):
     """Preflight must fail closed on a typo'd reference path, not only on null."""
     import json

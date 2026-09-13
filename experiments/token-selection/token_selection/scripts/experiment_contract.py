@@ -92,8 +92,7 @@ def validate_scratch_config(
     When ``method='rho_excess'`` (or it is the only configured method), also require a
     local ``reference.load_path`` **or** ``reference.s3_uri`` (materialized at launch).
     When ``method='rel_ema'`` with ``ema.seed_mode='refhq'``, same for RefHQ seed.
-    When ``method='learnability'``, require early/late local paths **or** S3 provenance
-    (``s3_uri`` / ``s3_uris`` + ``steps``). When ``method='middle_ppl'``, require
+    When ``method='middle_ppl'``, require
     ``reference.load_path`` **or** late-avg ``reference.s3_uris`` + ``reference.steps``.
     Smoke configs may omit paths and supply in-memory frozen twins instead.
     """
@@ -127,7 +126,7 @@ def validate_scratch_config(
                 f"ema.seed_mode / ema_seed_mode={seed_mode!r} unsupported; "
                 "expected 'zero' or 'refhq'"
             )
-    if resolved in ("rho_excess", "rel_ema", "learnability", "middle_ppl"):
+    if resolved in ("rho_excess", "rel_ema", "middle_ppl"):
         if not reference_source_ok(cfg, method=resolved):
             if resolved == "rho_excess":
                 raise ValueError(
@@ -139,14 +138,9 @@ def validate_scratch_config(
                     "rel_ema with ema.seed_mode='refhq' requires reference.load_path "
                     "or reference.s3_uri (auto-materialized at --launch)"
                 )
-            if resolved == "middle_ppl":
-                raise ValueError(
-                    "middle_ppl requires reference.load_path or reference.s3_uris/steps "
-                    "(late-avg RefHQ; auto-materialized at --launch)"
-                )
             raise ValueError(
-                "learnability requires reference.early/late load_path or S3 provenance "
-                "(early.s3_uri + late.s3_uris/steps); auto-materialized at --launch"
+                "middle_ppl requires reference.load_path or reference.s3_uris/steps "
+                "(late-avg RefHQ; auto-materialized at --launch)"
             )
 
 

@@ -13,7 +13,7 @@ which tokens contribute to the loss:
   * Random control     -- random ~60% token keep rate (baseline; mask is free)
   * RHO-1              -- reference-model excess loss
   * Attention          -- last-block attention top-k
-  * BLADE              -- reference-ensemble learnability
+  * BLADE              -- dynamic-reference excess loss
   * Perplexity         -- offline middle-perplexity band
   * REL-EMA            -- self-reference EMA excess loss
 

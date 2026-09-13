@@ -35,7 +35,7 @@ def default_ref_cache() -> Path:
     env = (os.environ.get("TOKEN_SELECTION_REF_CACHE") or "").strip()
     if env:
         return Path(env).expanduser().resolve()
-    # Shared across arms so rho-1 and rel-ema-refhq reuse step1315.
+    # Shared across arms so rho-1 and RefHQ-seeded REL reuse step1315.
     root = Path(__file__).resolve().parents[2]  # experiments/token-selection
     return (root / ".cache" / "refhq").resolve()
 
@@ -226,7 +226,7 @@ def ensure_late_average_pt(
     cache_dir: Optional[Path] = None,
     force: bool = False,
 ) -> Path:
-    """Export each step then write mean state dict for learnability late ref."""
+    """Export each step then write the mean state dict for the late-average ref."""
     import torch
 
     from token_selection.olmo_ext.train_module import (
@@ -266,8 +266,8 @@ def ensure_late_average_pt(
                 "averaged_checkpoints": [str(p) for p in singles],
                 "steps": [int(s) for s in steps],
                 "note": (
-                    "Late learnability reference = mean of RefHQ steps "
-                    f"{list(steps)}. Use as reference.late.load_path."
+                    "Late-average reference = mean of RefHQ steps "
+                    f"{list(steps)}. Use as reference.load_path."
                 ),
             },
             tmp,
@@ -345,50 +345,6 @@ def ensure_reference_paths(
             ref["load_path"] = str(path)
             out["reference.load_path"] = str(path)
 
-    if resolved == "learnability":
-        early = ref.setdefault("early", {})
-        late = ref.setdefault("late", {})
-        if not isinstance(early, MutableMapping) or not isinstance(late, MutableMapping):
-            raise TypeError("reference.early / reference.late must be mappings")
-
-        if _local_path_ok(early.get("load_path")):
-            out["reference.early.load_path"] = str(
-                Path(str(early["load_path"])).resolve()
-            )
-        else:
-            early_uri = str(
-                early.get("s3_uri") or f"{DEFAULT_REFHQ_BASE}/step250/"
-            ).strip()
-            path = ensure_distcp_pt(
-                early_uri,
-                cache_dir=cache,
-                output_name="refhq_step250_early.pt",
-                force=force,
-            )
-            early["load_path"] = str(path)
-            out["reference.early.load_path"] = str(path)
-
-        if _local_path_ok(late.get("load_path")):
-            out["reference.late.load_path"] = str(Path(str(late["load_path"])).resolve())
-        else:
-            steps = late.get("steps") or [1000, 1125, 1315]
-            steps_i = [int(s) for s in steps]
-            uris = late.get("s3_uris")
-            if not uris:
-                uris = [f"{DEFAULT_REFHQ_BASE}/step{s}/" for s in steps_i]
-            if len(list(uris)) != len(steps_i):
-                raise ValueError(
-                    "reference.late.s3_uris length must match reference.late.steps"
-                )
-            path = ensure_late_average_pt(
-                [str(u) for u in uris],
-                steps=steps_i,
-                cache_dir=cache,
-                force=force,
-            )
-            late["load_path"] = str(path)
-            out["reference.late.load_path"] = str(path)
-
     if resolved == "middle_ppl":
         if _local_path_ok(ref.get("load_path")):
             out["reference.load_path"] = str(Path(str(ref["load_path"])).resolve())
@@ -437,18 +393,6 @@ def reference_source_ok(cfg: Mapping[str, Any], *, method: Optional[str] = None)
         if seed != "refhq":
             return True
         return _single_ok(ref)
-    if resolved == "learnability":
-        early = ref.get("early") or {}
-        late = ref.get("late") or {}
-        early_ok = _declared_local_path(early.get("load_path")) or str(
-            early.get("s3_uri") or ""
-        ).startswith("s3://")
-        late_ok = (
-            _declared_local_path(late.get("load_path"))
-            or bool(late.get("s3_uris"))
-            or bool(late.get("steps"))
-        )
-        return early_ok and late_ok
     if resolved == "middle_ppl":
         if _declared_local_path(ref.get("load_path")):
             return True

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """OLMo-core scratch entry for ``rel_ema``, ``rho_excess``, ``middle_ppl``,
-``attention_topk``, ``learnability``, and optional ``full``.
+``attention_topk``, and optional ``full``.
 
 Requires edu-llm/OLMo-core installed. Builds trainer configs from the experiment
 YAML and documents the torchrun launch. ``--launch`` fails closed if the requested
@@ -60,7 +60,6 @@ _SELECTING = (
     "rho_excess",
     "middle_ppl",
     "attention_topk",
-    "learnability",
 )
 
 # On a shared multi-GPU host, launching without an explicit pin would default to
@@ -431,8 +430,6 @@ def build_plan(
         "init_seed": int((cfg.get("model") or {}).get("init_seed", cfg["seed"])),
         "load_path": None,
         "reference_load_path": ref_path if needs_reference else "",
-        "early_reference_load_path": early_path if method == "learnability" else "",
-        "late_reference_load_path": late_path if method == "learnability" else "",
         "ema_seed_mode": ema_seed_mode if method == "rel_ema" else "zero",
         "model_name": cfg["model"]["name"],
         "model_arch": str(arch),
@@ -524,7 +521,7 @@ def _run_fingerprint(plan: Dict[str, Any]) -> Dict[str, Any]:
 
     When ``reference_load_path`` is set (RHO or RefHQ-seeded REL), also pin
     ``reference_content_sha256`` so replacing the file at the same path cannot
-    silently resume a different reference. Learnability pins early/late digests
+    silently resume a different reference. Middle-PPL pins its late-average digest
     the same way. Hash keys are omitted when paths are empty so zero-init REL
     fingerprints stay backward-compatible.
     """
@@ -1336,7 +1333,6 @@ def main() -> None:
             "rho_excess",
             "middle_ppl",
             "attention_topk",
-            "learnability",
         ],
         required=True,
     )
@@ -1397,7 +1393,6 @@ def main() -> None:
         "rho_excess",
         "middle_ppl",
         "attention_topk",
-        "learnability",
     ]
     if method not in allowed:
         raise SystemExit(f"method {method!r} not in config methods {allowed}")
@@ -1424,7 +1419,7 @@ def main() -> None:
 
     # On --launch, materialize null RefHQ load_paths from YAML s3_uri(s) into the
     # shared local cache (idempotent; multi-rank safe via mkdir lock).
-    if args.launch and method in ("rho_excess", "rel_ema", "learnability", "middle_ppl"):
+    if args.launch and method in ("rho_excess", "rel_ema", "middle_ppl"):
         from token_selection.olmo_ext.refhq_materialize import ensure_reference_paths
 
         try:

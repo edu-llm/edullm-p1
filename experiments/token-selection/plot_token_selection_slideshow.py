@@ -11,7 +11,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "token_selection_370m_bootstrap_results.json"
-OUT_DIR = ROOT.parents[1] / "p1-whitepaper-overleaf" / "figures"
+OUT_DIR = ROOT / "figures"
 
 ARM_COLORS = {
     "rho_1": "#60A5FA",

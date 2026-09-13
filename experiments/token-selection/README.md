@@ -89,7 +89,7 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 | **Control (full-CE)** | **26.30** | **1.00x** |
 | REL-EMA (exponential) | 34.71 | 1.32x |
 | rho-1 | 45.08 | 1.71x |
-| BLADE | 47.98 | 1.83x |
+| BLADE | 47.98 | 1.82x |
 | Middle-PPL | 49.21 | 1.87x |
 
 The rho-1, BLADE and Middle-PPL totals include pretraining their reference models.
@@ -237,7 +237,7 @@ is incomplete.
 | **Control (full-CE)** | **26.30** | **26.30** | **1.00x** |
 | REL-EMA (exponential) | 34.71 | 34.71 | 1.32x |
 | rho-1 | 34.71 | 45.08 | 1.71x |
-| BLADE | 39.71 | 47.98 | 1.83x |
+| BLADE | 39.71 | 47.98 | 1.82x |
 | Perplexity (Middle-PPL) | 34.71 | 49.21 | 1.87x |
 
 Reading the table: Attention top-k is essentially free -- the score is read off
@@ -246,7 +246,7 @@ loss makes it marginally *cheaper* than full CE. Every arm that needs a second m
 forward pass -- REL-EMA's EMA copy, rho-1's and Middle-PPL's frozen reference, BLADE's
 lagged reference -- pays ~1.32x in-run, and the arms that also had to *pretrain* that
 reference pay up to **1.87x** end to end. **The three most expensive arms are three of
-the worst-performing ones** (Perplexity 1.87x, BLADE 1.83x, rho-1 1.71x, against
+the worst-performing ones** (Perplexity 1.87x, BLADE 1.82x, rho-1 1.71x, against
 Attention's 0.99x), so token selection bought negative return on a large compute
 premium.
 
@@ -272,7 +272,7 @@ forward+backward, on top of the 2360 training steps. That accounts for the 39.71
    this budget. Every *other* selection arm (Attention, BLADE, Middle-PPL, REL-EMA) is
    clearly worse than random-control too.
 4. **BLADE's extra machinery did not pay off** -- worse than simple rho-1 despite
-   3,145,728,000 extra tokens of K-update forward+backward (1.83x control FLOPs).
+   3,145,728,000 extra tokens of K-update forward+backward (1.82x control FLOPs).
 5. **Cost.** Token selection was the most expensive lever and the weakest scientific
    return: up to **1.87x** the control's analytic FLOPs for a strictly worse result.
 6. **The control is not yet seed-matched.** The reported full-loss control differs from

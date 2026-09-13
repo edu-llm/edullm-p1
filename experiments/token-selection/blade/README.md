@@ -14,7 +14,7 @@ the shared RefHQ-matched OLMo-2 370M contract.
 | Sync steps | **500, 875, 1250, 1625, 2000** then hold ref → end |
 | Selection score | **`L_proxy − L_ref`**, keep top-γ (equivalent to minimizing `L_ref − L_proxy`) |
 | Train | `pretrain/regmix-10b` (`s3://edullm-data/`, `resolve_latest`) |
-| Val / HQ (K updates) | `pretrain/refhq-instruct/v3` (pinned validated release) |
+| Val / HQ (K updates) | each K update takes one `pretrain/regmix-10b` batch and one `pretrain/refhq-instruct/v3` batch, optimizing `L_val + lambda_pen * L_train` (pinned validated release) |
 | Run id | `blade-regmix10b-refhq-instruct-v3-v1` |
 | Artifact durability | Runtime scratch + W&B (**fail-closed for production online checkpoint uploads**) |
 

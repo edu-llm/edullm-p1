@@ -42,19 +42,15 @@ come from closed-form OLS and we keep the grid point with the lowest SSE.
   * CI = 2.5 / 97.5 percentile of the bootstrap distribution.
   * ``numpy`` ``default_rng`` seeded with 0, so the numbers are reproducible.
 
-WHY THE ALPHA GRID WAS WIDENED FROM [0.05, 3.0] TO [0.05, 6.0]
---------------------------------------------------------------
-The earlier analysis profiled ``alpha`` over ``np.linspace(0.05, 3.0, ...)``.
-REL-EMA decays much more sharply than the other arms, and its profiled optimum
-landed exactly on the upper edge of that grid -- it was BOUNDARY-PINNED at
-alpha = 3.0, i.e. the grid, not the data, was choosing the exponent. A pinned
-exponent also truncates the bootstrap: draws that "want" a steeper exponent all
-pile up at the same boundary value, which artificially shrinks the interval.
-
-Widening the grid to 6.0 lets REL-EMA settle at its true interior optimum
-(alpha = 3.502) and un-truncates its bootstrap. Under the wider grid no arm
-sits on a boundary (largest: REL-EMA at 3.502; smallest: the full-loss control
-at 0.585), so the exponent is data-determined for every arm.
+ALPHA GRID BOUNDS
+-----------------
+``alpha`` is profiled over ``np.linspace(0.05, 6.0, 1192)``. The bounds are set
+wide enough that no arm's profiled optimum lands on a boundary (largest:
+REL-EMA at 3.502; smallest: the full-loss control at 0.585), so the exponent is
+data-determined for every arm rather than clipped by the grid. That matters for
+the interval as well as the point estimate: a clipped exponent truncates the
+bootstrap, because draws that "want" a steeper exponent pile up at the same
+boundary value and artificially shrink the spread.
 
 WHY ALPHA IS RE-ESTIMATED PER DRAW (ALPHA-FREE)
 -----------------------------------------------
@@ -97,7 +93,7 @@ FIG_DIR = ROOT / "figures"
 MIN_STEP = 1000
 N_BOOT = 10_000
 SEED = 0
-# Widened from [0.05, 3.0]; see module docstring (REL-EMA was pinned at 3.0).
+# Wide enough that no arm's profiled optimum lands on a boundary; see docstring.
 ALPHA_GRID = np.linspace(0.05, 6.0, 1192)
 ALPHA_FREE = True
 
@@ -525,12 +521,10 @@ METHOD_STRING = (
     "np.linspace(0.05, 6.0, 1192) with (a, b) from closed-form OLS at each grid "
     "point. Fitted final is evaluated at each arm's own final logged step. "
     "95% CI = 2.5/97.5 percentile of 10,000 i.i.d. residual bootstrap draws with "
-    "alpha RE-ESTIMATED on every draw (alpha-free), numpy default_rng seed 0. The "
-    "alpha grid was widened from the earlier [0.05, 3.0] because REL-EMA's "
-    "profiled optimum was boundary-pinned at exactly 3.0, which also truncated "
-    "its bootstrap; on the wider grid it settles at an interior 3.502 and no arm "
-    "sits on a grid boundary. Alpha-free was chosen over alpha-fixed because it "
-    "is the more conservative of the two (mean CI width 0.00989 vs 0.00700 bpb)."
+    "alpha RE-ESTIMATED on every draw (alpha-free), numpy default_rng seed 0. No "
+    "arm's profiled optimum sits on a grid boundary (largest 3.502, smallest "
+    "0.585). Alpha-free was chosen over alpha-fixed because it is the more "
+    "conservative of the two (mean CI width 0.00989 vs 0.00700 bpb)."
 )
 
 

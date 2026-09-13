@@ -2,7 +2,7 @@
  "protocol": {
   "form": "y = a + b * step**(-alpha)",
   "fit_window": "steps >= 1000",
-  "alpha_grid": "np.linspace(0.05, 6.0, 1192) (widened from the repo's [0.05,3.0] so no arm is boundary-pinned)",
+  "alpha_grid": "np.linspace(0.05, 6.0, 1192); no arm's profiled optimum sits on a grid boundary",
   "n_boot": 10000,
   "resample": "i.i.d. residual bootstrap on the fit-window residuals",
   "alpha_treatment": "re-estimated on every bootstrap draw (alpha-free); selected because it yields the WIDER intervals (mean width 0.00989 vs 0.00700 bpb for alpha-fixed)",

@@ -128,10 +128,9 @@ procedure. It is the matched protocol used for every number in this file.
    LR warmup transient and bias `alpha`.
 3. **alpha search.** `alpha` is chosen by grid search over
    `np.linspace(0.05, 6.0, 1192)`, with `a` and `b` solved in closed form by least
-   squares at each `alpha`. The grid was **widened from the previous `[0.05, 3.0]`**,
-   which **boundary-pinned REL-EMA at exactly `alpha = 3.0`** -- that pin is the whole
-   reason REL-EMA's fitted final moves **1.9175 -> 1.9199**. No other arm's fitted
-   `alpha` sat at a boundary under either grid.
+   squares at each `alpha`. The bounds are wide enough that **no arm's fitted
+   `alpha` sits on a boundary** (largest: REL-EMA at 3.502; smallest: the full-loss
+   control at 0.585), so the exponent is data-determined rather than clipped.
 4. **Bootstrap.** 10,000 i.i.d. residual bootstrap draws: residuals from the point fit
    are resampled with replacement and added back to the fitted curve.
 5. **alpha re-estimated on every draw.** Each bootstrap replicate re-runs the full

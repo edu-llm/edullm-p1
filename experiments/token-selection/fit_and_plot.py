@@ -99,7 +99,7 @@ ALPHA_FREE = True
 
 WANDB_PROJECT = "eduLLM/token-selection"
 WANDB_RUNS = {
-    "control": "hh19uatg",
+    "control": "349f144dc23ee52d18396be695d6b6b0",
     "rho_1": "ebf1fa33048b3459f768cd471c2a8917",
     "random_control": "fa841187ff07e9164da282efd353c217",
     "attention": "01e18e7141fdbf9b988f17c32bb0c084",

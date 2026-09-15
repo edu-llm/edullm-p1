@@ -18,14 +18,14 @@
     {
       "key": "control",
       "label": "Full-loss control",
-      "wandb_path": "eduLLM/token-selection/hh19uatg",
-      "final_step": 2384,
-      "n_fit_points": 12,
-      "alpha": 0.5846,
-      "fitted_final": 1.6473,
-      "observed": 1.6487,
-      "ci_lo": 1.6433,
-      "ci_hi": 1.6515
+      "wandb_path": "eduLLM/token-selection/349f144dc23ee52d18396be695d6b6b0",
+      "final_step": 2360,
+      "n_fit_points": 11,
+      "alpha": 1.5937,
+      "fitted_final": 1.6718,
+      "observed": 1.6751,
+      "ci_lo": 1.6653,
+      "ci_hi": 1.6787
     },
     {
       "key": "rho_1",

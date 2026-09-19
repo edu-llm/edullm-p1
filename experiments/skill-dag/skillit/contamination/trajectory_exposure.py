@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Token-weighted average contaminated exposure for a time-varying mixture.
 
-`../mixlaw/contamination/mixture_exposure.py` computes exposure for a FIXED
+`../../mixlaw/contamination/mixture_exposure.py` computes exposure for a FIXED
 mixture: exposure = sum_d weight(d) * rate(d). Skill-It reweights domains
 mid-training, so a single static weight vector does not describe a whole
 run -- the sampler holds each mixture fixed only between update steps, then
@@ -38,7 +38,7 @@ RATE_KEYS = ("matched_span_word_rate", "matched_document_rate")
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--per-domain", required=True, help="../mixlaw/contamination/results_olmo127b-reservoir.json")
+    parser.add_argument("--per-domain", required=True, help="../../mixlaw/contamination/results_olmo127b-reservoir.json")
     parser.add_argument("--updates", required=True, help="skillit_updates_<arm>.jsonl")
     parser.add_argument("--arm", required=True, help="label for the report, e.g. skillit-deriv")
     parser.add_argument("--final-step", type=int, required=True, help="this run's total step budget")

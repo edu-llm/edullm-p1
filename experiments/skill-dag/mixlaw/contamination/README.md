@@ -2,11 +2,11 @@
 
 This directory holds the code and results behind the domain-weighting
 paper's contamination audit of the shared 127B-token data reservoir that
-every mixture in this experiment (and in `../skillit/`) draws from.
+every mixture in this experiment (and in `../../skillit/`) draws from.
 Contamination is a property of the reservoir's domains, not of any one
 mixture, so this directory's scan and its results are shared by both the
 static-mixture (MixLaw / LightGBM) arms here and the dynamic-reweighting
-(Skill-It) arms in `../skillit/contamination/`, which reads this directory's
+(Skill-It) arms in `../../skillit/contamination/`, which reads this directory's
 `results_olmo127b-reservoir.json` directly rather than duplicating the scan.
 
 ## Methodology
@@ -80,29 +80,39 @@ independent of anything the mixture-selection method itself is doing.
 
 ### Per-arm exposure
 
-From `exposure_by_arm.json` (built by `mixture_exposure.py` against
-`../validation_mixtures_10b.json`, this experiment's own mixture
-definitions), baseline `olmo-mix-1124` (tag `natural`, the published
-Dolma/OLMo-mix domain proportions with no re-weighting).
+`../validation_mixtures_10b.json` catalogs more candidate mixtures than
+were actually trained at 370M (`mix07`, `mix18`, and one alternate
+mixing-law and one alternate LightGBM candidate were priced but not run).
+The four arms this experiment actually validated are named in
+`../README.md`'s "Arms actually run (370M)" table, matched here to their
+`run_name` by their published weight vectors in "Validated mixture weights
+(370M)": `olmo-mix-1124` = OLMo Mix 1124 (control), `mix01` = Data Mixing
+Laws paper, `ML-pilot_caps` = MixLaw, `LGB-min1pct` = LightGBM.
+`exposure_by_arm.json` is built with `mixture_exposure.py --include`
+restricted to exactly these four (see Reproducing below); it does not
+report exposure for the untrained candidates.
 
-| Arm | Tag | Matched-span word rate | vs. baseline | Matched-doc rate | vs. baseline |
+From `exposure_by_arm.json`, baseline `olmo-mix-1124` (tag `natural`, the
+published Dolma/OLMo-mix domain proportions with no re-weighting).
+
+| Arm | Paper name | Matched-span word rate | vs. baseline | Matched-doc rate | vs. baseline |
 | --- | --- | --- | --- | --- | --- |
-| `mix01` | base | 1.303e-05 | 0.687x | 6.031e-04 | 0.845x |
-| `LGB-min1pct` | LGB-min1pct | 1.494e-05 | 0.788x | 6.545e-04 | 0.917x |
-| `mix07` | C1-dclm60 | 1.541e-05 | 0.813x | 6.512e-04 | 0.912x |
-| `mix18` | C1 | 1.781e-05 | 0.940x | 5.105e-04 | 0.715x |
-| `LGB-near-opt-8` | LGB-near-opt-8 | 1.863e-05 | 0.983x | 5.323e-04 | 0.746x |
-| `olmo-mix-1124` | natural (baseline) | 1.895e-05 | 1.000x | 7.139e-04 | 1.000x |
-| `ML-near-opt-4` | ML-near-opt-4 | 3.935e-05 | 2.076x | 7.696e-04 | 1.078x |
-| `ML-pilot_caps` | ML-pilot_caps | 4.016e-05 | 2.119x | 7.576e-04 | 1.061x |
+| `mix01` | Data Mixing Laws paper | 1.303e-05 | 0.687x | 6.031e-04 | 0.845x |
+| `LGB-min1pct` | LightGBM | 1.494e-05 | 0.788x | 6.545e-04 | 0.917x |
+| `olmo-mix-1124` | OLMo Mix 1124 (control) | 1.895e-05 | 1.000x | 7.139e-04 | 1.000x |
+| `ML-pilot_caps` | MixLaw | 4.016e-05 | 2.119x | 7.576e-04 | 1.061x |
 
-Span-rate spread across the 8 arms: **3.08x** (lowest `mix01`, highest
-`ML-pilot_caps`; `exposure_by_arm.json` -> `span_rate_spread_across_arms`).
-Note the two rates do not always rank arms the same way (e.g. `mix18` has a
-higher span rate than `LGB-near-opt-8` but a lower doc rate) -- length bias
-in the document rate and differing per-domain matched-word density are two
-different things, which is why both are reported rather than one
-"contamination score."
+Span-rate spread across these four arms: **3.08x** (lowest `mix01`,
+highest `ML-pilot_caps`; `exposure_by_arm.json` ->
+`span_rate_spread_across_arms`). MixLaw's exposure is more than double the
+control's (2.12x) while LightGBM's is close to or below it (0.79x), yet the
+paper reports both beating the control by a comparable margin (1.6062 and
+1.6087 fitted-final bpb respectively) -- so a contamination-driven
+explanation for the win would have to apply very differently to the two
+search methods, which is weak evidence for one. The Data Mixing Laws paper
+mixture has the lowest exposure of any arm (0.69x control) and is the only
+one of the three non-control arms that does not beat the control, which
+argues against lower exposure conferring an advantage either.
 
 ## Code map
 
@@ -184,9 +194,13 @@ python "$CONTAM/aggregate_by_domain.py" \
   --corpus-name "olmo127b-edullm-publish full reservoir" \
   --out "$CONTAM/results_olmo127b-reservoir.json"
 
-# Project onto this experiment's mixtures.
+# Project onto the four arms actually trained at 370M (see Per-arm exposure
+# above for why this excludes the other candidates validation_mixtures_10b.json
+# catalogs).
 python "$CONTAM/mixture_exposure.py" \
   --per-domain "$CONTAM/results_olmo127b-reservoir.json" \
   --mixtures "$CONTAM/../validation_mixtures_10b.json" \
-  --baseline natural --out "$CONTAM/exposure_by_arm.json"
+  --baseline natural \
+  --include olmo-mix-1124,mix01,ML-pilot_caps,LGB-min1pct \
+  --out "$CONTAM/exposure_by_arm.json"
 ```

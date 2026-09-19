@@ -1,0 +1,98 @@
+{
+ "arm": "offline-probe",
+ "final_step": 2384,
+ "segments": [
+  {
+   "step": 0,
+   "length_steps": 500,
+   "weights": {
+    "dclm": 0.37425149700598803,
+    "arxiv": 0.249500998003992,
+    "starcoder": 0.1407185628742515,
+    "pes2o": 0.09381237524950099,
+    "open-web-math": 0.06387225548902195,
+    "algebraic-stack": 0.06187624750499002,
+    "wiki": 0.015968063872255488
+   },
+   "matched_span_word_rate": 1.3049392867790349e-05,
+   "matched_document_rate": 0.0006028969583224729
+  },
+  {
+   "step": 500,
+   "length_steps": 375,
+   "weights": {
+    "dclm": 0.1941941941941942,
+    "arxiv": 0.13113113113113115,
+    "starcoder": 0.1061061061061061,
+    "pes2o": 0.15715715715715717,
+    "open-web-math": 0.12212212212212212,
+    "algebraic-stack": 0.12412412412412413,
+    "wiki": 0.16516516516516516
+   },
+   "matched_span_word_rate": 2.361314840543871e-05,
+   "matched_document_rate": 0.0006003346081203161
+  },
+  {
+   "step": 875,
+   "length_steps": 375,
+   "weights": {
+    "dclm": 0.19,
+    "arxiv": 0.132,
+    "starcoder": 0.109,
+    "pes2o": 0.156,
+    "open-web-math": 0.124,
+    "algebraic-stack": 0.126,
+    "wiki": 0.163
+   },
+   "matched_span_word_rate": 2.3373910142629944e-05,
+   "matched_document_rate": 0.0005979147657939726
+  },
+  {
+   "step": 1250,
+   "length_steps": 375,
+   "weights": {
+    "dclm": 0.18781218781218778,
+    "arxiv": 0.13286713286713286,
+    "starcoder": 0.10989010989010987,
+    "pes2o": 0.1558441558441558,
+    "open-web-math": 0.12487512487512487,
+    "algebraic-stack": 0.12587412587412586,
+    "wiki": 0.16283716283716282
+   },
+   "matched_span_word_rate": 2.333404199264889e-05,
+   "matched_document_rate": 0.0005974189190361526
+  },
+  {
+   "step": 1625,
+   "length_steps": 375,
+   "weights": {
+    "dclm": 0.187,
+    "arxiv": 0.133,
+    "starcoder": 0.111,
+    "pes2o": 0.156,
+    "open-web-math": 0.125,
+    "algebraic-stack": 0.126,
+    "wiki": 0.162
+   },
+   "matched_span_word_rate": 2.324473038404618e-05,
+   "matched_document_rate": 0.000596334314024954
+  },
+  {
+   "step": 2000,
+   "length_steps": 384,
+   "weights": {
+    "dclm": 0.186,
+    "arxiv": 0.133,
+    "starcoder": 0.111,
+    "pes2o": 0.155,
+    "open-web-math": 0.126,
+    "algebraic-stack": 0.127,
+    "wiki": 0.162
+   },
+   "matched_span_word_rate": 2.3242735826856632e-05,
+   "matched_document_rate": 0.0005965535644508127
+  }
+ ],
+ "time_weighted_avg_matched_span_word_rate": 2.1198445297061458e-05,
+ "time_weighted_avg_matched_document_rate": 0.0005987944737945142
+}

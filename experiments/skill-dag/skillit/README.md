@@ -155,3 +155,7 @@ Lower is better. Control is best. Offline probe overlaps control; Online derivat
 ## Conclusions
 
 At this scale and budget, **static MixLaw mixtures dominate Skill-It reweighting**. Holding a good fixed mix for the full epoch beats adapting domain weights online from either probe or mixing-law adjacencies.
+
+Benchmark contamination between the shared 127B-token reservoir and the
+evaluation suite is audited in [contamination/](contamination/), including
+each arm's time-weighted exposure over its realized, time-varying mixture.

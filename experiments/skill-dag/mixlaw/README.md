@@ -356,3 +356,7 @@ Lower is better. Both fitted mixtures beat the OLMo Mix 1124 control. Data Mixin
 ## Conclusions
 
 Under the P1 one-epoch 370M contract, **data mixture is a high-leverage lever**: mixing-law optimization yields ~0.025 bpb absolute macro task-loss improvement over the OLMo Mix 1124 control, with tight CIs and decisive bootstrap significance. Among levers in this campaign, MixLaw is the clearest positive result.
+
+Benchmark contamination between the shared 127B-token reservoir and the
+evaluation suite, and its projection onto each arm's mixture, is audited in
+[contamination/](contamination/).

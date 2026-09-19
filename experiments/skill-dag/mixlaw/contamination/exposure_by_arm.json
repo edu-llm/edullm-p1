@@ -66,42 +66,6 @@
    "matched_span_word_rate_vs_baseline": 0.6873253450995578,
    "matched_document_rate_vs_baseline": 0.8447240082216247
   },
-  "mix07": {
-   "id": 7,
-   "tag": "C1-dclm60",
-   "weights": {
-    "dclm": 0.6,
-    "arxiv": 0.16,
-    "starcoder": 0.09,
-    "pes2o": 0.06,
-    "open-web-math": 0.0406,
-    "algebraic-stack": 0.0394,
-    "wiki": 0.01
-   },
-   "published_weight_sum": 1.0,
-   "matched_span_word_rate": 1.541165128478986e-05,
-   "matched_document_rate": 0.0006511700574987493,
-   "matched_span_word_rate_vs_baseline": 0.8131468562438422,
-   "matched_document_rate_vs_baseline": 0.9121109136917683
-  },
-  "mix18": {
-   "id": 18,
-   "tag": "C1",
-   "weights": {
-    "dclm": 0.2375237523752375,
-    "arxiv": 0.0406040604060406,
-    "starcoder": 0.0406040604060406,
-    "pes2o": 0.425042504250425,
-    "open-web-math": 0.10001000100010002,
-    "algebraic-stack": 0.043704370437043706,
-    "wiki": 0.11251125112511251
-   },
-   "published_weight_sum": 0.9999,
-   "matched_span_word_rate": 1.7812797776868636e-05,
-   "matched_document_rate": 0.0005104724920886396,
-   "matched_span_word_rate_vs_baseline": 0.9398357285350121,
-   "matched_document_rate_vs_baseline": 0.7150321575932986
-  },
   "ML-pilot_caps": {
    "id": 25,
    "tag": "ML-pilot_caps",
@@ -120,24 +84,6 @@
    "matched_span_word_rate_vs_baseline": 2.118982811312801,
    "matched_document_rate_vs_baseline": 1.061208584682913
   },
-  "ML-near-opt-4": {
-   "id": 26,
-   "tag": "ML-near-opt-4",
-   "weights": {
-    "dclm": 0.4402420724187851,
-    "arxiv": 0.011898187850289477,
-    "starcoder": 0.011898187850289477,
-    "pes2o": 0.042675809175663146,
-    "open-web-math": 0.18138755483924,
-    "algebraic-stack": 0.011898187850289477,
-    "wiki": 0.30000000001544325
-   },
-   "published_weight_sum": 0.9999999999485224,
-   "matched_span_word_rate": 3.9346651639544305e-05,
-   "matched_document_rate": 0.0007696271711571517,
-   "matched_span_word_rate_vs_baseline": 2.076001169063132,
-   "matched_document_rate_vs_baseline": 1.0780368879100508
-  },
   "LGB-min1pct": {
    "id": 27,
    "tag": "LGB-min1pct",
@@ -155,24 +101,6 @@
    "matched_document_rate": 0.0006545431793154429,
    "matched_span_word_rate_vs_baseline": 0.7883741954388855,
    "matched_document_rate_vs_baseline": 0.9168357335553167
-  },
-  "LGB-near-opt-8": {
-   "id": 28,
-   "tag": "LGB-near-opt-8",
-   "weights": {
-    "dclm": 0.18150266876105942,
-    "arxiv": 0.18152022799030815,
-    "starcoder": 0.07612101791112265,
-    "pes2o": 0.37741078137529865,
-    "open-web-math": 0.019706663260932466,
-    "algebraic-stack": 0.037212589676888896,
-    "wiki": 0.12652605102438985
-   },
-   "published_weight_sum": 0.9999999999999999,
-   "matched_span_word_rate": 1.862550809783416e-05,
-   "matched_document_rate": 0.0005323012235973517,
-   "matched_span_word_rate_vs_baseline": 0.9827158086976259,
-   "matched_document_rate_vs_baseline": 0.7456082321714543
   }
  },
  "span_rate_spread_across_arms": 3.082940017301225

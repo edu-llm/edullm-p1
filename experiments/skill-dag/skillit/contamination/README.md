@@ -100,10 +100,10 @@ aggressively than `deriv`'s online one (`weight[dclm]` reaches 0.864 by step
 grows -- so despite ending up more `dclm`-concentrated, `probe`'s exposure
 stays close to `deriv`'s and to the shared starting point, because `dclm`'s
 own rate is unremarkable next to `wiki`'s. Both time-weighted averages fall
-within the range the fixed-mixture MixLaw arms span in
+within the range the four validated MixLaw-experiment arms span in
 `../mixlaw/contamination/README.md` (1.303e-05 to 4.016e-05), below the
-natural baseline and closest to the `LGB-*` and `mix07`/`mix18` arms both
-Skill-It arms are seeded from.
+natural baseline and closest to `LGB-min1pct` (LightGBM) -- the exact
+mixture both Skill-It arms are seeded from.
 
 ## Code map
 

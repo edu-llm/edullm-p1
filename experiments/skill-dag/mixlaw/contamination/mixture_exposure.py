@@ -30,6 +30,14 @@ Reads a `validation_mixtures_*.json`-shaped file directly: a
 `weights` a list aligned to `domain_order`. This is the same schema
 `validation_mixtures_10b.json` in this directory already uses, so it can be
 pointed at that file with no conversion step.
+
+`validation_mixtures_10b.json` catalogs more candidate mixtures than were
+actually trained at 370M -- `mix07`/`mix18` and one alternate candidate per
+search method were priced but not run; the four arms this experiment
+actually validated are named in its own `README.md`'s "Arms actually run
+(370M)" table. Pass `--include` with exactly those `run_name`s so the
+reported exposure numbers describe the experiment that was run, not every
+mixture that was ever considered.
 """
 
 from __future__ import annotations
@@ -50,12 +58,26 @@ def main() -> int:
     parser.add_argument("--per-domain", required=True, help="results_*.json from aggregate_by_domain.py")
     parser.add_argument("--mixtures", required=True, help="validation_mixtures_*.json")
     parser.add_argument("--baseline", default="natural", help="run_name or tag to index against")
+    parser.add_argument(
+        "--include",
+        default="",
+        help="comma-separated run_names to keep; default is every mixture in "
+        "the file, which is usually wrong if the file catalogs candidates "
+        "that were priced but not actually trained",
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
     per_domain = json.loads(Path(args.per_domain).read_text(encoding="utf-8"))["domains"]
     mix = json.loads(Path(args.mixtures).read_text(encoding="utf-8"))
     order = mix["domain_order"]
+
+    include = {x.strip() for x in args.include.split(",") if x.strip()} or None
+    if include is not None:
+        available = {m["run_name"] for m in mix["mixtures"]}
+        unknown = include - available
+        if unknown:
+            raise RuntimeError(f"--include names not in {args.mixtures}: {sorted(unknown)}")
 
     missing = [d for d in order if d not in per_domain]
     if missing:
@@ -69,6 +91,8 @@ def main() -> int:
 
     arms: dict[str, dict] = {}
     for m in mix["mixtures"]:
+        if include is not None and m["run_name"] not in include:
+            continue
         weights = m.get("weights")
         if not weights:
             continue
@@ -94,6 +118,12 @@ def main() -> int:
         for key in RATE_KEYS:
             entry[key] = sum(w * rates[key][d] for d, w in zip(order, normalized))
         arms[m["run_name"]] = entry
+
+    if include is not None and set(arms) != include:
+        raise RuntimeError(
+            f"--include named {sorted(include)} but only {sorted(arms)} had "
+            f"usable weights; a requested arm carries no `weights` field"
+        )
 
     base = None
     for name, entry in arms.items():

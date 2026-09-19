@@ -1,27 +1,28 @@
 {
+ "generated_by": "experiments/token-selection: regenerated from token_selection_370m_wandb_curves.json via fit_and_plot.fit_all(); FLOPs recomputed analytically",
  "protocol": {
   "form": "y = a + b * step**(-alpha)",
   "fit_window": "steps >= 1000",
   "alpha_grid": "np.linspace(0.05, 6.0, 1192); no arm's profiled optimum sits on a grid boundary",
   "n_boot": 10000,
   "resample": "i.i.d. residual bootstrap on the fit-window residuals",
-  "alpha_treatment": "re-estimated on every bootstrap draw (alpha-free); selected because it yields the WIDER intervals (mean width 0.00989 vs 0.00700 bpb for alpha-fixed)",
-  "fitted_final_at": "each arm's own final logged step",
+  "alpha_treatment": "re-estimated on every bootstrap draw (alpha-free); selected because it yields the WIDER intervals (mean width 0.01063 vs 0.00749 bpb for alpha-fixed)",
+  "fitted_final_at": "each arm's own final logged step (2360 for all seven arms)",
   "ci": "2.5/97.5 percentile of the bootstrap distribution",
   "rng_seed": 0,
-  "source": "eduLLM/token-selection W&B eval/macro_bpb histories (pulled live, not the cached JSON)"
+  "source": "eduLLM/token-selection W&B eval/macro_bpb histories, cached in token_selection_370m_wandb_curves.json; full-loss control is full-loss-control-regmix10b-v3 (matched seed/step/grid rerun, replaces v2)"
  },
  "table1": {
   "Full-loss control": {
-   "fitted_final": 1.6473,
-   "observed": 1.6487,
+   "fitted_final": 1.6718,
+   "observed": 1.6751,
    "ci": [
-    1.6433,
-    1.6515
+    1.6653,
+    1.6787
    ],
-   "alpha": 0.585,
-   "final_step": 2384,
-   "n_fit_points": 12
+   "alpha": 1.594,
+   "final_step": 2360,
+   "n_fit_points": 11
   },
   "RHO-1": {
    "fitted_final": 1.6824,
@@ -96,60 +97,68 @@
    -0.0102,
    0.0042
   ],
-  "p_one_sided": 0.182,
-  "p_two_sided": 0.363
+  "p_one_sided": 0.1817,
+  "p_two_sided": 0.3634
  },
  "deltas_vs_control": {
   "RHO-1": {
-   "delta": 0.0351,
+   "delta": 0.0106,
    "ci": [
-    0.0287,
-    0.0406
+    0.0039,
+    0.0172
    ],
-   "p_one_sided": 0.0
+   "p_one_sided": 0.0005
   },
   "Random control": {
-   "delta": 0.0384,
+   "delta": 0.0139,
    "ci": [
-    0.0295,
-    0.0459
+    0.0017,
+    0.0239
    ],
-   "p_one_sided": 0.0
+   "p_one_sided": 0.0121
   },
   "Attention": {
-   "delta": 0.0518,
+   "delta": 0.0273,
    "ci": [
-    0.0449,
-    0.0582
+    0.0192,
+    0.0344
    ],
    "p_one_sided": 0.0
   },
   "BLADE": {
-   "delta": 0.0617,
+   "delta": 0.0372,
    "ci": [
-    0.0541,
-    0.0718
+    0.0318,
+    0.0426
    ],
    "p_one_sided": 0.0
   },
   "Perplexity": {
-   "delta": 0.2574,
+   "delta": 0.2329,
    "ci": [
-    0.2516,
-    0.2636
+    0.2252,
+    0.2418
    ],
    "p_one_sided": 0.0
   },
   "REL-EMA": {
-   "delta": 0.2727,
+   "delta": 0.2482,
    "ci": [
-    0.268,
-    0.277
+    0.2406,
+    0.2551
    ],
    "p_one_sided": 0.0
   }
  },
  "deltas_vs_random": {
+  "Full-loss control": {
+   "delta": -0.0139,
+   "ci": [
+    -0.0239,
+    -0.0017
+   ],
+   "p_one_sided": 0.0121
+  },
   "RHO-1": {
    "delta": -0.0033,
    "ci": [
@@ -164,7 +173,7 @@
     0.0085,
     0.019
    ],
-   "p_one_sided": 1.0
+   "p_one_sided": 0.0
   },
   "BLADE": {
    "delta": 0.0233,
@@ -172,7 +181,7 @@
     0.0149,
     0.0334
    ],
-   "p_one_sided": 1.0
+   "p_one_sided": 0.0
   },
   "Perplexity": {
    "delta": 0.219,
@@ -180,7 +189,7 @@
     0.2111,
     0.2295
    ],
-   "p_one_sided": 1.0
+   "p_one_sided": 0.0
   },
   "REL-EMA": {
    "delta": 0.2343,
@@ -188,19 +197,19 @@
     0.2274,
     0.2431
    ],
-   "p_one_sided": 1.0
+   "p_one_sided": 0.0
   }
  },
  "flops": {
   "Full-loss control": {
-   "train_1e18": 26.296236749239615,
+   "train_1e18": 26.031509533643245,
    "score_1e18": 0.0,
    "ref_1e18": 0.0,
-   "run_total_1e18": 26.296236749239615,
-   "grand_total_1e18": 26.296236749239615,
+   "run_total_1e18": 26.031509533643245,
+   "grand_total_1e18": 26.031509533643245,
    "run_rel_control": 1.0,
    "total_rel_control": 1.0,
-   "note": "fwd+bwd only, 2384 steps"
+   "note": "fwd+bwd only, 2360 steps"
   },
   "Random control": {
    "train_1e18": 26.031509533643245,
@@ -208,8 +217,8 @@
    "ref_1e18": 0.0,
    "run_total_1e18": 26.031509533643245,
    "grand_total_1e18": 26.031509533643245,
-   "run_rel_control": 0.9899328859060402,
-   "total_rel_control": 0.9899328859060402,
+   "run_rel_control": 1.0,
+   "total_rel_control": 1.0,
    "note": "mask is free; identical to full loss per token"
   },
   "RHO-1": {
@@ -218,8 +227,8 @@
    "ref_1e18": 10.368482610857901,
    "run_total_1e18": 34.70867937819099,
    "grand_total_1e18": 45.077161989048896,
-   "run_rel_control": 1.319910514541387,
-   "total_rel_control": 1.7142058165548097,
+   "run_rel_control": 1.3333333333333333,
+   "total_rel_control": 1.731638418079096,
    "note": "1 extra no-grad fwd/step (frozen Instruct ref) + Instruct ref pretraining"
   },
   "Attention": {
@@ -228,8 +237,8 @@
    "ref_1e18": 0.0,
    "run_total_1e18": 26.11454465177289,
    "grand_total_1e18": 26.11454465177289,
-   "run_rel_control": 0.9930905665628379,
-   "total_rel_control": 0.9930905665628379,
+   "run_rel_control": 1.003189792663477,
+   "total_rel_control": 1.003189792663477,
    "note": "last-block Q/K recompute + QK^T only"
   },
   "BLADE": {
@@ -238,8 +247,8 @@
    "ref_1e18": 8.272725487386625,
    "run_total_1e18": 39.7090823394558,
    "grand_total_1e18": 47.98180782684242,
-   "run_rel_control": 1.5100671140939597,
-   "total_rel_control": 1.8246644295302012,
+   "run_rel_control": 1.5254237288135593,
+   "total_rel_control": 1.8432203389830508,
    "note": "no selection <500; 2 extra no-grad fwd/step after; 5x75x2 full-batch ref fwd+bwd"
   },
   "Perplexity (Middle-PPL)": {
@@ -248,8 +257,8 @@
    "ref_1e18": 14.504845354551215,
    "run_total_1e18": 34.70867937819099,
    "grand_total_1e18": 49.21352473274221,
-   "run_rel_control": 1.319910514541387,
-   "total_rel_control": 1.8715044742729305,
+   "run_rel_control": 1.3333333333333333,
+   "total_rel_control": 1.8905367231638417,
    "note": "offline mask precompute = 1 fwd over corpus + HQ ref pretraining"
   },
   "REL-EMA": {
@@ -258,12 +267,20 @@
    "ref_1e18": 0.0,
    "run_total_1e18": 34.70867937819099,
    "grand_total_1e18": 34.70867937819099,
-   "run_rel_control": 1.319910514541387,
-   "total_rel_control": 1.319910514541387,
+   "run_rel_control": 1.3333333333333333,
+   "total_rel_control": 1.3333333333333333,
    "note": "1 extra no-grad fwd/step (EMA shadow); no ref pretraining"
   }
  },
  "overlapping_pairs": [
+  [
+   "Full-loss control",
+   "RHO-1"
+  ],
+  [
+   "Full-loss control",
+   "Random control"
+  ],
   [
    "RHO-1",
    "Random control"

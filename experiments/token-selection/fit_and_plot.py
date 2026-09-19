@@ -38,7 +38,7 @@ come from closed-form OLS and we keep the grid point with the lowest SSE.
   * ``alpha`` is RE-ESTIMATED on every bootstrap draw ("alpha-free"), rather
     than being frozen at the point-estimate value.
   * The fitted final value is evaluated at each arm's OWN final logged step
-    (2384 for the full-loss control, 2360 for the other six).
+    (2360 for all seven arms).
   * CI = 2.5 / 97.5 percentile of the bootstrap distribution.
   * ``numpy`` ``default_rng`` seeded with 0, so the numbers are reproducible.
 
@@ -46,7 +46,7 @@ ALPHA GRID BOUNDS
 -----------------
 ``alpha`` is profiled over ``np.linspace(0.05, 6.0, 1192)``. The bounds are set
 wide enough that no arm's profiled optimum lands on a boundary (largest:
-REL-EMA at 3.502; smallest: the full-loss control at 0.585), so the exponent is
+REL-EMA at 3.502; smallest: BLADE at 0.794), so the exponent is
 data-determined for every arm rather than clipped by the grid. That matters for
 the interval as well as the point estimate: a clipped exponent truncates the
 bootstrap, because draws that "want" a steeper exponent pile up at the same
@@ -55,10 +55,10 @@ boundary value and artificially shrink the spread.
 WHY ALPHA IS RE-ESTIMATED PER DRAW (ALPHA-FREE)
 -----------------------------------------------
 Freezing ``alpha`` at its point estimate treats a quantity that was estimated
-from the same 11-12 points as if it were known exactly, so it understates
+from the same 11 points as if it were known exactly, so it understates
 uncertainty. Re-estimating it per draw propagates that uncertainty. It is also
-the more conservative of the two variants: mean CI width is 0.00989 bpb
-alpha-free vs 0.00700 bpb alpha-fixed, so every interval reported here is the
+the more conservative of the two variants: mean CI width is 0.01063 bpb
+alpha-free vs 0.00749 bpb alpha-fixed, so every interval reported here is the
 WIDER of the two. That is the basis on which the protocol was chosen.
 
 Data source
@@ -106,6 +106,18 @@ WANDB_RUNS = {
     "blade": "005xjces",
     "middle_ppl": "2bbd4ec49b531d37115a44f73a0512e2",
     "rel_ema": "cc52d5537a03ad8e57cc87a025668b2e",
+    "random_control_seed69": "123189f79a722b3481d06bc48b61fad9",
+}
+
+# The random control was run twice. It is REPORTED as a single two-run fit: one
+# power law fitted to the union of both runs' fit-window points, bootstrapped over
+# the pooled residuals, so the interval carries seed-to-seed spread as well as
+# within-run noise. Every comparison involving the random control uses that fit.
+# The per-seed fits are kept for Table 1 and for Figure 1, which draws both curves.
+RANDOM_SEED_KEYS = ("random_control", "random_control_seed69")
+RANDOM_SEED_LABEL = {
+    "random_control": "Random control seed 42",
+    "random_control_seed69": "Random control seed 69",
 }
 
 # Display order == ascending fitted-final bpb. Colors are the matplotlib tab10
@@ -259,6 +271,43 @@ def fit_all(curves: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, dict]
             loss=loss,
         )
         results[key] = res
+
+    # Per-seed fits for the random control, kept for Table 1 and Figure 1.
+    for key in RANDOM_SEED_KEYS:
+        if key not in curves:
+            continue
+        steps, loss = curves[key]
+        mask = steps >= MIN_STEP
+        res = bootstrap_arm(steps[mask], loss[mask], float(steps[-1]))
+        res.update(
+            key=key,
+            label=RANDOM_SEED_LABEL[key],
+            final_step=float(steps[-1]),
+            observed=float(loss[-1]),
+            n_fit_points=int(mask.sum()),
+            steps=steps,
+            loss=loss,
+        )
+        results[f"{key}__seedfit"] = res
+
+    # Replace the reported random control with the pooled two-run fit.
+    present = [k for k in RANDOM_SEED_KEYS if k in curves]
+    if len(present) > 1:
+        pooled_steps = np.concatenate([curves[k][0][curves[k][0] >= MIN_STEP] for k in present])
+        pooled_loss = np.concatenate([curves[k][1][curves[k][0] >= MIN_STEP] for k in present])
+        final_step = float(max(curves[k][0][-1] for k in present))
+        pooled = bootstrap_arm(pooled_steps, pooled_loss, final_step)
+        pooled.update(
+            key="random_control",
+            label=LABEL["random_control"],
+            final_step=final_step,
+            observed=float(np.mean([curves[k][1][-1] for k in present])),
+            n_fit_points=int(pooled_steps.size),
+            n_seeds=len(present),
+            steps=curves["random_control"][0],
+            loss=curves["random_control"][1],
+        )
+        results["random_control"] = pooled
     return results
 
 
@@ -266,20 +315,29 @@ def fit_all(curves: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, dict]
 def print_table1(results: dict[str, dict]) -> None:
     print()
     print("=" * 94)
-    print("TABLE 1 -- fitted-final validation macro bpb (matched alpha-free protocol)")
+    print("TABLE 1 -- fitted-final macro task-loss bpb (matched alpha-free protocol)")
     print("=" * 94)
     print(
         f"{'Arm':<20} {'alpha':>6} {'n':>3} {'final_step':>10} "
         f"{'fitted':>8} {'observed':>9}  {'95% CI':>18} {'width':>7}"
     )
     print("-" * 94)
-    for key in ORDER:
-        r = results[key]
+    def row(r: dict, label: str | None = None) -> None:
         print(
-            f"{r['label']:<20} {r['alpha']:6.3f} {r['n_fit_points']:3d} "
+            f"{label or r['label']:<24} {r['alpha']:6.3f} {r['n_fit_points']:3d} "
             f"{int(r['final_step']):10d} {r['fitted_final']:8.4f} {r['observed']:9.4f}  "
             f"[{r['ci_lo']:.4f}, {r['ci_hi']:.4f}] {r['ci_hi'] - r['ci_lo']:7.4f}"
         )
+
+    for key in ORDER:
+        if key == "random_control":
+            for sk in RANDOM_SEED_KEYS:
+                sr = results.get(f"{sk}__seedfit")
+                if sr is not None:
+                    row(sr)
+            row(results[key], "Random control average")
+            continue
+        row(results[key])
     print("-" * 94)
     widths = [results[k]["ci_hi"] - results[k]["ci_lo"] for k in ORDER]
     print(f"mean CI width = {np.mean(widths):.5f} bpb")
@@ -374,10 +432,26 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
             label=LEGEND[key],
         )
 
+    # Second seed of the random control, same colour, dash-dot, its own legend entry.
+    seed69 = results.get("random_control_seed69__seedfit")
+    if seed69 is not None:
+        m = seed69["steps"] >= 500
+        ax.plot(
+            seed69["steps"][m],
+            seed69["loss"][m],
+            color=COLOR["random_control"],
+            linestyle="-.",
+            marker="^",
+            markersize=7,
+            markerfacecolor="none",
+            linewidth=1.8,
+            label="Random control, 2nd seed",
+        )
+
     ax.set_xlabel("Training step", fontsize=17)
-    ax.set_ylabel("Validation macro bits-per-byte (lower is better)", fontsize=15)
+    ax.set_ylabel("Macro task-loss bits-per-byte (lower is better)", fontsize=15)
     ax.set_title(
-        "Training curves: validation macro bpb by token-filtering arm\n"
+        "Training curves: macro task-loss bpb by token-filtering arm\n"
         "(370M OLMo2, 10B-token corpus)",
         fontsize=19,
     )
@@ -400,6 +474,18 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
             linestyle=LINESTYLE[key],
             marker=MARKER[key],
             markersize=9 if MARKER[key] == "*" else 6,
+            linewidth=1.6,
+        )
+    if seed69 is not None:
+        m = seed69["steps"] >= lo_x
+        inset.plot(
+            seed69["steps"][m],
+            seed69["loss"][m],
+            color=COLOR["random_control"],
+            linestyle="-.",
+            marker="^",
+            markersize=6,
+            markerfacecolor="none",
             linewidth=1.6,
         )
     tail = [
@@ -483,7 +569,7 @@ def figure2(results: dict[str, dict], fig_dir: Path) -> None:
 
     ax.set_xticks(x)
     ax.set_xticklabels([LABEL[k] for k in ORDER], fontsize=16, rotation=20, ha="right")
-    ax.set_ylabel("Fitted-final validation macro bpb (lower is better)", fontsize=15)
+    ax.set_ylabel("Fitted-final macro task-loss bpb (lower is better)", fontsize=15)
     ax.set_title(
         "Final macro-bpb by arm: power-law fit ± 95% CI\n"
         "(370M OLMo2, 10B-token corpus)",
@@ -510,8 +596,10 @@ def _save(fig, fig_dir: Path, stem: str) -> None:
 # Full run provenance. The curve cache's own "source" field omits the REL-EMA
 # polarity note, so it is spelled out here rather than inherited.
 SOURCE_STRING = (
-    "wandb eduLLM/token-selection + hpo-ladder control (re-run 2026-09-05 as "
-    "full-loss-control-regmix10b-v2, replaces mixlaw-1 clone); rel_ema re-run "
+    "wandb eduLLM/token-selection; full-loss control is "
+    "full-loss-control-regmix10b-v3 (native FarmShare rerun 2026-09-14, matched "
+    "to the selection arms on init, data seed, step count and eval grid; replaces "
+    "the hpo-ladder-derived full-loss-control-regmix10b-v2); rel_ema re-run "
     "2026-09-05 with corrected selection polarity (current-minus-history, "
     "matching rho_excess/blade), replaces the inverted-polarity run"
 )
@@ -522,9 +610,9 @@ METHOD_STRING = (
     "point. Fitted final is evaluated at each arm's own final logged step. "
     "95% CI = 2.5/97.5 percentile of 10,000 i.i.d. residual bootstrap draws with "
     "alpha RE-ESTIMATED on every draw (alpha-free), numpy default_rng seed 0. No "
-    "arm's profiled optimum sits on a grid boundary (largest 3.502, smallest "
-    "0.585). Alpha-free was chosen over alpha-fixed because it is the more "
-    "conservative of the two (mean CI width 0.00989 vs 0.00700 bpb)."
+    "arm's profiled optimum sits on a grid boundary (largest 3.502 for REL-EMA, "
+    "smallest 0.794 for BLADE). Alpha-free was chosen over alpha-fixed because it "
+    "is the more conservative of the two (mean CI width 0.01063 vs 0.00749 bpb)."
 )
 
 

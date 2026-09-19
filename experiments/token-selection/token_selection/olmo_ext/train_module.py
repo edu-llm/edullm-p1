@@ -952,8 +952,6 @@ class TokenSelectTrainModule(TransformerTrainModule if _HAS_OLMO else object):  
                     current_loss=current_loss,
                     history_loss=history_loss,
                     reference_loss=reference_loss,
-                    early_loss=early_loss,
-                    late_loss=late_loss,
                     attention_score=attention_score,
                     shape_ref=micro_input_ids,
                     valid=micro_valid,

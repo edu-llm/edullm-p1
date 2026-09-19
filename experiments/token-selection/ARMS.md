@@ -1,13 +1,29 @@
 # Token-selection experiments
 
-Shared package: [`token_selection/`](token_selection/) (`PYTHONPATH=experiments/token-selection`).
+**The code that produced the reported runs lives in
+[`olmo_core_token_selection/`](olmo_core_token_selection/)** — a vendored copy of the
+`.edullm/` tree from the `edullm/token-selection-370m` branch of the OLMo-core fork.
+See [`olmo_core_token_selection/PROVENANCE.md`](olmo_core_token_selection/PROVENANCE.md)
+for exactly what was copied, what was left out, and why the branch's pinned commit
+cannot reproduce four of the seven arms.
+
+The per-arm directories below (`attention/`, `middle-ppl-token/`, `rel-ema-exp/`,
+`rho-1/`) are **documentation only**: a README describing each method and the YAML
+recording its intended contract. Their launch scripts have been removed because they
+targeted a superseded in-repo trainer that produced none of the reported runs; the real
+launch paths are `olmo_core_token_selection/farmshare/` and
+`olmo_core_token_selection/runpod/`.
+
 Reference architecture source of truth: [`reference/`](reference/) (RefHQ CE, leave as-is).
+This one *is* live: `reference/train_olmo3_370m_refhq.py` trained the HQ 5.5B reference
+(`edullm-370M-refhq-5p5b`, checkpoints 125…1125 plus `step1315`) that the Perplexity arm
+scores against.
 
 | Arm | Directory | Selection | Status |
 |-----|-----------|-----------|--------|
-| Full-loss control | [`control/`](control/) | none (full CE on every valid target token) | `full-loss-control-regmix10b-v3` — W&B [`eduLLM/token-selection/349f144dc23ee52d18396be695d6b6b0`](https://wandb.ai/eduLLM/token-selection/runs/349f144dc23ee52d18396be695d6b6b0); matched to the selection arms, see below |
-| Control (random 60%) | [`control/`](control/) | uniform random keep 60% | Standalone trainer; **two seeds**: `random-control-regmix10b-v1` (seed 42, W&B `fa841187ff07e9164da282efd353c217`) and `random-control-regmix10b-seed69-v1` (seed 69, W&B `123189f79a722b3481d06bc48b61fad9`). Reported as a single two-run fit, see below |
-| BLADE | [`blade/`](blade/) | top-60% `L_proxy − L_ref` | RegMix proxy/penalty stream + pinned `pretrain/refhq-instruct/v3` HQ updates; syncs 500/875/1250/1625/2000; K=75, τ=375, γ=0.6, λ=1.0; blade_start=500; pre/post-sync checkpoints |
+| Full-loss control | `arms.py` `full-loss-control` | none (full CE on every valid target token) | `full-loss-control-regmix10b-v3` — W&B [`eduLLM/token-selection/349f144dc23ee52d18396be695d6b6b0`](https://wandb.ai/eduLLM/token-selection/runs/349f144dc23ee52d18396be695d6b6b0); matched to the selection arms, see below |
+| Control (random 60%) | `arms.py` `random-control` | uniform random keep 60% | **Two seeds**: `random-control-regmix10b-v1` (seed 42, W&B `fa841187ff07e9164da282efd353c217`) and `random-control-regmix10b-seed69-v1` (seed 69, W&B `123189f79a722b3481d06bc48b61fad9`). Reported as a single two-run fit, see below |
+| BLADE | `arms.py` `blade` | top-60% `L_proxy − L_ref` | RegMix proxy/penalty stream + pinned `pretrain/refhq-instruct/v3` updates; syncs 500/875/1250/1625/2000; K=75, τ=375, γ=0.6, λ=1.0; blade_start=500; pre/post-sync checkpoints |
 | RHO-1 | [`rho-1/`](rho-1/) | top-60% `L_curr − L_ref` | Frozen refhq-instruct v3 step940; `t0=0`; YAML spine |
 | REL exp-α | [`rel-ema-exp/`](rel-ema-exp/) | top-60% `L_curr − L_hist` | Bias-corrected EMA from zero; `α(t)=1−e^(−t/300)`; `t0=0` |
 | Middle PPL (token) | [`middle-ppl-token/`](middle-ppl-token/) | middle-60% by frozen RefHQ `L_ref` | Online scorer; `t0=0` |

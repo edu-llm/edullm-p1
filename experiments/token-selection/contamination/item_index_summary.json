@@ -1,0 +1,190 @@
+{
+ "n_items": 40582,
+ "n_exact_keys": 1245972,
+ "n_prefixes": 1233050,
+ "n_prefix_targets": 1233442,
+ "n_prefixes_multivalued": 391,
+ "index_bytes_on_disk": 180341041,
+ "labels": [
+  {
+   "label": "arc_challenge_test_rc_5shot_bpb",
+   "n_items": 1172,
+   "stem_not_assessable": 44,
+   "gold_not_assessable": 893,
+   "stem_keys": 14702,
+   "gold_keys": 352,
+   "items_with_lt3_keys": 336
+  },
+  {
+   "label": "arc_challenge_val_rc_5shot_bpb",
+   "n_items": 299,
+   "stem_not_assessable": 7,
+   "gold_not_assessable": 229,
+   "stem_keys": 3776,
+   "gold_keys": 91,
+   "items_with_lt3_keys": 86
+  },
+  {
+   "label": "arc_easy_test_rc_5shot_bpb",
+   "n_items": 2376,
+   "stem_not_assessable": 78,
+   "gold_not_assessable": 2066,
+   "stem_keys": 22683,
+   "gold_keys": 359,
+   "items_with_lt3_keys": 919
+  },
+  {
+   "label": "arc_easy_val_rc_5shot_bpb",
+   "n_items": 570,
+   "stem_not_assessable": 21,
+   "gold_not_assessable": 496,
+   "stem_keys": 5504,
+   "gold_keys": 76,
+   "items_with_lt3_keys": 218
+  },
+  {
+   "label": "boolq_val_rc_5shot_bpb",
+   "n_items": 3270,
+   "stem_not_assessable": 0,
+   "gold_not_assessable": 3270,
+   "stem_keys": 313909,
+   "gold_keys": 0,
+   "items_with_lt3_keys": 16
+  },
+  {
+   "label": "csqa_val_rc_5shot_bpb",
+   "n_items": 1221,
+   "stem_not_assessable": 60,
+   "gold_not_assessable": 1221,
+   "stem_keys": 4389,
+   "gold_keys": 0,
+   "items_with_lt3_keys": 741
+  },
+  {
+   "label": "hellaswag_val_rc_5shot_bpb",
+   "n_items": 10042,
+   "stem_not_assessable": 1,
+   "gold_not_assessable": 866,
+   "stem_keys": 286278,
+   "gold_keys": 140134,
+   "items_with_lt3_keys": 355
+  },
+  {
+   "label": "mmlu_humanities_test_rc_5shot_bpb",
+   "n_items": 4705,
+   "stem_not_assessable": 316,
+   "gold_not_assessable": 2521,
+   "stem_keys": 343271,
+   "gold_keys": 12383,
+   "items_with_lt3_keys": 871
+  },
+  {
+   "label": "mmlu_humanities_val_rc_5shot_bpb",
+   "n_items": 518,
+   "stem_not_assessable": 16,
+   "gold_not_assessable": 283,
+   "stem_keys": 38362,
+   "gold_keys": 1307,
+   "items_with_lt3_keys": 80
+  },
+  {
+   "label": "mmlu_other_test_rc_5shot_bpb",
+   "n_items": 3242,
+   "stem_not_assessable": 548,
+   "gold_not_assessable": 2623,
+   "stem_keys": 55881,
+   "gold_keys": 1643,
+   "items_with_lt3_keys": 1636
+  },
+  {
+   "label": "mmlu_other_val_rc_5shot_bpb",
+   "n_items": 355,
+   "stem_not_assessable": 47,
+   "gold_not_assessable": 297,
+   "stem_keys": 5865,
+   "gold_keys": 143,
+   "items_with_lt3_keys": 166
+  },
+  {
+   "label": "mmlu_social_sciences_test_rc_5shot_bpb",
+   "n_items": 3077,
+   "stem_not_assessable": 433,
+   "gold_not_assessable": 1919,
+   "stem_keys": 25700,
+   "gold_keys": 6448,
+   "items_with_lt3_keys": 1298
+  },
+  {
+   "label": "mmlu_social_sciences_val_rc_5shot_bpb",
+   "n_items": 337,
+   "stem_not_assessable": 34,
+   "gold_not_assessable": 205,
+   "stem_keys": 3292,
+   "gold_keys": 647,
+   "items_with_lt3_keys": 121
+  },
+  {
+   "label": "mmlu_stem_test_rc_5shot_bpb",
+   "n_items": 3018,
+   "stem_not_assessable": 334,
+   "gold_not_assessable": 2339,
+   "stem_keys": 48609,
+   "gold_keys": 2568,
+   "items_with_lt3_keys": 938
+  },
+  {
+   "label": "mmlu_stem_val_rc_5shot_bpb",
+   "n_items": 321,
+   "stem_not_assessable": 18,
+   "gold_not_assessable": 238,
+   "stem_keys": 5315,
+   "gold_keys": 280,
+   "items_with_lt3_keys": 92
+  },
+  {
+   "label": "openbookqa_test_rc_5shot_bpb",
+   "n_items": 500,
+   "stem_not_assessable": 154,
+   "gold_not_assessable": 468,
+   "stem_keys": 1358,
+   "gold_keys": 35,
+   "items_with_lt3_keys": 389
+  },
+  {
+   "label": "openbookqa_val_rc_5shot_bpb",
+   "n_items": 500,
+   "stem_not_assessable": 150,
+   "gold_not_assessable": 452,
+   "stem_keys": 1286,
+   "gold_keys": 63,
+   "items_with_lt3_keys": 388
+  },
+  {
+   "label": "piqa_val_rc_5shot_bpb",
+   "n_items": 1838,
+   "stem_not_assessable": 847,
+   "gold_not_assessable": 499,
+   "stem_keys": 1373,
+   "gold_keys": 17046,
+   "items_with_lt3_keys": 929
+  },
+  {
+   "label": "socialiqa_val_rc_5shot_bpb",
+   "n_items": 1954,
+   "stem_not_assessable": 0,
+   "gold_not_assessable": 1844,
+   "stem_keys": 18706,
+   "gold_keys": 149,
+   "items_with_lt3_keys": 40
+  },
+  {
+   "label": "winogrande_val_rc_5shot_bpb",
+   "n_items": 1267,
+   "stem_not_assessable": 9,
+   "gold_not_assessable": 1136,
+   "stem_keys": 4451,
+   "gold_keys": 150,
+   "items_with_lt3_keys": 654
+  }
+ ]
+}

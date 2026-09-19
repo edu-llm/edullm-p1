@@ -31,7 +31,7 @@ dolma_hq_export_pythonpath "${RUN_DIR}"
 
 AWS_OK=0
 if # shellcheck disable=SC1091
-  source "${RUN_DIR}/scripts/farmshare/prepare_aws_session_light.sh" && # shellcheck disable=SC1090
+  source "${RUN_DIR}/datasets/farmshare/prepare_aws_session_light.sh" && # shellcheck disable=SC1090
   source "${AWS_SESSION_ENV}"; then
   AWS_OK=1
   echo "aws_session_ready login_node=${AWS_SESSION_ENV}"

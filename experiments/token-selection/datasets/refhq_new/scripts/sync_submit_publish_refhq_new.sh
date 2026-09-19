@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SCRIPTS_LOCAL="${REPO_ROOT}/datasets/refhq_new/scripts"
 
 ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" \
-  "mkdir -p ${STAGING}/datasets/refhq_new/scripts ${STAGING}/datasets ${STAGING}/scripts/farmshare ${RUN_DIR}/logs"
+  "mkdir -p ${STAGING}/datasets/refhq_new/scripts ${STAGING}/datasets ${STAGING}/datasets/farmshare ${RUN_DIR}/logs"
 
 rsync -avz -e "ssh -S ${SOCK} -o BatchMode=yes" \
   "${SCRIPTS_LOCAL}/finalize_upload.py" \
@@ -29,19 +29,19 @@ rsync -avz -e "ssh -S ${SOCK} -o BatchMode=yes" \
   "${HOST}:${STAGING}/datasets/"
 
 rsync -avz -e "ssh -S ${SOCK} -o BatchMode=yes" \
-  "${REPO_ROOT}/scripts/farmshare/prepare_aws_session_light.sh" \
-  "${REPO_ROOT}/scripts/farmshare/write_aws_session_env.py" \
-  "${HOST}:${STAGING}/scripts/farmshare/"
+  "${REPO_ROOT}/datasets/farmshare/prepare_aws_session_light.sh" \
+  "${REPO_ROOT}/datasets/farmshare/write_aws_session_env.py" \
+  "${HOST}:${STAGING}/datasets/farmshare/"
 
 ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" bash -s <<REMOTE
 set -Eeuo pipefail
 STAGING=${STAGING}
 RUN_DIR=${RUN_DIR}
-mkdir -p "\${RUN_DIR}/datasets/refhq_new/scripts" "\${RUN_DIR}/scripts/farmshare"
+mkdir -p "\${RUN_DIR}/datasets/refhq_new/scripts" "\${RUN_DIR}/datasets/farmshare"
 cp -a "\${STAGING}/datasets/refhq_new/scripts/." "\${RUN_DIR}/datasets/refhq_new/scripts/"
 cp -a "\${STAGING}/datasets/edullm_text_companion.py" "\${RUN_DIR}/datasets/" 2>/dev/null || true
 cp -a "\${STAGING}/datasets/olmo_shard_utils.py" "\${RUN_DIR}/datasets/" 2>/dev/null || true
-cp -a "\${STAGING}/scripts/farmshare/." "\${RUN_DIR}/scripts/farmshare/"
+cp -a "\${STAGING}/datasets/farmshare/." "\${RUN_DIR}/datasets/farmshare/"
 sed -i 's/\r\$//' "\${RUN_DIR}/datasets/refhq_new/scripts/"*.sh \
   "\${RUN_DIR}/datasets/refhq_new/scripts/"*.py \
   "\${RUN_DIR}/datasets/refhq_new/scripts/"*.sbatch
@@ -57,7 +57,7 @@ export PYTHONPATH="\${RUN_DIR}/datasets:\${PYTHONPATH:-}"
 
 if [[ ! -f "\${AWS_SESSION_ENV}" ]]; then
   echo "ERROR: missing \${AWS_SESSION_ENV}" >&2
-  echo "  laptop: scripts/farmshare/push_aws_session_to_farmshare.sh \${RUN_DIR}" >&2
+  echo "  laptop: datasets/farmshare/push_aws_session_to_farmshare.sh \${RUN_DIR}" >&2
   exit 1
 fi
 

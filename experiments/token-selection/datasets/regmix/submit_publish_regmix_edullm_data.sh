@@ -11,7 +11,7 @@ STAGING_ROOT="${STAGING_ROOT:-/scratch/users/${SUNET}/agent-runs/edullm-farmshar
 RUN_DIR="${RUN_DIR:-/scratch/users/${SUNET}/agent-runs/regmix-edullm-publish-$(date -u +%Y%m%dT%H%M%SZ)}"
 STAGE_DIR="${STAGE_DIR:-${RUN_DIR}/publish-stage}"
 
-mkdir -p "${RUN_DIR}/logs" "${RUN_DIR}/scripts/regmix" "${RUN_DIR}/scripts/farmshare"
+mkdir -p "${RUN_DIR}/logs" "${RUN_DIR}/scripts/regmix" "${RUN_DIR}/datasets/farmshare"
 cd "${RUN_DIR}"
 
 if [[ -d "${REGMIX_ROOT}/venv" && ! -e "${RUN_DIR}/venv" ]]; then
@@ -29,18 +29,18 @@ fi
 
 cp -a "${STAGING_ROOT}/datasets/regmix/publish_regmix_edullm_data.py" "${RUN_DIR}/scripts/regmix/"
 cp -a "${STAGING_ROOT}/datasets/regmix/publish_regmix_edullm_data.sbatch" "${RUN_DIR}/scripts/regmix/"
-cp -a "${STAGING_ROOT}/scripts/farmshare/prepare_aws_session_light.sh" "${RUN_DIR}/scripts/farmshare/"
-cp -a "${STAGING_ROOT}/scripts/farmshare/write_aws_session_env.py" "${RUN_DIR}/scripts/"
+cp -a "${STAGING_ROOT}/datasets/farmshare/prepare_aws_session_light.sh" "${RUN_DIR}/datasets/farmshare/"
+cp -a "${STAGING_ROOT}/datasets/farmshare/write_aws_session_env.py" "${RUN_DIR}/scripts/"
 sed -i 's/\r$//' \
   "${RUN_DIR}/scripts/regmix/"*.py \
   "${RUN_DIR}/scripts/regmix/"*.sbatch \
-  "${RUN_DIR}/scripts/farmshare/"*.sh \
+  "${RUN_DIR}/datasets/farmshare/"*.sh \
   2>/dev/null || true
 
 export EDULLM_ROOT="${RUN_DIR}"
 export RUN_DIR REGMIX_ROOT STAGE_DIR
 # shellcheck disable=SC1091
-source "${RUN_DIR}/scripts/farmshare/prepare_aws_session_light.sh" || {
+source "${RUN_DIR}/datasets/farmshare/prepare_aws_session_light.sh" || {
   echo "ERROR: could not mint AWS session for edullm-landing writes" >&2
   exit 1
 }

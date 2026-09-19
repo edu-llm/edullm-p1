@@ -6,28 +6,6 @@
 
 **AWS data prep:** `prepare_regmix_data.py`
 
-**Difficulty labels (FarmShare):** `submit_regmix_labeling.sh` — compression ratio, Flesch reading ease, and MTLD on the seven trimmed domain shards under `trim/<domain>/`. Writes `RUN_DIR/labels/` (`READY`, `docs/`, `metrics/`, `metrics_index.jsonl.gz`).
+**Publish:** `publish_regmix_edullm_data.py` (called from `submit_publish_regmix_edullm_data.sh`) stages the trimmed, tokenized shards and calls `edullm_data.publish()` under `pretrain/regmix-10b`.
 
-**LM learnability labels (FarmShare):** `submit_regmix_doc_lm_labeling.sh` — document-level NLL / learnability under averaged RefHQ checkpoints. Writes `RUN_DIR/lm_labels/labels/` (nested; finalized with `READY`).
-
-**Label upload to S3:** `submit_regmix_labels_upload.sh` → `finalize_regmix_labels_upload.py`
-
-- `labels/` → `s3://edullm-datasets/regmix/regmix-10b/labels/`
-- `lm_labels/labels/` (or flat `lm_labels/`) → `s3://edullm-datasets/regmix/regmix-10b/lm_labels/`
-- Receipt: `RUN_DIR/labels_upload_manifest.json` (also copied to the corpus prefix)
-
-**Curriculum training index:** built by `experiments/curriculum/scripts/build_curriculum_index.py`; published as `curriculum/regmix-370m` on edullm-data (four order groups).
-
-```bash
-# 1. Build local ranked index (CPU; needs labels + lm_labels on disk or S3)
-python experiments/curriculum/scripts/build_curriculum_index.py \
-  --labels-root ... --lm-labels-root ... --out-dir ...
-
-# 2. Stage + publish token-order groups (requires pretrain/regmix-10b on edullm-data)
-python datasets/regmix/publish_regmix_curriculum_edullm_data.py \
-  --index-dir ... --stage-dir ...          # live publish
-python datasets/regmix/publish_regmix_curriculum_edullm_data.py \
-  --index-dir ... --stage-dir ... --dry-run  # layout check only
-```
-
-**FarmShare publish:** `sync_submit_publish_regmix_curriculum_edullm_data.sh` (from laptop) or `submit_publish_regmix_curriculum_edullm_data.sh` (on login node). Defaults: `INDEX_DIR=$REGMIX_ROOT/curriculum_index`, target `curriculum/regmix-370m`. Set `DRY_RUN=1` for layout-only; `PARENT_VERSION=` to pin `pretrain/regmix-10b`.
+The source repo's `regmix/` also holds a second, unrelated job graph — per-document difficulty labels (compression ratio, Flesch, MTLD, LM learnability) and a curriculum training index built from them — for a different paper. That graph reads the finished `pretrain/regmix-10b` corpus but never writes it, so it isn't part of this pipeline; see `../README.md` for why it's excluded here.

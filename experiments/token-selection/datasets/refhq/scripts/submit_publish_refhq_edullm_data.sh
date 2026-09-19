@@ -33,12 +33,12 @@ fi
 dolma_hq_sync_to_run "${STAGING_ROOT}" "${RUN_DIR}"
 dolma_hq_export_pythonpath "${RUN_DIR}"
 mkdir -p "${RUN_DIR}/scripts"
-cp -a "${STAGING_ROOT}/scripts/farmshare/write_aws_session_env.py" "${RUN_DIR}/scripts/"
+cp -a "${STAGING_ROOT}/datasets/farmshare/write_aws_session_env.py" "${RUN_DIR}/scripts/"
 
 export EDULLM_ROOT="${RUN_DIR}"
 export RUN_DIR REFHQ_ROOT STAGE_DIR HQ_SCRIPTS
 # shellcheck disable=SC1091
-source "${RUN_DIR}/scripts/farmshare/prepare_aws_session_light.sh" || {
+source "${RUN_DIR}/datasets/farmshare/prepare_aws_session_light.sh" || {
   echo "ERROR: could not mint AWS session for edullm-landing writes" >&2
   exit 1
 }

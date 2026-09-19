@@ -22,7 +22,7 @@ cd "${RUN_DIR}"
 # Sync pipeline scripts into the isolated run dir.
 REGMIX_ROOT="${EDULLM_ROOT}/datasets/regmix"
 DATASETS_SHARED="${EDULLM_ROOT}/datasets"
-FARMSHARE="${EDULLM_ROOT}/scripts/farmshare"
+FARMSHARE="${EDULLM_ROOT}/datasets/farmshare"
 cp -a "${REGMIX_ROOT}/plan_regmix_mix.py" "${RUN_DIR}/scripts/"
 cp -a "${REGMIX_ROOT}/finalize_regmix_upload.py" "${RUN_DIR}/scripts/"
 cp -a "${REGMIX_ROOT}/trim_regmix_domain.sbatch" "${RUN_DIR}/scripts/"
@@ -44,7 +44,7 @@ pip install boto3 tqdm transformers zstandard
 # Use the light helper — full prepare_aws_session.sh requires Dolma/HF bootstrap.
 export EDULLM_ROOT RUN_DIR
 # shellcheck disable=SC1091
-source "${EDULLM_ROOT}/scripts/farmshare/prepare_aws_session_light.sh"
+source "${EDULLM_ROOT}/datasets/farmshare/prepare_aws_session_light.sh"
 # shellcheck disable=SC1090
 source "${AWS_SESSION_ENV}"
 
@@ -117,7 +117,7 @@ FINAL_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --chdir="${RUN_DIR}" \
   --output="${RUN_DIR}/logs/upload-%j.out" \
   --error="${RUN_DIR}/logs/upload-%j.err" \
-  --wrap="set -Eeuo pipefail; source ${RUN_DIR}/env.sh; export EDULLM_ROOT RUN_DIR; source ${EDULLM_ROOT}/scripts/farmshare/prepare_aws_session_light.sh; source ${AWS_SESSION_ENV}; source ${VENV}/bin/activate; python ${RUN_DIR}/scripts/finalize_regmix_upload.py --run-dir ${RUN_DIR} --dst-bucket ${DST_BUCKET} --dst-prefix ${DST_PREFIX}")
+  --wrap="set -Eeuo pipefail; source ${RUN_DIR}/env.sh; export EDULLM_ROOT RUN_DIR; source ${EDULLM_ROOT}/datasets/farmshare/prepare_aws_session_light.sh; source ${AWS_SESSION_ENV}; source ${VENV}/bin/activate; python ${RUN_DIR}/scripts/finalize_regmix_upload.py --run-dir ${RUN_DIR} --dst-bucket ${DST_BUCKET} --dst-prefix ${DST_PREFIX}")
 echo "upload_job_id=${FINAL_JOB}"
 echo "${FINAL_JOB}" > "${RUN_DIR}/upload_job_id.txt"
 

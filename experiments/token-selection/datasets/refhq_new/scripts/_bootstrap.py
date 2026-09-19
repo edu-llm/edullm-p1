@@ -12,7 +12,7 @@ def setup_paths() -> tuple[Path, Path]:
     Returns (refhq_new_root, repo_root).
     """
     refhq_new_root = Path(__file__).resolve().parents[1]
-    repo_root = refhq_new_root.parents[1]  # datasets/refhq_new -> edullm root
+    repo_root = refhq_new_root.parents[1]  # datasets/refhq_new -> this vendored datasets/ tree's own parent
     datasets_dir = repo_root / "datasets"
     scripts_dir = refhq_new_root / "scripts"
     for entry in (datasets_dir, scripts_dir):

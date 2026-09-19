@@ -8,7 +8,7 @@ STAGING_ROOT="${STAGING_ROOT:-/scratch/users/${SUNET}/agent-runs/edullm-farmshar
 RUN_DIR="${RUN_DIR:-/scratch/users/${SUNET}/agent-runs/olmo30b-edullm-publish-$(date -u +%Y%m%dT%H%M%SZ)}"
 STAGE_DIR="${STAGE_DIR:-${RUN_DIR}/publish-stage}"
 
-mkdir -p "${RUN_DIR}/logs" "${RUN_DIR}/scripts/olmo" "${RUN_DIR}/scripts/farmshare"
+mkdir -p "${RUN_DIR}/logs" "${RUN_DIR}/scripts/olmo" "${RUN_DIR}/datasets/farmshare"
 cd "${RUN_DIR}"
 
 if [[ ! -x "${RUN_DIR}/venv/bin/python" ]]; then
@@ -24,12 +24,12 @@ fi
 # Shared publisher lives under datasets/olmohq; sbatch under datasets/olmo.
 cp -a "${STAGING_ROOT}/datasets/olmohq/publish_olmohq_edullm_data.py" "${RUN_DIR}/scripts/olmo/"
 cp -a "${STAGING_ROOT}/datasets/olmo/publish_olmo_original_30b_edullm_data.sbatch" "${RUN_DIR}/scripts/olmo/"
-cp -a "${STAGING_ROOT}/scripts/farmshare/prepare_aws_session_light.sh" "${RUN_DIR}/scripts/farmshare/"
-cp -a "${STAGING_ROOT}/scripts/farmshare/write_aws_session_env.py" "${RUN_DIR}/scripts/"
+cp -a "${STAGING_ROOT}/datasets/farmshare/prepare_aws_session_light.sh" "${RUN_DIR}/datasets/farmshare/"
+cp -a "${STAGING_ROOT}/datasets/farmshare/write_aws_session_env.py" "${RUN_DIR}/scripts/"
 sed -i 's/\r$//' \
   "${RUN_DIR}/scripts/olmo/"*.py \
   "${RUN_DIR}/scripts/olmo/"*.sbatch \
-  "${RUN_DIR}/scripts/farmshare/"*.sh \
+  "${RUN_DIR}/datasets/farmshare/"*.sh \
   2>/dev/null || true
 # Belt-and-suspenders against prior out_di corruption.
 sed -i 's/self\.out_dir = out_di$/self.out_dir = out_dir/' \
@@ -38,7 +38,7 @@ sed -i 's/self\.out_dir = out_di$/self.out_dir = out_dir/' \
 export EDULLM_ROOT="${RUN_DIR}"
 export RUN_DIR STAGE_DIR
 # shellcheck disable=SC1091
-source "${RUN_DIR}/scripts/farmshare/prepare_aws_session_light.sh" || {
+source "${RUN_DIR}/datasets/farmshare/prepare_aws_session_light.sh" || {
   echo "ERROR: could not mint AWS session for edullm-datasets read / edullm-landing write" >&2
   exit 1
 }

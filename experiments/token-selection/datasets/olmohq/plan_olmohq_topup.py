@@ -19,7 +19,7 @@ from huggingface_hub import HfApi
 
 REPO_ID = "allenai/olmo-mix-1124"
 
-# Planned availability (mixlaw_common / earlier inventory).
+# Planned availability, from an earlier per-domain HF inventory pass.
 PLANNED_AVAILABLE = {
     "dclm": 28_600_000_000,
     "arxiv": 20_800_000_000,

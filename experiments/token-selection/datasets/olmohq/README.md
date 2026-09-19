@@ -8,7 +8,7 @@ Reuses DCLM shards from the completed 30B run; upsamples other domains from `all
 
 ## Availability note (plan vs measured)
 
-`mixlaw_common.DOMAIN_AVAILABLE_TOKENS` is the **planned** inventory. Dolma2-measured
+`PLANNED_AVAILABLE` in `plan_olmohq_topup.py` is the **planned** inventory. Dolma2-measured
 totals on S3 initially under-shot that plan for **starcoder** and **pes2o**. Use:
 
 ```bash

@@ -26,7 +26,7 @@ elif [[ -f "${RUN_DIR}/aws-session.env" ]]; then
   source "${RUN_DIR}/aws-session.env"
   export AWS_SESSION_ENV="${RUN_DIR}/aws-session.env"
 else
-  echo "ERROR: AWS_SESSION_ENV missing; push via scripts/farmshare/push_aws_session_to_farmshare.sh ${RUN_DIR}" >&2
+  echo "ERROR: AWS_SESSION_ENV missing; push via datasets/farmshare/push_aws_session_to_farmshare.sh ${RUN_DIR}" >&2
   exit 1
 fi
 

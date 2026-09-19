@@ -22,9 +22,8 @@ import boto3
 #
 # These are NOT "RegMix-optimized Pile weights": the domain set is the RedPajama-style
 # one used by Data Mixing Laws, not the Pile's 22 subsets, and the numbers are the
-# paper's Pilot-01 reference mixture, not a RegMix regression optimum. See
-# experiments/skill-dag/mixlaw/README.md ("Data Mixing Laws paper | pilot") for the
-# authoritative weight table:
+# paper's Pilot-01 reference mixture, not a RegMix regression optimum. The weight
+# table below is the authoritative one used to derive DOMAIN_TARGETS:
 #   dclm 0.375  arxiv 0.250  starcoder 0.141  pes2o 0.094
 #   open-web-math 0.064  algebraic-stack 0.061  wiki 0.016
 #

@@ -5,7 +5,7 @@ set -Eeuo pipefail
 dolma_hq_stage_shared_utils() {
   local staging_root="$1"
   local run_dir="$2"
-  mkdir -p "${run_dir}/datasets" "${run_dir}/scripts/farmshare"
+  mkdir -p "${run_dir}/datasets" "${run_dir}/datasets/farmshare"
   local shared
   for shared in \
     olmo_shard_utils.py \
@@ -18,8 +18,8 @@ dolma_hq_stage_shared_utils() {
   for infra in \
     prepare_aws_session_light.sh \
     write_aws_session_env.py; do
-    if [[ -f "${staging_root}/scripts/farmshare/${infra}" ]]; then
-      cp -a "${staging_root}/scripts/farmshare/${infra}" "${run_dir}/scripts/farmshare/"
+    if [[ -f "${staging_root}/datasets/farmshare/${infra}" ]]; then
+      cp -a "${staging_root}/datasets/farmshare/${infra}" "${run_dir}/datasets/farmshare/"
     fi
   done
 }

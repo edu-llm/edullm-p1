@@ -33,7 +33,7 @@ else
     export AWS_SESSION_ENV="${RUN_DIR}/aws-session.env"
   else
     # shellcheck disable=SC1091
-    source "${RUN_DIR}/scripts/farmshare/prepare_aws_session_light.sh"
+    source "${RUN_DIR}/datasets/farmshare/prepare_aws_session_light.sh"
     # shellcheck disable=SC1090
     source "${AWS_SESSION_ENV}"
   fi

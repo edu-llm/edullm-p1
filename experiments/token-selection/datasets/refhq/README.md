@@ -4,6 +4,6 @@
 
 **Entry:** `scripts/submit_refhq_regmix_5p5.sh` → `scripts/submit_refhq_tokenize.sh`
 
-HQ-filtered domain pulls from Hugging Face (see `scripts/hq_reference_sources.py`). Python package: `refhq` (`import refhq`; add repo `datasets/` to `PYTHONPATH`).
+HQ-filtered domain pulls from Hugging Face (see `scripts/hq_reference_sources.py`). Python package: `refhq` (`import refhq`; add this vendored `datasets/` to `PYTHONPATH`).
 
-**Tests:** `pytest datasets/refhq/tests/`
+(The original `tests/` for this package are not vendored here; see `../README.md` for what was left out and why.)

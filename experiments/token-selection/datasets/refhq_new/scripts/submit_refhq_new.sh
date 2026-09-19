@@ -22,7 +22,7 @@
 #     tokens/<source>/<domain>/{train,val}-NNNNN.u32le.bin
 #
 # AWS: mint on laptop, push session — never sb-aws-creds login on FarmShare:
-#   scripts/farmshare/push_aws_session_to_farmshare.sh "${RUN_DIR}"
+#   datasets/farmshare/push_aws_session_to_farmshare.sh "${RUN_DIR}"
 set -Eeuo pipefail
 
 SUNET="${SUNET:-nzhao2}"
@@ -125,7 +125,7 @@ AWS_SESSION_ENV="${AWS_SESSION_ENV:-${RUN_DIR}/aws-session.env}"
 if [[ ! -f "${AWS_SESSION_ENV}" ]]; then
   echo "WARN: ${AWS_SESSION_ENV} missing." >&2
   echo "  From the engineer laptop (not FarmShare):" >&2
-  echo "  scripts/farmshare/push_aws_session_to_farmshare.sh ${RUN_DIR}" >&2
+  echo "  datasets/farmshare/push_aws_session_to_farmshare.sh ${RUN_DIR}" >&2
   echo "  finalize/publish need the session; push before those jobs start." >&2
 fi
 
@@ -292,4 +292,4 @@ echo "submitted refhq-new under ${SCRATCH_ROOT}"
 echo "s3://${S3_BUCKET}/${S3_PREFIX}/"
 echo "dataset_id=pretrain/refhq-instruct tokenizer=tokenizer/dolma2-bpe"
 echo "chain download=${DL_JOB} normalize=${NORM_JOB} post_normalize=${POSTNORM_JOB}"
-echo "AWS: scripts/farmshare/push_aws_session_to_farmshare.sh ${RUN_DIR}"
+echo "AWS: datasets/farmshare/push_aws_session_to_farmshare.sh ${RUN_DIR}"

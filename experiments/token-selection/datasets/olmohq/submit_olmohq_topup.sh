@@ -23,7 +23,7 @@ cd "${RUN_DIR}"
 OLMOHQ="${EDULLM_ROOT}/datasets/olmohq"
 OLMO="${EDULLM_ROOT}/datasets/olmo"
 DATASETS="${EDULLM_ROOT}/datasets"
-FARMSHARE="${EDULLM_ROOT}/scripts/farmshare"
+FARMSHARE="${EDULLM_ROOT}/datasets/farmshare"
 
 cp -a "${OLMOHQ}/plan_olmohq_topup.py" "${RUN_DIR}/scripts/"
 cp -a "${OLMOHQ}/finalize_olmohq_topup_upload.py" "${RUN_DIR}/scripts/"

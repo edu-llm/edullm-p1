@@ -19,7 +19,7 @@ cd "${RUN_DIR}"
 
 OLMO_ROOT="${EDULLM_ROOT}/datasets/olmo"
 DATASETS_SHARED="${EDULLM_ROOT}/datasets"
-FARMSHARE="${EDULLM_ROOT}/scripts/farmshare"
+FARMSHARE="${EDULLM_ROOT}/datasets/farmshare"
 for f in download_s3_shard.py download_s3_shard.sbatch; do
   cp -a "${DATASETS_SHARED}/${f}" "${RUN_DIR}/scripts/"
 done

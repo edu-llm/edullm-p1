@@ -21,7 +21,8 @@
 
 
 Arm-by-arm contract table: [ARMS.md](ARMS.md). Contamination audit (paper Section 2.3):
-[contamination/](contamination/).
+[contamination/](contamination/). Code that built the training corpus and both reference
+corpora from Hugging Face sources (Appendix A): [datasets/](datasets/).
 
 Shared contract: same architecture, batch, LR, and step budget. The manipulation is **which tokens receive gradient** on each step (full CE vs a scored subset). Sequences still come from the same shuffled corpus; selection is per-token inside the batch.
 

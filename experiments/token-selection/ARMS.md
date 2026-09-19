@@ -7,6 +7,12 @@ See [`olmo_core_token_selection/PROVENANCE.md`](olmo_core_token_selection/PROVEN
 for exactly what was copied, what was left out, and why the branch's pinned commit
 cannot reproduce four of the seven arms.
 
+**The code that built the corpora from Hugging Face sources lives in
+[`datasets/`](datasets/)** — the training corpus (`pretrain/regmix-10b`), the HQ
+reference, and the Instruct reference, each vendored from this same repo's top-level
+`datasets/`. See [`datasets/README.md`](datasets/README.md) for what was copied and
+what was left out.
+
 The per-arm directories below (`attention/`, `middle-ppl-token/`, `rel-ema-exp/`,
 `rho-1/`) are **documentation only**: a README describing each method and the YAML
 recording its intended contract. Their launch scripts have been removed because they

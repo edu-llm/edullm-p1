@@ -115,7 +115,7 @@ span rate (1.965e-05) already sits above the LightGBM blend's average
 (1.494e-05), so offline probe's concentration into `dclm` raises exposure
 by itself, with no help from `wiki` -- exposure rises even as the arm
 moves away from the single highest-rate domain. Online derivative's rise
-comes from the opposite mechanism: `wiki`'s span rate (9.504e-05) is 65x
+comes from the opposite mechanism: `wiki`'s span rate (9.504e-05) is 4.8x
 `dclm`'s, so even a modest reallocation onto it (1.1% to 4.7% of the
 mixture) is enough to lift the time-weighted average while `dclm` barely
 moves.

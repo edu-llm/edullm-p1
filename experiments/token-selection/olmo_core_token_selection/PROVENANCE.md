@@ -10,16 +10,24 @@ from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m` |
-| Base commit | `98ea67c948fd93ccbfd2633e1ae818c3ae1d2ad7` |
+| Commit | `53daffdf66d07f617e14b17beff3be89cafdc95d` |
 | Source path | `.edullm/` |
-| State copied | the **uncommitted working tree**, not the base commit |
 | Copied on | 2026-09-19 |
 
-## Why the base commit is not enough
+This directory is byte-identical to `.edullm/` at that commit, for every file
+listed below.
+
+At the time the study ran, this code existed only as an uncommitted working tree
+on one laptop. It was committed upstream as `bf087c8f` ("Commit the
+token-selection tree that produced the reported runs") and merged with the two
+commits that had landed on the branch meanwhile, giving `53daffdf`. Cite
+`53daffdf` for reproduction.
+
+## Why the previously pinned commit is not enough
 
 The arm YAMLs in the sibling directories pin `revision: 98ea67c9…`, but that
 commit **cannot** have produced four of the seven reported arms. Diffing the
-working tree against the branch tip shows:
+code that ran against that older tip shows:
 
 - `token_selection_370m/arms.py` at `98ea67c9` contains no `full-loss-control`
   and no `random-control` ArmSpec at all. Both arms exist only in the working
@@ -36,9 +44,8 @@ working tree against the branch tip shows:
   reported run id is `blade-regmix10b-refhq-instruct-v3-v1` — again the
   working-tree value.
 
-So the vendored copy here, not the pinned revision, is the auditable record.
-The upstream branch should still be committed and pushed; until it is, this
-directory is the only published form of that code.
+So `53daffdf`, not the `98ea67c9` revision the YAMLs pin, is the auditable
+record. The YAML `revision:` fields are stale and should be read as historical.
 
 ## What is included, and why
 
@@ -78,8 +85,15 @@ Only code that ran to produce reported results:
 
 ## Caveat
 
-Because this is a copy of an uncommitted working tree, it has no upstream commit
-SHA of its own, and the reported W&B runs logged `git_commit=None`. The
-correspondence between this code and those runs rests on the run ids, arm
-configuration, and reference paths lining up, as set out above — not on a
-recorded commit hash.
+The code now has an upstream commit, but it was committed *after* the study ran,
+and the reported W&B runs logged `git_commit=None`. So the correspondence
+between this code and those runs rests on the run ids, arm configuration, and
+reference paths lining up, as set out above — not on a commit hash recorded at
+training time.
+
+One asymmetry worth knowing: `runpod/launch.sh` defaults
+`OLMO_CORE_CHECKPOINT_SKIP_FDATASYNC=1`, so the four RunPod arms (RHO-1,
+Attention, Perplexity, BLADE) wrote checkpoints without a per-file `fdatasync`.
+The FarmShare arms (full-loss control, both random-control seeds, REL-EMA) do
+not set that flag and synced normally. This affects crash durability, not the
+contents of any checkpoint that was successfully read back and evaluated.

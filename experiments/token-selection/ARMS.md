@@ -5,8 +5,8 @@ Reference architecture source of truth: [`reference/`](reference/) (RefHQ CE, le
 
 | Arm | Directory | Selection | Status |
 |-----|-----------|-----------|--------|
-| Full-loss control | [`control/`](control/) | none (full CE on every valid target token) | `full-loss-control-regmix10b-v2` — W&B [`eduLLM/token-selection/hh19uatg`](https://wandb.ai/eduLLM/token-selection/runs/hh19uatg), tagged `cloned`; matched rerun in flight, see below |
-| Control (random 60%) | [`control/`](control/) | uniform random keep 60% | Standalone trainer; `random-control-regmix10b-v1` (W&B `fa841187ff07e9164da282efd353c217`) |
+| Full-loss control | [`control/`](control/) | none (full CE on every valid target token) | `full-loss-control-regmix10b-v3` — W&B [`eduLLM/token-selection/349f144dc23ee52d18396be695d6b6b0`](https://wandb.ai/eduLLM/token-selection/runs/349f144dc23ee52d18396be695d6b6b0); matched to the selection arms, see below |
+| Control (random 60%) | [`control/`](control/) | uniform random keep 60% | Standalone trainer; **two seeds**: `random-control-regmix10b-v1` (seed 42, W&B `fa841187ff07e9164da282efd353c217`) and `random-control-regmix10b-seed69-v1` (seed 69, W&B `123189f79a722b3481d06bc48b61fad9`). Reported as a single two-run fit, see below |
 | BLADE | [`blade/`](blade/) | top-60% `L_proxy − L_ref` | RegMix proxy/penalty stream + pinned `pretrain/refhq-instruct/v3` HQ updates; syncs 500/875/1250/1625/2000; K=75, τ=375, γ=0.6, λ=1.0; blade_start=500; pre/post-sync checkpoints |
 | RHO-1 | [`rho-1/`](rho-1/) | top-60% `L_curr − L_ref` | Frozen refhq-instruct v3 step940; `t0=0`; YAML spine |
 | REL exp-α | [`rel-ema-exp/`](rel-ema-exp/) | top-60% `L_curr − L_hist` | Bias-corrected EMA from zero; `α(t)=1−e^(−t/300)`; `t0=0` |
@@ -21,9 +21,9 @@ Reference architecture source of truth: [`reference/`](reference/) (RefHQ CE, le
 - **Token budget:** one epoch of published `pretrain/regmix-10b` **v1**, whose realized size is
   **10,004,807,041 tokens**. YAML/standalone defaults use `9900000000` → **2360** steps at GBS
   `4_194_304`. All seven arms (full-loss control, random control, RHO-1, BLADE, Attention,
-  Middle-PPL, REL-EMA) train on this same published dataset. Neither 2360 steps
-  (9,898,557,440 tokens) nor the full-loss control's 2384 steps (9,999,220,736 tokens) wraps into
-  a second epoch — both stay under 10,004,807,041.
+  Middle-PPL, REL-EMA) train on this same published dataset, all for **2360** steps
+  (9,898,557,440 tokens), which does not wrap into a second epoch — it stays under
+  10,004,807,041.
 
   Realized per-domain token counts (uint32 `.npy` bytes / 4, verified on FarmShare):
 
@@ -52,26 +52,45 @@ Reference architecture source of truth: [`reference/`](reference/) (RefHQ CE, le
 
 ### Full-loss control (reported)
 
-The full-loss control is **not** a matched sibling of the six selection arms, and the mismatch is
-load-bearing for how Table 1 is read.
-
 | Field | Value |
 | --- | --- |
-| Run | `full-loss-control-regmix10b-v2` |
-| W&B | [`eduLLM/token-selection/hh19uatg`](https://wandb.ai/eduLLM/token-selection/runs/hh19uatg) |
-| Tags | `cloned` |
-| Cloned from | `eduLLM/hpo-ladder`, group `hpo-ladder-batch-ablation`, run `library-4mi` |
-| Dataloader seed | **6199** (the other arms use 42) |
-| Init seed | **0** as actually logged — `init_seed` did not propagate into `TransformerConfig`, so the intended 6199/6198 never reached weight init |
-| Steps | **2384** (the other arms run 2360) |
-| Eval grid | ~**119**-step spacing (the other arms use the 125-step permanent ladder) |
+| Run | `full-loss-control-regmix10b-v3` |
+| W&B | [`eduLLM/token-selection/349f144dc23ee52d18396be695d6b6b0`](https://wandb.ai/eduLLM/token-selection/runs/349f144dc23ee52d18396be695d6b6b0) |
+| Hardware | 4×L40S (FarmShare job 1719708) |
+| Steps | **2360**, same as every other arm |
+| Eval grid | the **125**-step permanent ladder, same as every other arm |
+| Method | `method="full"` with `keep_fraction=1.0`, routed through the stock train module (not the selection path) |
 
-**Matched rerun in flight.** `full-loss-control-regmix10b-v3`: FarmShare job
-**1719708**, 4×L40S, **2360** steps, **125**-step checkpoint ladder, `method="full"` with
-`keep_fraction=1.0` routed through the stock train module (not the selection path). Once it lands,
-the control is seed-, step- and grid-matched to the selection arms and the confound described in
-the paper's Section 3 goes away. Until then, treat the control's margin over the selection arms as
-carrying an unquantified seed/step/grid component.
+This run replaced `full-loss-control-regmix10b-v2` (W&B `hh19uatg`), which was cloned from
+`eduLLM/hpo-ladder` and was **not** a matched sibling of the selection arms: dataloader seed 6199
+rather than 42, 2384 steps rather than 2360, a ~119-step eval grid, and an init seed that logged as
+0 because `init_seed` never propagated into `TransformerConfig`. v3 is matched on init (confirmed
+via the step-0 eval fingerprint), data seed, step count and eval grid, so that confound is gone.
+
+**Initialization is still not uniform across all seven arms.** The step-0 evaluation splits them
+into exactly two groups: **4.4662** bpb (full-loss control, random control, REL-EMA) and **4.4838**
+bpb (RHO-1, Attention, BLADE, Middle-PPL) — a 0.0176 bpb spread before any training. The two
+controls share an initialization, so the headline control-vs-random comparison is clean, but RHO-1
+is in the other group.
+
+### Random control (reported as a two-run fit)
+
+The random-60% arm was run at two seeds:
+
+| Run | Seed | W&B | Fitted final | 95% CI |
+| --- | --- | --- | --- | --- |
+| `random-control-regmix10b-v1` | 42 | `fa841187ff07e9164da282efd353c217` | 1.6857 | [1.6775, 1.6920] |
+| `random-control-regmix10b-seed69-v1` | 69 | `123189f79a722b3481d06bc48b61fad9` | 1.6939 | [1.6865, 1.6993] |
+
+The two differ by **0.0082 bpb** (95% CI [0.0033, 0.0126], two-sided **p = 0.0002**), which is
+larger than several of the between-arm gaps, so a single run of this arm cannot carry the baseline.
+It is therefore **reported as one two-run fit**: a single power law fitted to the union of both
+runs' fit-window points (11 each, 22 total), with the bootstrap taken over the pooled residuals, so
+the interval carries seed-to-seed spread as well as within-run noise. Pooled: **1.6900**, 95% CI
+**[1.6841, 1.6947]**. Every comparison involving the random control uses this fit.
+
+The seed-69 run's step-1500 evaluation was recovered from its on-disk `task_loss` artifact; a resume
+collided with W&B's monotonic-step rule and dropped it from the logged history.
 
 ---
 
@@ -80,4 +99,4 @@ See each arm’s `README.md` for launch commands. Do not submit AWS workloads un
 ---
 
 Full experiment plan: [README.md](README.md).  
-Contamination audit (paper Section 4): [contamination/](contamination/).  
+Contamination audit (paper Section 2.3): [contamination/](contamination/).  

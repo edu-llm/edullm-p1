@@ -1,0 +1,589 @@
+{
+ "corpus": "refhq-new-v1-instruct",
+ "domains": {
+  "chat": {
+   "docs_scanned": 864361,
+   "words_scanned": 816585590,
+   "matched_documents": 623,
+   "matched_document_rate": 0.0007207636624049442,
+   "matched_span_words": 13041,
+   "matched_span_word_rate": 1.5970156906638532e-05,
+   "tokens_in_matched_docs_rate": 0.0010707609964070025,
+   "distinct_items_stem": 180,
+   "distinct_items_gold": 36,
+   "macro_stem_rate": 0.0026961009597445216,
+   "macro_gold_rate": 0.0037829387453595727,
+   "per_benchmark": {
+    "arc_challenge": {
+     "stem_found": 2,
+     "stem_assessable": 1420,
+     "stem_rate": 0.0014084507042253522,
+     "gold_found": 2,
+     "gold_assessable": 349,
+     "gold_rate": 0.0057306590257879654
+    },
+    "arc_easy": {
+     "stem_found": 1,
+     "stem_assessable": 2847,
+     "stem_rate": 0.00035124692658939234,
+     "gold_found": 4,
+     "gold_assessable": 384,
+     "gold_rate": 0.010416666666666666
+    },
+    "boolq": {
+     "stem_found": 46,
+     "stem_assessable": 3270,
+     "stem_rate": 0.014067278287461774,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "csqa": {
+     "stem_found": 2,
+     "stem_assessable": 1161,
+     "stem_rate": 0.0017226528854435831,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "hellaswag": {
+     "stem_found": 3,
+     "stem_assessable": 10041,
+     "stem_rate": 0.00029877502240812666,
+     "gold_found": 3,
+     "gold_assessable": 9176,
+     "gold_rate": 0.00032693984306887534
+    },
+    "mmlu": {
+     "stem_found": 126,
+     "stem_assessable": 13827,
+     "stem_rate": 0.009112605771316989,
+     "gold_found": 24,
+     "gold_assessable": 5148,
+     "gold_rate": 0.004662004662004662
+    },
+    "openbookqa": {
+     "stem_found": 0,
+     "stem_assessable": 696,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 80,
+     "gold_rate": 0.0
+    },
+    "piqa": {
+     "stem_found": 0,
+     "stem_assessable": 991,
+     "stem_rate": 0.0,
+     "gold_found": 2,
+     "gold_assessable": 1339,
+     "gold_rate": 0.0014936519790888724
+    },
+    "socialiqa": {
+     "stem_found": 0,
+     "stem_assessable": 1954,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 110,
+     "gold_rate": 0.0
+    },
+    "winogrande": {
+     "stem_found": 0,
+     "stem_assessable": 1258,
+     "stem_rate": 0.0,
+     "gold_found": 1,
+     "gold_assessable": 131,
+     "gold_rate": 0.007633587786259542
+    }
+   }
+  },
+  "code": {
+   "docs_scanned": 618994,
+   "words_scanned": 161497658,
+   "matched_documents": 223,
+   "matched_document_rate": 0.0003602619734601628,
+   "matched_span_words": 4245,
+   "matched_span_word_rate": 2.6285210897609424e-05,
+   "tokens_in_matched_docs_rate": 0.0004145385191901668,
+   "distinct_items_stem": 81,
+   "distinct_items_gold": 18,
+   "macro_stem_rate": 0.0007726008746349882,
+   "macro_gold_rate": 0.0007383024961149961,
+   "per_benchmark": {
+    "arc_challenge": {
+     "stem_found": 0,
+     "stem_assessable": 1420,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 349,
+     "gold_rate": 0.0
+    },
+    "arc_easy": {
+     "stem_found": 0,
+     "stem_assessable": 2847,
+     "stem_rate": 0.0,
+     "gold_found": 1,
+     "gold_assessable": 384,
+     "gold_rate": 0.0026041666666666665
+    },
+    "boolq": {
+     "stem_found": 8,
+     "stem_assessable": 3270,
+     "stem_rate": 0.0024464831804281344,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "csqa": {
+     "stem_found": 0,
+     "stem_assessable": 1161,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "hellaswag": {
+     "stem_found": 0,
+     "stem_assessable": 10041,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 9176,
+     "gold_rate": 0.0
+    },
+    "mmlu": {
+     "stem_found": 73,
+     "stem_assessable": 13827,
+     "stem_rate": 0.005279525565921747,
+     "gold_found": 17,
+     "gold_assessable": 5148,
+     "gold_rate": 0.0033022533022533025
+    },
+    "openbookqa": {
+     "stem_found": 0,
+     "stem_assessable": 696,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 80,
+     "gold_rate": 0.0
+    },
+    "piqa": {
+     "stem_found": 0,
+     "stem_assessable": 991,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 1339,
+     "gold_rate": 0.0
+    },
+    "socialiqa": {
+     "stem_found": 0,
+     "stem_assessable": 1954,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 110,
+     "gold_rate": 0.0
+    },
+    "winogrande": {
+     "stem_found": 0,
+     "stem_assessable": 1258,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 131,
+     "gold_rate": 0.0
+    }
+   }
+  },
+  "general": {
+   "docs_scanned": 4017028,
+   "words_scanned": 1479012008,
+   "matched_documents": 12006,
+   "matched_document_rate": 0.0029887767772592074,
+   "matched_span_words": 571135,
+   "matched_span_word_rate": 0.00038615981270653755,
+   "tokens_in_matched_docs_rate": 0.0037887535528379566,
+   "distinct_items_stem": 2097,
+   "distinct_items_gold": 451,
+   "macro_stem_rate": 0.07370288263277557,
+   "macro_gold_rate": 0.03335734513216583,
+   "per_benchmark": {
+    "arc_challenge": {
+     "stem_found": 44,
+     "stem_assessable": 1420,
+     "stem_rate": 0.030985915492957747,
+     "gold_found": 17,
+     "gold_assessable": 349,
+     "gold_rate": 0.04871060171919771
+    },
+    "arc_easy": {
+     "stem_found": 63,
+     "stem_assessable": 2847,
+     "stem_rate": 0.022128556375131718,
+     "gold_found": 27,
+     "gold_assessable": 384,
+     "gold_rate": 0.0703125
+    },
+    "boolq": {
+     "stem_found": 748,
+     "stem_assessable": 3270,
+     "stem_rate": 0.22874617737003058,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "csqa": {
+     "stem_found": 396,
+     "stem_assessable": 1161,
+     "stem_rate": 0.34108527131782945,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "hellaswag": {
+     "stem_found": 151,
+     "stem_assessable": 10041,
+     "stem_rate": 0.015038342794542376,
+     "gold_found": 147,
+     "gold_assessable": 9176,
+     "gold_rate": 0.016020052310374892
+    },
+    "mmlu": {
+     "stem_found": 616,
+     "stem_assessable": 13827,
+     "stem_rate": 0.04455051710421639,
+     "gold_found": 224,
+     "gold_assessable": 5148,
+     "gold_rate": 0.04351204351204351
+    },
+    "openbookqa": {
+     "stem_found": 9,
+     "stem_assessable": 696,
+     "stem_rate": 0.01293103448275862,
+     "gold_found": 1,
+     "gold_assessable": 80,
+     "gold_rate": 0.0125
+    },
+    "piqa": {
+     "stem_found": 3,
+     "stem_assessable": 991,
+     "stem_rate": 0.0030272452068617556,
+     "gold_found": 28,
+     "gold_assessable": 1339,
+     "gold_rate": 0.020911127707244213
+    },
+    "socialiqa": {
+     "stem_found": 52,
+     "stem_assessable": 1954,
+     "stem_rate": 0.02661207778915046,
+     "gold_found": 1,
+     "gold_assessable": 110,
+     "gold_rate": 0.00909090909090909
+    },
+    "winogrande": {
+     "stem_found": 15,
+     "stem_assessable": 1258,
+     "stem_rate": 0.01192368839427663,
+     "gold_found": 6,
+     "gold_assessable": 131,
+     "gold_rate": 0.04580152671755725
+    }
+   }
+  },
+  "math": {
+   "docs_scanned": 576014,
+   "words_scanned": 205549849,
+   "matched_documents": 528,
+   "matched_document_rate": 0.000916644387115591,
+   "matched_span_words": 12346,
+   "matched_span_word_rate": 6.00632890759263e-05,
+   "tokens_in_matched_docs_rate": 0.0007512727484416688,
+   "distinct_items_stem": 81,
+   "distinct_items_gold": 12,
+   "macro_stem_rate": 0.0006091591839659542,
+   "macro_gold_rate": 0.0005819560696072793,
+   "per_benchmark": {
+    "arc_challenge": {
+     "stem_found": 0,
+     "stem_assessable": 1420,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 349,
+     "gold_rate": 0.0
+    },
+    "arc_easy": {
+     "stem_found": 0,
+     "stem_assessable": 2847,
+     "stem_rate": 0.0,
+     "gold_found": 1,
+     "gold_assessable": 384,
+     "gold_rate": 0.0026041666666666665
+    },
+    "boolq": {
+     "stem_found": 1,
+     "stem_assessable": 3270,
+     "stem_rate": 0.0003058103975535168,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "csqa": {
+     "stem_found": 0,
+     "stem_assessable": 1161,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "hellaswag": {
+     "stem_found": 0,
+     "stem_assessable": 10041,
+     "stem_rate": 0.0,
+     "gold_found": 1,
+     "gold_assessable": 9176,
+     "gold_rate": 0.00010897994768962511
+    },
+    "mmlu": {
+     "stem_found": 80,
+     "stem_assessable": 13827,
+     "stem_rate": 0.005785781442106025,
+     "gold_found": 10,
+     "gold_assessable": 5148,
+     "gold_rate": 0.0019425019425019425
+    },
+    "openbookqa": {
+     "stem_found": 0,
+     "stem_assessable": 696,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 80,
+     "gold_rate": 0.0
+    },
+    "piqa": {
+     "stem_found": 0,
+     "stem_assessable": 991,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 1339,
+     "gold_rate": 0.0
+    },
+    "socialiqa": {
+     "stem_found": 0,
+     "stem_assessable": 1954,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 110,
+     "gold_rate": 0.0
+    },
+    "winogrande": {
+     "stem_found": 0,
+     "stem_assessable": 1258,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 131,
+     "gold_rate": 0.0
+    }
+   }
+  },
+  "science": {
+   "docs_scanned": 117351,
+   "words_scanned": 75428497,
+   "matched_documents": 6,
+   "matched_document_rate": 5.11286652861927e-05,
+   "matched_span_words": 222,
+   "matched_span_word_rate": 2.9431847223470462e-06,
+   "tokens_in_matched_docs_rate": 0.00011677284249744496,
+   "distinct_items_stem": 2,
+   "distinct_items_gold": 1,
+   "macro_stem_rate": 6.570573241429091e-05,
+   "macro_gold_rate": 2.428127428127428e-05,
+   "per_benchmark": {
+    "arc_challenge": {
+     "stem_found": 0,
+     "stem_assessable": 1420,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 349,
+     "gold_rate": 0.0
+    },
+    "arc_easy": {
+     "stem_found": 1,
+     "stem_assessable": 2847,
+     "stem_rate": 0.00035124692658939234,
+     "gold_found": 0,
+     "gold_assessable": 384,
+     "gold_rate": 0.0
+    },
+    "boolq": {
+     "stem_found": 1,
+     "stem_assessable": 3270,
+     "stem_rate": 0.0003058103975535168,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "csqa": {
+     "stem_found": 0,
+     "stem_assessable": 1161,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 0,
+     "gold_rate": null
+    },
+    "hellaswag": {
+     "stem_found": 0,
+     "stem_assessable": 10041,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 9176,
+     "gold_rate": 0.0
+    },
+    "mmlu": {
+     "stem_found": 0,
+     "stem_assessable": 13827,
+     "stem_rate": 0.0,
+     "gold_found": 1,
+     "gold_assessable": 5148,
+     "gold_rate": 0.00019425019425019425
+    },
+    "openbookqa": {
+     "stem_found": 0,
+     "stem_assessable": 696,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 80,
+     "gold_rate": 0.0
+    },
+    "piqa": {
+     "stem_found": 0,
+     "stem_assessable": 991,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 1339,
+     "gold_rate": 0.0
+    },
+    "socialiqa": {
+     "stem_found": 0,
+     "stem_assessable": 1954,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 110,
+     "gold_rate": 0.0
+    },
+    "winogrande": {
+     "stem_found": 0,
+     "stem_assessable": 1258,
+     "stem_rate": 0.0,
+     "gold_found": 0,
+     "gold_assessable": 131,
+     "gold_rate": 0.0
+    }
+   }
+  }
+ },
+ "benchmarks": [
+  "arc_challenge",
+  "arc_easy",
+  "boolq",
+  "csqa",
+  "hellaswag",
+  "mmlu",
+  "openbookqa",
+  "piqa",
+  "socialiqa",
+  "winogrande"
+ ],
+ "n_items": 40582,
+ "totals": {
+  "docs_scanned": 6193748,
+  "words_scanned": 2738073602,
+  "matched_documents": 13386,
+  "matched_document_rate": 0.002161211595951272,
+  "matched_span_words": 600989,
+  "matched_span_word_rate": 0.00021949336919249113,
+  "distinct_items_stem": 2227,
+  "distinct_items_gold": 471,
+  "distinct_items_any": 2432,
+  "macro_stem_rate": 0.07504727253082859,
+  "macro_gold_rate": 0.033959797004974736,
+  "per_benchmark": {
+   "arc_challenge": {
+    "stem_found": 44,
+    "stem_assessable": 1420,
+    "stem_rate": 0.030985915492957747,
+    "gold_found": 17,
+    "gold_assessable": 349,
+    "gold_rate": 0.04871060171919771
+   },
+   "arc_easy": {
+    "stem_found": 64,
+    "stem_assessable": 2847,
+    "stem_rate": 0.02247980330172111,
+    "gold_found": 27,
+    "gold_assessable": 384,
+    "gold_rate": 0.0703125
+   },
+   "boolq": {
+    "stem_found": 764,
+    "stem_assessable": 3270,
+    "stem_rate": 0.23363914373088684,
+    "gold_found": 0,
+    "gold_assessable": 0,
+    "gold_rate": null
+   },
+   "csqa": {
+    "stem_found": 396,
+    "stem_assessable": 1161,
+    "stem_rate": 0.34108527131782945,
+    "gold_found": 0,
+    "gold_assessable": 0,
+    "gold_rate": null
+   },
+   "hellaswag": {
+    "stem_found": 152,
+    "stem_assessable": 10041,
+    "stem_rate": 0.015137934468678418,
+    "gold_found": 149,
+    "gold_assessable": 9176,
+    "gold_rate": 0.016238012205754142
+   },
+   "mmlu": {
+    "stem_found": 728,
+    "stem_assessable": 13827,
+    "stem_rate": 0.052650611123164825,
+    "gold_found": 240,
+    "gold_assessable": 5148,
+    "gold_rate": 0.046620046620046623
+   },
+   "openbookqa": {
+    "stem_found": 9,
+    "stem_assessable": 696,
+    "stem_rate": 0.01293103448275862,
+    "gold_found": 1,
+    "gold_assessable": 80,
+    "gold_rate": 0.0125
+   },
+   "piqa": {
+    "stem_found": 3,
+    "stem_assessable": 991,
+    "stem_rate": 0.0030272452068617556,
+    "gold_found": 30,
+    "gold_assessable": 1339,
+    "gold_rate": 0.022404779686333084
+   },
+   "socialiqa": {
+    "stem_found": 52,
+    "stem_assessable": 1954,
+    "stem_rate": 0.02661207778915046,
+    "gold_found": 1,
+    "gold_assessable": 110,
+    "gold_rate": 0.00909090909090909
+   },
+   "winogrande": {
+    "stem_found": 15,
+    "stem_assessable": 1258,
+    "stem_rate": 0.01192368839427663,
+    "gold_found": 6,
+    "gold_assessable": 131,
+    "gold_rate": 0.04580152671755725
+   }
+  }
+ },
+ "span_rate_spread": 131.20474898313347
+}

@@ -1,226 +1,322 @@
-# Benchmark contamination audit (verbatim 13-gram)
+# Benchmark contamination audit (matched-span, length-robust)
 
-This directory vendors the code and the reduced results behind **Section 4** of the
-paper. It is the authoritative copy: the working directory on FarmShare was
-`/scratch/users/nzhao2/agent-runs/ngram13-20260911T161822/`, and everything here
-was copied down from that run.
-
-Two large/derived artifacts are deliberately **not** vendored, because they are
-regenerable and would dominate the repo: the eval-side index `eval_index.pkl`
-(13 MB), and the raw per-shard hit directories `results/`, `strict_hits/`,
-`res_hits/`, `hits_*`, and `logs/`. Re-running `build_eval_index.py` plus the
-`*.sbatch` array jobs reproduces them.
-
-> **Hash stability is required.** Every sbatch wrapper exports
-> `PYTHONHASHSEED=0` (see `strict.sbatch`, `res.sbatch`). Without it, CPython's
-> built-in `hash()` is salted per process, n-gram hashes are not stable across
-> array tasks, and hits fail to reduce. The strict eval index
-> `eval_ngrams_strict.pkl` and the scanner `contam_scan.py` are reused unchanged
-> so these numbers stay directly comparable to the published 0.89%.
+This directory holds the code and results behind the paper's contamination
+audit of the three corpora used in the token-selection experiment. It
+**replaces** an earlier verbatim-13-gram audit that lived at this path: that
+audit's own denominator (40,087 items) and per-corpus match counts (358 /
+438 / 1,472) did not match the numbers this paper's text now reports (40,582
+items; 957 / 1,010 / 2,432), and neither the scanner nor the eval-item index
+that produced them had ever been committed here, so the discrepancy was not
+reproducible from this repo. This directory now vendors the code that
+produced the *current* numbers, so the join can be checked directly rather
+than taken on faith. See [Superseded methodology](#superseded-methodology-not-vendored-here)
+below for what changed and why the two audits' numbers are not comparable.
 
 ## Methodology
 
-**Unit of overlap: the verbatim 13-gram.** `n = 13`, matching the prior
-published protocol. A hit means a corpus document contains a word 13-gram that
-also occurs in an evaluation item's prompt stem.
+Full write-up: the "methodology v4" sections referenced in every file's
+docstring below. Summary, in contrast with the superseded audit:
 
-**Normalization** (recorded machine-readably in `fields.json`):
+- **Unit of overlap: a length-floored n-gram, not a fixed 13-gram.** An item's
+  `stem` or `gold` field is indexed at `n = 13` only if it has >= 13 words;
+  an 8-12 word field is indexed as one exact whole-string match; a field
+  under 8 words is **NOT ASSESSABLE** and excluded from every rate (counted,
+  never scored as clean). A fixed 13-gram with no floor systematically misses
+  short items and silently drops them into the "clean" bucket.
+- **Index text comes from the evaluator's own scored strings, not
+  reconstructed HuggingFace fields.** `dump_eval_items.py` reads
+  `request["request"]["context"]` / `["continuation"]` off ai2-olmo's own
+  `OEEvalTask` objects -- the exact strings the model is conditioned on and
+  scored on -- rather than re-deriving them from HF dataset rows. This is not
+  a cosmetic difference: ai2-olmo *assembles* what it scores (HellaSwag's
+  context is activity label + `ctx_a` + capitalized `ctx_b`; WinoGrande's
+  scored continuation turned out to be the sentence *suffix*, not the option
+  word), so an index built from reconstructed fields is an index over text
+  the evaluator never actually sees.
+- **MMLU's per-subject few-shot exemplars are stripped at the index, not
+  worked around after the fact.** `strip_exemplars` (in `item_identity.py`)
+  removes the label-wide prompt header first, then strips each item's own
+  per-subject exemplar block via a sorted-neighbor sliding window, since MMLU
+  draws its five exemplars per *subject* rather than per label -- a
+  label-wide common-prefix strip alone finds almost nothing there. Left
+  unstripped, a single mirrored copy of a subject's dev examples matches
+  every item in that subject and inflates the subject's rate roughly 5x (see
+  [MMLU exemplar fix](#mmlu-exemplar-fix) below). Because this is fixed at
+  the index rather than by excluding MMLU from a "self-contained" subset
+  after scanning, MMLU's own rate is reported directly rather than omitted.
+- **Matched-span word rate as the primary length-robust metric**, alongside
+  the length-biased matched-*document* rate (a document is "matched" if any
+  span in it hits) and a macro item-fraction rate averaged across benchmarks
+  (so a 10,000-item benchmark and a 300-item benchmark get equal say, matching
+  how the endpoint itself is weighted). `scan_corpus.py` unions all matched
+  word spans per document so the span rate is computable directly rather than
+  only the document-level upper bound.
+- **Provenance-tagged, loose index.** Every indexed n-gram records which
+  field (`stem` or `gold`) it came from, so nested nothing needs a second
+  scan -- the stem-only, gold-only and "any field" rates are all read off one
+  pass.
+- **Silent-failure gates.** Every scan asserts a normalizer fingerprint
+  match, a canary document's exact post-normalization form, and full recovery
+  of synthetic "spike" documents carrying known item n-grams before it emits
+  a single real hit. A scan that would otherwise report a suspiciously clean
+  result because its normalizer diverged from the index's, or because a
+  decompressor died partway through a shard, raises instead of finishing
+  quietly. See `scan_corpus.py`'s module docstring for the failure modes each
+  gate closes.
 
-- lowercase
-- every non-alphanumeric character is treated as a **separator**, not as a
-  character (so punctuation cannot be part of a token)
-- tokens are the resulting whitespace-delimited runs
+## Corpora scanned
 
-n-grams are hashed (FNV-1a 64-bit in `build_eval_index.py`; CPython `hash()`
-with `PYTHONHASHSEED=0` in the strict/reservoir path) and looked up in a
-`gram -> {eval item id}` dictionary. Collisions are possible in principle at
-64 bits but negligible at this scale, and they can only *inflate* the reported
-rate, so the numbers are conservative upper bounds.
+Denominator: **40,582 evaluation items** (`eval_items_summary.json` ->
+`total_rows`; `item_index_summary.json` -> `n_items`), the same 20
+(task, split) labels of the OLMo-ladder RC suite the training runs in this
+experiment evaluate `task_loss_bpb` on (`TASK_LOSS_RAW_LABELS` in
+`dump_eval_items.py`). This is a corrected count from the same 20 labels the
+superseded audit's 40,087 used -- see
+[Superseded methodology](#superseded-methodology-not-vendored-here).
 
-**Question text only.** For every benchmark we index only the prompt stem the
-model is actually shown — never the answer options and never the gold label.
-Indexing the options would make almost any mention of a common noun a "hit".
-The exact field per benchmark, from `fields.json`:
+| Corpus | Role | Path scanned (FarmShare scratch) | Docs scanned | Words scanned |
+| --- | --- | --- | --- | --- |
+| `regmix-10b` | 10B training corpus (`pretrain/regmix-10b` v1) | `regmix-10b-20260725-124810/trim/<domain>/<domain>-trimmed.json.gz`, one file per domain | 4,748,990 | 5,879,719,994 |
+| `hq-reference-v1` | HQ reference corpus (Reference A) | `hq-reference-v1/out/<domain>/`, one directory per domain | 3,367,856 | 2,298,753,521 |
+| `refhq-new-v1` | Instruct reference corpus (Reference B) | `refhq-new-v1/out/<source>/<category>/documents/`, `category` is the aggregation domain | 6,193,748 | 2,738,073,602 |
 
-| Benchmark | Field matched |
-| --- | --- |
-| `arc_challenge` | `question` |
-| `arc_easy` | `question` |
-| `boolq` | `passage` + `question` (both appear in the RC prompt) |
-| `csqa` | `question` |
-| `hellaswag` | `ctx` (activity label + context, as shown in the prompt) |
-| `mmlu_*` | `question` |
-| `openbookqa` | `question_stem` |
-| `piqa` | `goal` |
-| `socialiqa` | `context` + `question` |
-| `winogrande` | `sentence` |
+All three share the domain set `{algebraic-stack, arxiv, dclm, open-web-math,
+pes2o, starcoder, wiki}` except `refhq-new-v1`, which is organized by
+`{chat, code, general, math, science}` instead (its 23 source/category
+shards are listed in the reproduction commands below). Every path above is
+relative to `/scratch/users/nzhao2/` on FarmShare -- the actual location the
+runs read from, recorded here for the same reason the superseded audit's
+README recorded its own working directory: so the exact input is on the
+record rather than merely asserted. See
+[Dependencies and what's not vendored](#dependencies-and-whats-not-vendored)
+for why the raw corpora themselves are not (and cannot practically be)
+committed to this repo.
 
-**Denominator: 40,087 evaluation items.** These are all items across the **20
-(task, split) labels** of the OLMo-ladder RC suite — the same 20 labels the
-training runs evaluate `task_loss_bpb` on. Per-item counts:
-`arc_challenge_val` 299, `arc_challenge_test` 1,171, `arc_easy_val` 570,
-`arc_easy_test` 2,374, `boolq_val` 3,270, `csqa_val` 1,220, `hellaswag_val`
-10,042, `openbookqa_val` 463, `openbookqa_test` 462, `piqa_val` 1,560,
-`socialiqa_val` 1,954, `winogrande_val` 1,267, and MMLU 1,519 (val) + 13,916
-(test) = 15,435. Sum = 40,087.
+## Results
 
-MMLU supplies **8 of the 20** labels (`stem`, `humanities`, `social_sciences`,
-`other` x `val`, `test`); in `strict_summary.json` and
-`reservoir_summary.json` those 8 are reported *pooled* as `mmlu_val` and
-`mmlu_test`, so the per-task tables print 14 rows rather than 20. The item
-denominator is unaffected.
+From `results_regmix-10b.json`, `results_hq-reference-v1.json`,
+`results_refhq-new-v1.json` -> `totals`. Percentages rounded to 2 decimal
+places except where the source table needs more precision to show a
+difference.
 
-**"Self-contained question stems."** MMLU, HellaSwag and BoolQ stems are not
-self-contained: a HellaSwag `ctx` is a sentence fragment, a BoolQ stem carries
-a whole Wikipedia passage, and MMLU questions frequently quote textbook or
-statute text that legitimately appears in pretraining data. A 13-gram hit on
-those is usually *source* overlap, not test leakage. The self-contained subset
-therefore restricts to the 8 benchmarks whose stem is a standalone question or
-sentence — `arc_challenge`, `arc_easy`, `csqa`, `openbookqa`, `piqa`,
-`winogrande`, `socialiqa`, `boolq` — and is the number to read as an estimate
-of actual leakage. (The subset list is `SELFC` in `reduce_strict.py`; `boolq`
-is included there for continuity with the prior protocol even though its stem
-embeds a passage, and it contributes zero hits in every corpus, so it does not
-move the rate.)
+| Corpus | Matched items (any field) | Item rate | Self-contained-stem rate | Matched-span word rate |
+| --- | --- | --- | --- | --- |
+| `regmix-10b` (training) | 957 / 40,582 | **2.36%** | **2.00%** | 1.095e-05 |
+| `hq-reference-v1` (HQ reference) | 1,010 / 40,582 | **2.49%** | **2.22%** | 2.643e-05 |
+| `refhq-new-v1` (Instruct reference) | 2,432 / 40,582 | **5.99%** | **7.50%** | 2.195e-04 |
 
-## Results — the paper's three corpora
+"Item rate" is `distinct_items_any / n_items` (union of the stem and gold
+fields). "Self-contained-stem rate" is `macro_stem_rate`: the stem-field hit
+rate per benchmark, averaged across the 10 distinct benchmarks (not the 20
+task/split labels) so no single large benchmark dominates the average --
+this is the rate to read as an estimate of standalone-question leakage, and
+it is now computed the same way for every benchmark including MMLU (see
+[Methodology](#methodology)).
 
-Denominator 40,087 eval items. From `strict_summary.json` -> `by_corpus`.
+Contamination in the training corpus is shared by every arm trained on it,
+so it cannot explain a gap between arms. The Instruct reference corpus --
+used as the frozen reference model for the RHO-1 and BLADE arms -- is
+matched by roughly **2.5x** more items than the training corpus (2,432 vs
+957). A reference model that has memorized more evaluation items would raise
+excess loss on those items and bias its arm toward *outperforming* the
+control; the paper's finding that RHO-1 and BLADE still underperform the
+full-loss control holds despite that bias, not because contamination is
+absent.
 
-| Corpus | Role | Docs scanned | 13-grams | Items matched | Item rate | Self-contained |
-| --- | --- | --- | --- | --- | --- | --- |
-| `dml_train_10b` | 10B training corpus (`pretrain/regmix-10b` v1) | 4,748,990 | 5,822,742,335 | 358 | **0.8931%** | **0.1574%** |
-| `refhq_hq` | HQ reference corpus | 3,265,570 | 3,175,606,016 | 438 | **1.0926%** | **0.1437%** |
-| `refhq_instruct` | Instruct reference corpus | 6,193,748 | 2,663,753,719 | 1,472 | **3.6720%** | **3.6277%** |
+### `refhq-new-v1` (Instruct) per-benchmark, selected rows
 
-These match the paper's reported 0.89% / 0.16%, 1.09% / 0.14%, and
-3.67% / 3.63%.
+From `results_refhq-new-v1.json` -> `totals.per_benchmark`.
 
-Read the contrast this way: for the training corpus and the HQ reference, the
-overall rate (~1%) is an order of magnitude above the self-contained rate
-(~0.15%), i.e. essentially all of it is MMLU/HellaSwag source overlap. For the
-Instruct reference the two rates *coincide* (3.67% vs 3.63%) — the overlap is
-in genuine standalone question stems, which is what instruction-tuning mixtures
-are made of.
+| Benchmark | Stem found / assessable | Stem rate | Gold found / assessable | Gold rate |
+| --- | --- | --- | --- | --- |
+| `csqa` (val only, this benchmark has no test split here) | 396 / 1,161 | **34.11%** | -- (no assessable gold; CSQA's gold is a single letter, always under the 8-word floor) | -- |
+| `mmlu` (pooled: 4 subject groups x val+test) | 728 / 13,827 | **5.27%** | 240 / 5,148 | **4.66%** |
 
-### `refhq_instruct` per task
+### MMLU exemplar fix
 
-From `strict_summary.json` -> `by_corpus.refhq_instruct.per_task`
-(matched / n / rate).
+`mmlu` above pools all four subject groups and both val/test splits (13,827
+assessable stems). The superseded verbatim-13-gram audit reported its MMLU
+figure differently -- `mmlu_val` alone (1,519 items, val split only) at
+**27.3%** -- so the two numbers are not scoped identically and a single
+"5x" is not a clean per-item ratio. The comparison is still informative in
+direction and rough magnitude: this pipeline's pooled rate of **5.27%** is
+far below 27.3%, and the gap is explained by *why* the old number was high,
+not by the denominator difference. That audit's index was built from a
+fixed-width 13-gram over MMLU's raw indexed text, which (per this pipeline's
+`item_identity.strip_exemplars`, applied here and not there) still carried
+each item's per-subject few-shot exemplars: a single mirrored dev block
+matches every item in the subject, so the reported rate was dominated by
+exemplar overlap rather than standalone-question leakage. `csqa`, which has
+no per-subject exemplar structure to strip, moves much less between the two
+audits (32.3% -> 34.1%) even though its own denominator also shifted
+slightly (1,220 items in the superseded audit vs 1,161 *assessable* stems
+here, out of 1,221 -- 60 CSQA stems fall under this pipeline's 8-word floor
+and are excluded rather than scored). The residual movement there is
+consistent with that item-count and floor correction rather than an
+exemplar effect, since CSQA has no per-subject exemplar block to strip.
 
-| Label | Matched | n | Rate |
+### Regmix and HQ-reference `csqa` / `mmlu`, for comparison
+
+| Corpus | `csqa` stem rate | `mmlu` stem rate | `mmlu` gold rate |
 | --- | --- | --- | --- |
-| `csqa_val` | 394 | 1,220 | **32.2951%** |
-| `mmlu_val` | 415 | 1,519 | **27.3206%** |
-| `arc_challenge_test` | 35 | 1,171 | 2.9889% |
-| `mmlu_test` | 379 | 13,916 | 2.7235% |
-| `arc_easy_test` | 51 | 2,374 | 2.1483% |
-| `arc_challenge_val` | 6 | 299 | 2.0067% |
-| `winogrande_val` | 25 | 1,267 | 1.9732% |
-| `openbookqa_val` | 8 | 463 | 1.7279% |
-| `hellaswag_val` | 148 | 10,042 | 1.4738% |
-| `arc_easy_val` | 7 | 570 | 1.2281% |
-| `openbookqa_test` | 1 | 462 | 0.2165% |
-| `piqa_val` | 3 | 1,560 | 0.1923% |
-| `boolq_val` | 0 | 3,270 | 0.0000% |
-| `socialiqa_val` | 0 | 1,954 | 0.0000% |
+| `regmix-10b` | 0.52% | 1.85% | 1.03% |
+| `hq-reference-v1` | 0.09% | 1.89% | 1.22% |
+| `refhq-new-v1` | 34.11% | 5.27% | 4.66% |
 
-The paper's headline per-task figures are `csqa_val` **32.3%** and `mmlu_val`
-**27.3%**. CSQA and the MMLU dev/validation split are both widely redistributed
-inside public instruction mixtures, which is exactly what this measures.
-
-Per-source attribution for `refhq_instruct` (`by_domain`): `hermes-3` 2.60%,
-`openhermes-25` 1.52%, `tulu-3` 1.40%, `dolci` 1.29%, `tulu-v2` 1.16%,
-`smoltalk` 0.61%. No single source accounts for it; the mixtures overlap each
-other.
-
-For the 10B training corpus, `by_domain` localizes the overlap to `dclm`
-(337 of 358 matched items, 0.8407%); `arxiv` 0.0449%, `pes2o` 0.0499%,
-`starcoder` 0.0324%, `wiki` 0.0299%, and `open-web-math` and
-`algebraic-stack` contribute exactly zero.
-
-## Other result files
-
-- `strict_summary.json` — the strict-protocol scan. Also covers three corpora
-  not in the paper's Section 4 table: `olmomix_stock_30b` (0.1297% / 0.0205%),
-  `olmoe_synthetic_10b` (0.9928% / 0.1027%), `lgbm_opt` (1.1350% / 0.1027%).
-- `reservoir_summary.json` — the full 127B tokenized reservoir, scanned from
-  raw `uint32` Dolma2 shards by decoding tokens back to text (`scan_tok.py`).
-  62,057,627 docs, 74,305,588,695 13-grams, 7.4713% overall / 1.9165%
-  self-contained. Per domain the overall rate ranges from `starcoder` 0.1222%
-  to `algebraic-stack` 3.4799% and `dclm` 3.2380%.
-- `arm_exposure.json` — per-domain rates re-weighted into each candidate data
-  mixture, at a common per-domain token budget (`budget_tokens` 3,745,444,630,
-  set by the smallest domain, `wiki`). Arm exposure: Olmo-mix-1124 natural
-  0.7645%, Data Mixing Laws paper weights 0.4000%, MixLaw fit 0.6184%,
-  LightGBM fit 0.5051%.
-- `arm_union.json` — the same arms evaluated as an actual 10B-token union draw
-  rather than a re-weighting: Olmo-mix natural 1.5491%, DML paper 1.0702%,
-  MixLaw fit 1.2248%, LightGBM fit — see file.
-- `mine_summary.json` — an independent pass over the two reference corpora
-  using the **new** `build_eval_index.py` index (26,123 items, 15 labels, MMLU
-  kept split into its four categories, short items dropped). Useful as a
-  cross-check that the strict numbers are not an artifact of the older index;
-  it is *not* the source of any paper number, and its denominator differs, so
-  do not mix its rates with the table above.
-- `fields.json` — the machine-readable protocol record: `n`, per-benchmark
-  field, normalization string, index size.
+The Instruct corpus's `csqa` rate is nearly two orders of magnitude above the
+training and HQ-reference corpora's (34.11% vs 0.52% / 0.09%); its `mmlu`
+rate is smaller in relative terms but still roughly 3x theirs (5.27% vs
+1.85% / 1.89%). CSQA and MMLU's dev/validation splits are both widely
+redistributed inside public instruction-tuning mixtures, which is exactly
+what this measures.
 
 ## Code map
 
-Index construction
+Index construction (section 4a/4b of the methodology)
 
-- `build_eval_index.py` — builds the n=13 eval-side index from HuggingFace
-  datasets; writes `eval_index.pkl` and `fields.json`. Submitted by
-  `build_index.sbatch`.
+- `item_identity.py` -- the shared normalizer, exemplar-stripping and hashing
+  logic. Stdlib only. Imported by every other file here.
+- `dump_eval_items.py` -- reads the eval item text ai2-olmo actually scores
+  off its own task objects; writes `eval_items.jsonl.gz` and a per-label
+  summary. **Requires ai2-olmo + torch**; see
+  [Dependencies](#dependencies-and-whats-not-vendored).
+- `build_item_index.py` -- builds the length-floored, provenance-tagged n-gram
+  index from `eval_items.jsonl.gz`. Stdlib only.
+- `verify_item_identity.py` -- asserts a training run scored the same item
+  set this index was built from (doc_id digests + sampled content hashes).
+  Stdlib only; not needed to reproduce the numbers in this README, included
+  for the fidelity claim that the scan indexes what training actually scores.
 
-Scanning
+Scanning and aggregation (sections 3, 5, 6)
 
-- `scan_shard.py` — scan one JSON/JSONL(.gz) corpus shard against the index
-  (`scan.sbatch`). Handles plain-text documents and flattened chat records
-  (`messages` / `conversations`).
-- `scan_big.py` — multi-core variant for the largest shards
-  (`scan_big.sbatch`).
-- `scan_tok.py` — scan a raw-`uint32` tokenized Dolma2 shard by decoding to
-  text, then applying exactly the strict normalization. Token-range sharded
-  (`res.sbatch`).
-- `strict.sbatch` — runs the *prior* scanner `contam_scan.py` (from the Sep-10
-  directory) unchanged against `eval_ngrams_strict.pkl`. This is the path that
-  produces `strict_summary.json`, i.e. the paper's numbers.
+- `scan_corpus.py` -- scans one corpus domain (a file or a directory of
+  shard files) against the index; one process per domain or per-domain
+  shard. Stdlib only (reads `.json.gz` / `.jsonl.gz` directly; shells out to
+  the `zstd` CLI for `.zst`/`.zstd` shards, since no corpus scanned for this
+  paper needed that path but the reader supports it for corpora that do).
+- `aggregate_by_domain.py` -- reduces one corpus's per-domain hit files and
+  `DONE` sentinels into the `results_*.json` tables above. Stdlib only.
+- `scan_array.sbatch` -- Slurm array template, one task per line of a
+  task-list TSV (`domain\tshard\tpath`). See "Reproducing" below for how the
+  task list was built for each corpus.
 
-Manifests
+## Dependencies and what's not vendored
 
-- `mkstrict.py` — builds `strict_shards.tsv`, one row per (file, line-shard),
-  ~700 MB gz per array task, capped at 20 shards per file.
-- `mkres.py` — builds `res_shards.tsv` for the 127B reservoir, sharded by
-  token range (120M tokens per task), topping up `pes2o` and `starcoder` from
-  the topup tree to hit the paper's per-domain totals.
+Everything above is **stdlib-only** except `dump_eval_items.py`, which needs
+`torch` and `ai2-olmo` (`olmo.config`, `olmo.eval`, `olmo.tokenizer`)
+importable -- the same training environment the runs in this experiment
+used. That dependency is real and disclosed, not a hidden path: reading eval
+item text from ai2-olmo's own task objects rather than reconstructing it from
+HuggingFace fields is the fix this methodology makes (see Methodology
+above). Its output, `eval_items.jsonl.gz`, **is committed in this directory**
+precisely so everything downstream is runnable with the stdlib alone, without
+ai2-olmo, starting from that file.
 
-Reduction and analysis
+Not vendored, and why:
 
-- `reduce.py` / `reduce_strict.py` — aggregate per-shard hit files into
-  per-corpus and per-domain tables with item rates and the self-contained
-  subset.
-- `ref_numbers.py` — recompute the previously published numbers straight from
-  the Sep-10 artifacts, as an exact reference point for the new scans.
-- `arm_exposure.py` / `arm_union.py` — project per-domain rates onto the
-  candidate data mixtures.
-- `tokcount.py` — per-domain token totals from `.npy` headers (no data read).
-- `tokinv.py` — inventory every tokenized shard tree as `filesize / 4` (raw
-  `uint32`), and diff against the paper's reservoir targets.
+- **The raw corpora** (`regmix-10b`, `hq-reference-v1`, `refhq-new-v1`) --
+  tens of billions of words each, and not something a paper's code repo
+  should carry. Their FarmShare paths are recorded above for provenance.
+- **`item_index.pkl`** (172 MB; see `item_index_summary.json` ->
+  `index_bytes_on_disk`) -- larger than GitHub's per-file limit, and it
+  regenerates deterministically from the committed `eval_items.jsonl.gz` via
+  `build_item_index.py` in well under a minute.
+- **Raw per-shard hit files and `DONE` sentinels** -- regenerable from
+  `scan_corpus.py` against the committed index and the corpora above; the
+  reduced `results_*.json` tables are what the paper's numbers cite.
 
 ## Reproducing
 
-```bash
-RUN=/scratch/users/nzhao2/agent-runs/ngram13-<stamp>
-mkdir -p "$RUN"/{logs,results,strict_hits,res_hits}
-cp *.py *.sbatch "$RUN"/
+Exact commands run for this paper, paths as on FarmShare. `dump_eval_items.py`
+needs the private training monorepo's environment (ai2-olmo + torch); every
+step after it needs only this directory and Python's stdlib.
 
-sbatch build_index.sbatch "$RUN"                      # eval_index.pkl
-python mkstrict.py "$RUN"                             # strict_shards.tsv
-sbatch --array=0-$(( $(wc -l < "$RUN"/strict_shards.tsv) - 1 )) strict.sbatch "$RUN"
-python reduce_strict.py "$RUN"/strict_hits "$RUN"/strict_summary.json
+```bash
+CONTAM=path/to/this/directory   # experiments/token-selection/contamination
+
+# 4a. Dump eval item text (needs ai2-olmo; produces the committed eval_items.jsonl.gz)
+python "$CONTAM/dump_eval_items.py" \
+  --out "$CONTAM/eval_items.jsonl.gz" \
+  --summary "$CONTAM/eval_items_summary.json"
+
+# 4a/6.5. Build the index (stdlib only; not committed, see Dependencies above)
+python "$CONTAM/build_item_index.py" \
+  --items "$CONTAM/eval_items.jsonl.gz" \
+  --out /path/to/item_index.pkl \
+  --summary "$CONTAM/item_index_summary.json"
+
+# One task-list TSV per corpus: <domain>\t<shard-id>\t<path>.
+# regmix-10b: one line per domain, the corpus's single per-domain file.
+for d in algebraic-stack arxiv dclm open-web-math pes2o starcoder wiki; do
+  printf '%s\t0000\t%s\n' "$d" \
+    "/scratch/users/nzhao2/agent-runs/regmix-10b-20260725-124810/trim/$d/$d-trimmed.json.gz"
+done > regmix-10b.tsv
+
+# hq-reference-v1: one line per domain, the corpus's per-domain directory
+# (scan_corpus.py reads every *.json.gz/*.jsonl.zstd shard inside, sorted).
+for d in algebraic-stack arxiv dclm open-web-math pes2o starcoder wiki; do
+  printf '%s\t0000\t%s\n' "$d" "/scratch/users/nzhao2/hq-reference-v1/out/$d"
+done > hq-reference-v1.tsv
+
+# refhq-new-v1: one line per (source, category) documents directory; category
+# is the aggregation domain, source becomes the shard id so several sources
+# can contribute to one category.
+find /scratch/users/nzhao2/refhq-new-v1/out -maxdepth 3 -type d -name documents \
+  | while read -r dir; do
+      cat=$(basename "$(dirname "$dir")")
+      src=$(basename "$(dirname "$(dirname "$dir")")")
+      printf '%s\t%s\t%s\n' "$cat" "$src" "$dir"
+    done > refhq-new-v1.tsv
+
+# Scan each corpus (Slurm array, one task per task-list line).
+for corpus in regmix-10b hq-reference-v1 refhq-new-v1; do
+  N=$(wc -l < "$corpus.tsv")
+  CN_TASKLIST="$PWD/$corpus.tsv" CN_INDEX=/path/to/item_index.pkl \
+    CN_OUT="/scratch/users/nzhao2/agent-runs/<run>/$corpus/hits" \
+    sbatch --array="0-$((N - 1))" "$CONTAM/scan_array.sbatch"
+done
+
+# Aggregate each corpus once its array completes.
+python "$CONTAM/aggregate_by_domain.py" \
+  --hits /scratch/.../regmix-10b/hits --items "$CONTAM/eval_items.jsonl.gz" \
+  --domains algebraic-stack,arxiv,dclm,open-web-math,pes2o,starcoder,wiki \
+  --corpus-name regmix-10b --out "$CONTAM/results_regmix-10b.json"
+
+python "$CONTAM/aggregate_by_domain.py" \
+  --hits /scratch/.../hq-reference-v1/hits --items "$CONTAM/eval_items.jsonl.gz" \
+  --domains algebraic-stack,arxiv,dclm,open-web-math,pes2o,starcoder,wiki \
+  --corpus-name hq-reference-v1 --out "$CONTAM/results_hq-reference-v1.json"
+
+python "$CONTAM/aggregate_by_domain.py" \
+  --hits /scratch/.../refhq-new-v1/hits --items "$CONTAM/eval_items.jsonl.gz" \
+  --domains chat,code,general,math,science \
+  --corpus-name refhq-new-v1 --out "$CONTAM/results_refhq-new-v1.json"
 ```
 
-Every sbatch wrapper pins `PYTHONHASHSEED=0`. Dropping it silently invalidates
-the reduction — that is the Sep-10 failure mode.
+## Superseded methodology (not vendored here)
+
+This directory previously held a verbatim-13-gram audit (`n = 13`, hashed
+with `PYTHONHASHSEED=0`, indexed over reconstructed HuggingFace fields,
+denominator 40,087 items). That audit's numbers (0.89% / 1.09% / 3.67%
+overall; 358 / 438 / 1,472 matched items) do not match this paper's current
+text, and its scanner, its eval-side index builder, and the FarmShare run
+directory it was copied from were never committed to this repo -- so when a
+reviewer tried to check the paper's numbers against this directory, there
+was nothing here that could reproduce either the old or the new figures.
+
+Rather than reconcile the two audits' numbers after the fact, this directory
+now vendors the pipeline that produced the paper's *current* numbers in
+full, per [Dependencies and what's not vendored](#dependencies-and-whats-not-vendored)
+above, so the join is checkable directly. The two audits are not expected to
+agree term-for-term: a fixed-width 13-gram with no length floor, scanned
+against reconstructed HuggingFace fields, is a different measurement from a
+length-floored, provenance-tagged, exemplar-stripped one, and their
+"self-contained" and "overall" columns are not even defined over the same
+benchmark subsets (the old audit's self-contained rate flatly counts items
+across 8 of the 10 benchmarks; this pipeline's `macro_stem_rate` averages
+per-benchmark rates across all 10, MMLU included), so a single conversion
+factor between them does not exist. [MMLU exemplar fix](#mmlu-exemplar-fix)
+below works through the closest thing to a before/after comparison this
+directory can make -- the same benchmark, on the same corpus, indexed with
+and without exemplar-stripping -- and is explicit about where even that
+comparison's denominators still differ.

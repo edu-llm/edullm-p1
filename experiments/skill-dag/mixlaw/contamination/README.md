@@ -2,11 +2,11 @@
 
 This directory holds the code and results behind the domain-weighting
 paper's contamination audit of the shared 127B-token data reservoir that
-every mixture in this experiment (and in `../skillit/`) draws from.
+every mixture in this experiment (and in `../../skillit/`) draws from.
 Contamination is a property of the reservoir's domains, not of any one
 mixture, so this directory's scan and its results are shared by both the
 static-mixture (MixLaw / LightGBM) arms here and the dynamic-reweighting
-(Skill-It) arms in `../skillit/contamination/`, which reads this directory's
+(Skill-It) arms in `../../skillit/contamination/`, which reads this directory's
 `results_olmo127b-reservoir.json` directly rather than duplicating the scan.
 
 ## Methodology

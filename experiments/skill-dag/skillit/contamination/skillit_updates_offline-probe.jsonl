@@ -1,0 +1,6 @@
+{"step": 0, "p_after": {"dclm": 0.375, "arxiv": 0.25, "starcoder": 0.141, "pes2o": 0.094, "open-web-math": 0.064, "algebraic-stack": 0.062, "wiki": 0.016}}
+{"step": 500, "p_after": {"dclm": 0.194, "arxiv": 0.131, "starcoder": 0.106, "pes2o": 0.157, "open-web-math": 0.122, "algebraic-stack": 0.124, "wiki": 0.165}}
+{"step": 875, "p_after": {"dclm": 0.19, "arxiv": 0.132, "starcoder": 0.109, "pes2o": 0.156, "open-web-math": 0.124, "algebraic-stack": 0.126, "wiki": 0.163}}
+{"step": 1250, "p_after": {"dclm": 0.188, "arxiv": 0.133, "starcoder": 0.11, "pes2o": 0.156, "open-web-math": 0.125, "algebraic-stack": 0.126, "wiki": 0.163}}
+{"step": 1625, "p_after": {"dclm": 0.187, "arxiv": 0.133, "starcoder": 0.111, "pes2o": 0.156, "open-web-math": 0.125, "algebraic-stack": 0.126, "wiki": 0.162}}
+{"step": 2000, "p_after": {"dclm": 0.186, "arxiv": 0.133, "starcoder": 0.111, "pes2o": 0.155, "open-web-math": 0.126, "algebraic-stack": 0.127, "wiki": 0.162}}

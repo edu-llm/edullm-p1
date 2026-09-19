@@ -126,7 +126,7 @@ ARMS = [
     # key,             bar/table label,     figure-1 legend label,          color,     ls,   marker
     ("control",        "Full-loss control", "Full-loss control (baseline)", "#000000", "--", "s"),
     ("rho_1",          "RHO-1",             "RHO-1",                        "#1f77b4", "-",  "o"),
-    ("random_control", "Random control",    "Random control (baseline)",    "#7f7f7f", ":",  "^"),
+    ("random_control", "Random control",    "Random control (baseline, 2-seed mean)", "#7f7f7f", ":",  "^"),
     ("attention",      "Attention",         "Attention",                    "#d62728", "-",  "D"),
     ("blade",          "BLADE",             "BLADE",                        "#9467bd", "-",  "v"),
     ("middle_ppl",     "Perplexity",        "Perplexity",                   "#2ca02c", "-",  "P"),
@@ -297,6 +297,13 @@ def fit_all(curves: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, dict]
         pooled_loss = np.concatenate([curves[k][1][curves[k][0] >= MIN_STEP] for k in present])
         final_step = float(max(curves[k][0][-1] for k in present))
         pooled = bootstrap_arm(pooled_steps, pooled_loss, final_step)
+        # Figure 1 draws one random-control line: the per-step mean over seeds.
+        # Every seed shares the same eval grid, so this is a plain column mean.
+        grids = [curves[k][0] for k in present]
+        if not all(np.array_equal(grids[0], g) for g in grids[1:]):
+            raise ValueError("random-control seeds do not share an eval grid")
+        mean_steps = grids[0]
+        mean_loss = np.mean([curves[k][1] for k in present], axis=0)
         pooled.update(
             key="random_control",
             label=LABEL["random_control"],
@@ -304,8 +311,8 @@ def fit_all(curves: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, dict]
             observed=float(np.mean([curves[k][1][-1] for k in present])),
             n_fit_points=int(pooled_steps.size),
             n_seeds=len(present),
-            steps=curves["random_control"][0],
-            loss=curves["random_control"][1],
+            steps=mean_steps,
+            loss=mean_loss,
         )
         results["random_control"] = pooled
     return results
@@ -432,22 +439,6 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
             label=LEGEND[key],
         )
 
-    # Second seed of the random control, same colour, dash-dot, its own legend entry.
-    seed69 = results.get("random_control_seed69__seedfit")
-    if seed69 is not None:
-        m = seed69["steps"] >= 500
-        ax.plot(
-            seed69["steps"][m],
-            seed69["loss"][m],
-            color=COLOR["random_control"],
-            linestyle="-.",
-            marker="^",
-            markersize=7,
-            markerfacecolor="none",
-            linewidth=1.8,
-            label="Random control, 2nd seed",
-        )
-
     ax.set_xlabel("Training step", fontsize=17)
     ax.set_ylabel("Macro task-loss bits-per-byte (lower is better)", fontsize=15)
     ax.set_title(
@@ -474,18 +465,6 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
             linestyle=LINESTYLE[key],
             marker=MARKER[key],
             markersize=9 if MARKER[key] == "*" else 6,
-            linewidth=1.6,
-        )
-    if seed69 is not None:
-        m = seed69["steps"] >= lo_x
-        inset.plot(
-            seed69["steps"][m],
-            seed69["loss"][m],
-            color=COLOR["random_control"],
-            linestyle="-.",
-            marker="^",
-            markersize=6,
-            markerfacecolor="none",
             linewidth=1.6,
         )
     tail = [

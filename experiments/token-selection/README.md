@@ -112,10 +112,12 @@ step count (2384 vs 2360) and eval grid (~119 vs 125 steps). v3 is matched on in
 (confirmed via the step-0 eval fingerprint), data seed, step count and eval grid, so that
 confound is resolved. See `ARMS.md` for the field-by-field comparison.
 
-Initialization is still not uniform across all seven arms: the step-0 eval splits them into
-**4.4662** bpb (full-loss control, random control, REL-EMA) and **4.4838** bpb (rho-1,
-Attention, BLADE, Middle-PPL), a 0.0176 bpb spread before any training. The two controls
-share an initialization; rho-1 does not.
+Initialization is not uniform across the arms: the step-0 eval splits the eight runs into
+**4.4610** bpb (random control seed 69), **4.4662** bpb (full-loss control, random control
+seed 42, REL-EMA) and **4.4838** bpb (rho-1, Attention, BLADE, Middle-PPL), a 0.0228 bpb
+spread before any training. The full-loss control shares an initialization with the seed-42
+random control but not with seed 69, so the pooled random-control baseline mixes two
+initializations; rho-1 is in a third group again.
 
 A random-60% selection control (keep-rate 60% chosen uniformly at random per row, no scoring
 signal) was run on 4×L40S at **two seeds** — `random-control-regmix10b-v1` (seed 42) and
@@ -320,8 +322,9 @@ Two caveats a reader should carry out of this page. First, only the random contr
 seed replicate; the other six arms are single runs whose intervals contain **no
 seed-to-seed variance**, and the one seed contrast we can measure is 0.0082 bpb, which is
 of the same order as the closest between-arm gaps. Second, initialization was **not**
-uniform across arms -- the step-0 eval splits them into two groups 0.0176 bpb apart, and
-ρ-1 sits in the opposite group from both controls. The direction of the headline result
+uniform across arms -- the step-0 eval splits them into three groups spanning 0.0228 bpb,
+ρ-1 sits apart from both controls, and the two random-control seeds do not share an
+initialization with each other. The direction of the headline result
 is robust (the selection arms lose to full CE by 0.011 to 0.25 bpb), but the ordering
 inside the top cluster is not settled.
 

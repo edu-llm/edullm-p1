@@ -83,11 +83,17 @@ rather than 42, 2384 steps rather than 2360, a ~119-step eval grid, and an init 
 0 because `init_seed` never propagated into `TransformerConfig`. v3 is matched on init (confirmed
 via the step-0 eval fingerprint), data seed, step count and eval grid, so that confound is gone.
 
-**Initialization is still not uniform across all seven arms.** The step-0 evaluation splits them
-into exactly two groups: **4.4662** bpb (full-loss control, random control, REL-EMA) and **4.4838**
-bpb (RHO-1, Attention, BLADE, Middle-PPL) — a 0.0176 bpb spread before any training. The two
-controls share an initialization, so the headline control-vs-random comparison is clean, but RHO-1
-is in the other group.
+**Initialization is not uniform across the arms.** The step-0 evaluation splits the eight runs
+into three groups: **4.4610** bpb (random control seed 69), **4.4662** bpb (full-loss control,
+random control seed 42, REL-EMA) and **4.4838** bpb (RHO-1, Attention, BLADE, Middle-PPL) — a
+0.0228 bpb spread before any training. Two consequences:
+
+- The full-loss control and the **seed-42** random control share an initialization, but the
+  **seed-69** replicate does not, so the pooled two-run random control mixes two initializations.
+  That is a fair estimate of run-to-run variance (seed 69 re-rolls init as well as selection), but
+  it means the 0.0082 bpb seed spread is *not* attributable to the selection RNG alone.
+- RHO-1 — the one arm that finishes below the random control — sits in the third group, so its
+  comparison against either control is confounded by initialization.
 
 ### Random control (reported as a two-run fit)
 

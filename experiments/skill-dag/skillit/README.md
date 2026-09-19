@@ -2,7 +2,7 @@
 
 **Question.** Can Skill-It domain reweighting — driven by an offline probe adjacency or by online mixing-law derivatives — improve macro task-loss over a fixed Data Mixing Laws paper mixture under a matched one-epoch budget?
 
-**Answer.** No. All three Skill-It arms finished at or worse than the Data Mixing Laws paper control. The best Skill-It arm (offline probe adjacency) is statistically indistinguishable from control; the derivative and MixLaw-seeded offline arms are clearly worse.
+**Answer.** No. Both Skill-It arms finished at or worse than the Data Mixing Laws paper control. The best Skill-It arm (offline probe adjacency) is statistically indistinguishable from control; the derivative arm is clearly worse.
 
 ---
 
@@ -76,51 +76,59 @@ So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \
 
 Skill-It reweighting follows [Chen et al., Skill-It!](https://arxiv.org/abs/2307.14430). Online derivative \(A\) additionally uses the MixLaw parametric form from [Ye et al., Data Mixing Laws](https://arxiv.org/abs/2403.16952).
 
+Two arms were actually trained, both starting from the **LightGBM-optimized
+mixture** (`LGB-min1pct`), not the Data Mixing Laws paper mixture — confirmed
+by each run's own step-0 logged weights
+(`skillit-370m-probe-rerun-20260918-011120`,
+`skillit-370m-deriv-20260916-124719`), which match `LGB-min1pct`'s published
+weight vector to full float precision. An earlier version of this table
+additionally listed a third "Offline (MixLaw start)" arm and attributed a
+Data-Mixing-Laws-paper start to these two; no such third run exists and the
+starting-mixture attribution was wrong.
+
 | Arm | Manipulation | A100-h | FLOPs |
 |-----|--------------|-------:|------:|
-| Offline probe | Start at Data Mixing Laws paper mix; at each update apply Skill-It with the **fixed** offline \(A\) above and current task losses | 47.26 | \(2.63\times10^{19}\) |
-| Online derivative | Start at Data Mixing Laws paper mix; at each update **recompute** \(A(r)\) from MixLaw derivatives, then Skill-It-update | 53.8 | \(2.63\times10^{19}\) |
-| Offline (MixLaw start) | Same fixed offline \(A\) as Offline probe, but **initialize** domain weights at the MixLaw optimum instead of the Data Mixing Laws paper mix | 47.14 | \(2.63\times10^{19}\) |
-| **Total** | | **148.2** | **\(7.89\times10^{19}\)** |
+| Offline probe | Start at the LightGBM-optimized mixture; at each update apply Skill-It with the **fixed** offline \(A\) above and current task losses | 47.26 | \(2.63\times10^{19}\) |
+| Online derivative | Start at the LightGBM-optimized mixture; at each update **recompute** \(A(r)\) from MixLaw derivatives, then Skill-It-update | 53.8 | \(2.63\times10^{19}\) |
+| **Total** | | **101.06** | **\(5.26\times10^{19}\)** |
 
 Comparisons use the Data Mixing Laws paper full run as control (fixed weights for the whole epoch; not an extra Skill-It train). A100-hours are the no-waste totals measured for these runs. Online derivative’s A100-hours are throughput-repriced to steady-state (W&B wall was 70.51 A100-h; defective-pod I/O on a mid-run stretch is excluded).
 
 ### Domain weights after each update
 
-Logged \(p\) (post-update domain mixture) from W&B `skillit/weight/*` at step 0 and each Skill-It update. Weights sum to 1.
+Logged \(p\) (post-update domain mixture) read directly from each run's own
+`skillit_updates.jsonl` progress log at step 0 and each Skill-It update.
+Weights sum to 1. Step 0 for both arms is `LGB-min1pct`, the
+LightGBM-optimized mixture (see Arms actually run above).
 
 **Offline probe**
 
 | step | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |-----:|-----:|------:|----------:|------:|--------------:|----------------:|-----:|
-| 0 | 0.375 | 0.250 | 0.141 | 0.094 | 0.064 | 0.062 | 0.016 |
-| 500 | 0.194 | 0.131 | 0.106 | 0.157 | 0.122 | 0.124 | 0.165 |
-| 875 | 0.190 | 0.132 | 0.109 | 0.156 | 0.124 | 0.126 | 0.163 |
-| 1250 | 0.188 | 0.133 | 0.110 | 0.156 | 0.125 | 0.126 | 0.163 |
-| 1625 | 0.187 | 0.133 | 0.111 | 0.156 | 0.125 | 0.126 | 0.162 |
-| 2000 | 0.186 | 0.133 | 0.111 | 0.155 | 0.126 | 0.127 | 0.162 |
+| 0 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
+| 500 | 0.646 | 0.168 | 0.057 | 0.077 | 0.031 | 0.010 | 0.011 |
+| 875 | 0.720 | 0.131 | 0.037 | 0.071 | 0.023 | 0.008 | 0.011 |
+| 1250 | 0.779 | 0.101 | 0.023 | 0.064 | 0.017 | 0.006 | 0.010 |
+| 1625 | 0.827 | 0.077 | 0.015 | 0.057 | 0.012 | 0.004 | 0.009 |
+| 2000 | 0.864 | 0.057 | 0.009 | 0.050 | 0.008 | 0.003 | 0.008 |
 
 **Online derivative**
 
 | step | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |-----:|-----:|------:|----------:|------:|--------------:|----------------:|-----:|
-| 0 | 0.375 | 0.250 | 0.141 | 0.094 | 0.064 | 0.062 | 0.016 |
-| 500 | 0.141 | 0.124 | 0.124 | 0.144 | 0.145 | 0.124 | 0.199 |
-| 875 | 0.151 | 0.129 | 0.129 | 0.145 | 0.137 | 0.129 | 0.180 |
-| 1250 | 0.151 | 0.129 | 0.129 | 0.144 | 0.138 | 0.129 | 0.180 |
-| 1625 | 0.151 | 0.129 | 0.129 | 0.145 | 0.138 | 0.129 | 0.180 |
-| 2000 | 0.151 | 0.129 | 0.129 | 0.145 | 0.138 | 0.129 | 0.179 |
+| 0 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
+| 500 | 0.556 | 0.200 | 0.082 | 0.086 | 0.047 | 0.013 | 0.016 |
+| 875 | 0.557 | 0.189 | 0.078 | 0.091 | 0.052 | 0.012 | 0.021 |
+| 1250 | 0.556 | 0.178 | 0.073 | 0.095 | 0.057 | 0.011 | 0.028 |
+| 1625 | 0.553 | 0.168 | 0.069 | 0.099 | 0.062 | 0.011 | 0.037 |
+| 2000 | 0.549 | 0.159 | 0.065 | 0.103 | 0.067 | 0.010 | 0.047 |
 
-**Offline (MixLaw start)**
-
-| step | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
-|-----:|-----:|------:|----------:|------:|--------------:|----------------:|-----:|
-| 0 | 0.568 | 0.000 | 0.000 | 0.097 | 0.035 | 0.000 | 0.300 |
-| 500 | 0.194 | 0.131 | 0.107 | 0.156 | 0.122 | 0.124 | 0.166 |
-| 875 | 0.190 | 0.132 | 0.109 | 0.156 | 0.124 | 0.125 | 0.163 |
-| 1250 | 0.188 | 0.132 | 0.110 | 0.156 | 0.125 | 0.126 | 0.162 |
-| 1625 | 0.187 | 0.133 | 0.111 | 0.155 | 0.125 | 0.127 | 0.162 |
-| 2000 | 0.186 | 0.133 | 0.111 | 0.155 | 0.126 | 0.127 | 0.162 |
+Offline probe's fixed adjacency drives weight toward `dclm` monotonically at
+every update; online derivative's recomputed adjacency instead redistributes
+weight from `dclm`/`arxiv` onto `wiki` while leaving `dclm` close to its
+starting share. See
+[`contamination/README.md`](contamination/README.md#reading-these-together)
+for how this drives each arm's contaminated exposure.
 
 ---
 
@@ -132,6 +140,15 @@ Same as MixLaw: power law \(y = a + b/\mathrm{step}^{\alpha}\) on steps ≥ 1000
 
 ## Results
 
+**The per-arm bpb figures below have not been re-verified against the
+LightGBM-start correction above** (only the arm count and starting-mixture
+metadata in Setup/Arms/Domain-weights was confirmed wrong and fixed, using
+each run's own `skillit_updates.jsonl` log). The "Offline (MixLaw start)"
+row is removed since no such third run exists. If these bpb/CI numbers were
+computed under the old, mistaken assumption of a Data-Mixing-Laws-paper
+start, they need to be re-pulled from W&B for the two real runs before being
+treated as final.
+
 ### Fitted final macro task-loss (bpb)
 
 | Arm | Fitted final | Observed | 95% CI |
@@ -139,16 +156,15 @@ Same as MixLaw: power law \(y = a + b/\mathrm{step}^{\alpha}\) on steps ≥ 1000
 | Data Mixing Laws paper (control) | **1.6518** | 1.6518 | [1.6484, 1.6553] |
 | Offline probe | 1.6544 | 1.6631 | [1.6476, 1.6614] |
 | Online derivative | 1.6690 | 1.6745 | [1.6603, 1.6772] |
-| Offline (MixLaw start) | 1.6747 | 1.6748 | [1.6693, 1.6792] |
 
-Lower is better. Control is best. Offline probe overlaps control; Online derivative and Offline (MixLaw start) sit clearly above.
+Lower is better. Control is best. Offline probe overlaps control; Online derivative sits clearly above.
 
 ### Takeaways
 
 1. **Skill-It did not help** under this one-epoch 370M contract — mid-run reweighting failed to beat a static Data Mixing Laws paper mix.
 2. **Offline probe ≈ control** — five Skill-It updates with the probe adjacency neither help nor clearly hurt once curve uncertainty is accounted for.
-3. **Online derivatives and starting from MixLaw weights hurt** — both finish ~0.02 bpb worse than the Data Mixing Laws paper control.
-4. **Cost.** Three Skill-It trains 148.2 A100-hours and \(\approx 7.89\times10^{19}\) FLOPs (Online derivative alone 53.8 A100-h), plus \(\approx 6.8\times10^{17}\) FLOPs for the 60M probes.
+3. **Online derivative hurts** — finishes ~0.02 bpb worse than the Data Mixing Laws paper control.
+4. **Cost.** Two Skill-It trains 101.06 A100-hours and \(\approx 5.26\times10^{19}\) FLOPs (Online derivative alone 53.8 A100-h), plus \(\approx 6.8\times10^{17}\) FLOPs for the 60M probes.
 
 ---
 

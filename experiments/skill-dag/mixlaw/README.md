@@ -345,22 +345,24 @@ committed curves in [`skill_dag_370m_wandb_curves.json`](skill_dag_370m_wandb_cu
 full output in [`skill_dag_370m_bootstrap_results.json`](skill_dag_370m_bootstrap_results.json).
 The control is the **average of the two Olmo-mix-1124 dataloader seeds** (6198, 12345),
 whose bootstrap distribution is the element-by-element mean of the two seeds' own
-alpha-free bootstrap distributions.
+alpha-free bootstrap distributions. Every arm is resampled from its own
+independent random stream, so between-arm intervals are not coupled through a
+shared generator.
 
 | Arm | Fitted final | Observed | 95% CI | vs control |
 |-----|-------------:|---------:|--------|------------|
 | **MixLaw** | **1.6057** | 1.6048 | [1.6015, 1.6099] | $p < 10^{-4}$ |
 | **LightGBM** | **1.6080** | 1.6077 | [1.6049, 1.6106] | $p < 10^{-4}$ |
 | Olmo-mix-1124 seed 6198 | 1.6313 | 1.6370 | [1.6261, 1.6357] | — |
-| Olmo-mix-1124 seed 12345 | 1.6269 | 1.6285 | [1.6195, 1.6344] | — |
-| Olmo-mix-1124 average (control) | 1.6291 | 1.6328 | [1.6252, 1.6333] | — |
-| Data Mixing Laws paper | 1.6515 | 1.6518 | [1.6474, 1.6555] | worse, $p < 10^{-4}$ |
+| Olmo-mix-1124 seed 12345 | 1.6269 | 1.6285 | [1.6195, 1.6343] | — |
+| Olmo-mix-1124 average (control) | 1.6291 | 1.6328 | [1.6246, 1.6335] | — |
+| Data Mixing Laws paper | 1.6515 | 1.6518 | [1.6473, 1.6556] | worse, $p < 10^{-4}$ |
 
 Lower is better. Both fitted mixtures beat the Olmo-mix-1124 control. The Data Mixing
 Laws paper mixture is significantly **worse** than the control.
 
 **Seed-variance reference.** The two control seeds differ by 0.0044 bpb
-(95% CI [-0.0062, 0.0130], $p = 0.376$) — dataloader seed only, model init held fixed.
+(95% CI [-0.0046, 0.0132], $p = 0.34$) — dataloader seed only, model init held fixed.
 Any effect smaller than ~0.004 bpb is inside that noise floor.
 
 ### Takeaways

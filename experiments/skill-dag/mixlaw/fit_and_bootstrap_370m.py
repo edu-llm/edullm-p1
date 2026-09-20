@@ -22,12 +22,21 @@ than frozen at the point estimate. Holding alpha fixed understates the interval
 by roughly a third at this sample size, so every arm in the paper uses the
 alpha-free form.
 
+Each arm is resampled from its **own independent random stream**, spawned from
+``--seed`` via ``SeedSequence.spawn``. This matters: the arms are separate
+training runs with no shared randomness, so their bootstrap distributions must
+be independent. Drawing every arm's resample indices from one seeded generator
+(which happens by default when all arms have the same number of eval points)
+silently couples them and distorts every between-arm interval -- here it made
+the derivative arm's bootstrap draws correlate +0.91 with the control's and the
+probe arm's -0.43, shrinking one difference interval and inflating the other.
+
 The Olmo-mix-1124 control is the *average of the two dataloader seeds*: its
 bootstrap distribution is the element-by-element mean of the two seeds' own
 alpha-free bootstrap distributions, and its CI is the 2.5/97.5 percentiles of
 that averaged distribution.
 
-p-values are two-sided paired bootstrap tests on the difference of two
+p-values are two-sided bootstrap tests on the difference of two independent
 distributions, ``p = 2 * min(P(diff <= 0), P(diff >= 0))``, floored at the
 bootstrap resolution ``1/n_boot``.
 
@@ -79,8 +88,13 @@ def _ols_over_alpha(X: np.ndarray, Y: np.ndarray):
     return sse, slope, intercept
 
 
-def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed):
-    """Point fit + alpha-free residual bootstrap. Returns (fitted, finals)."""
+def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000):
+    """Point fit + alpha-free residual bootstrap. Returns (fitted, finals).
+
+    ``seed`` should be a per-arm :class:`numpy.random.SeedSequence` so that arms
+    are resampled independently; see the module docstring. Draws are generated
+    in blocks of ``chunk`` to bound peak memory at large ``n_boot``.
+    """
     s = np.asarray(steps, dtype=float)
     y = np.asarray(losses, dtype=float)
     mask = s >= MIN_STEP
@@ -98,12 +112,15 @@ def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed):
     fitted = a0 + b0 * final_step ** (-alpha0)
 
     rng = np.random.default_rng(seed)
-    draws = rng.integers(0, resid.size, (n_boot, resid.size))
-    Y = pred[None, :] + resid[draws]                   # (B, n)
-    sse, slope, icept = _ols_over_alpha(X, Y)
-    pick = np.argmin(sse, axis=0)                      # alpha-free: per-draw alpha
-    cols = np.arange(n_boot)
-    finals = icept[pick, cols] + slope[pick, cols] * final_step ** (-ALPHA_GRID[pick])
+    finals = np.empty(n_boot, dtype=float)
+    for lo in range(0, n_boot, chunk):
+        hi = min(lo + chunk, n_boot)
+        draws = rng.integers(0, resid.size, (hi - lo, resid.size))
+        Y = pred[None, :] + resid[draws]               # (B, n)
+        sse, slope, icept = _ols_over_alpha(X, Y)
+        pick = np.argmin(sse, axis=0)                  # alpha-free: per-draw alpha
+        cols = np.arange(hi - lo)
+        finals[lo:hi] = icept[pick, cols] + slope[pick, cols] * final_step ** (-ALPHA_GRID[pick])
     return fitted, finals
 
 
@@ -112,8 +129,13 @@ def ci(finals):
     return float(lo), float(hi)
 
 
-def paired_p(a: np.ndarray, b: np.ndarray) -> float:
-    """Two-sided paired bootstrap p-value for a - b, floored at 1/n."""
+def diff_p(a: np.ndarray, b: np.ndarray) -> float:
+    """Two-sided bootstrap p-value for a - b, floored at 1/n.
+
+    ``a`` and ``b`` are independent bootstrap distributions (one per arm), so
+    the difference is taken draw-by-draw only to build its sampling
+    distribution -- the draws are not paired observations.
+    """
     d = a - b
     n = d.size
     p = 2.0 * min((d >= 0).mean(), (d <= 0).mean())
@@ -127,7 +149,7 @@ def fmt_p(p: float, n_boot: int) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--n-boot", type=int, default=10_000)
+    ap.add_argument("--n-boot", type=int, default=200_000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--curves", type=Path, default=CURVES_PATH)
     ap.add_argument("--out", type=Path, default=RESULTS_PATH)
@@ -137,11 +159,14 @@ def main() -> None:
     final_step = int(data["final_step"])
     runs = data["runs"]
 
+    # One independent stream per arm -- see the module docstring.
+    streams = np.random.SeedSequence(args.seed).spawn(len(runs))
+
     fitted, finals, observed = {}, {}, {}
-    for key, run in runs.items():
+    for (key, run), stream in zip(runs.items(), streams):
         f, dist = fit_and_bootstrap(
             run["steps"], run["macro_bpb"],
-            final_step=final_step, n_boot=args.n_boot, seed=args.seed,
+            final_step=final_step, n_boot=args.n_boot, seed=stream,
         )
         fitted[key], finals[key] = f, dist
         observed[key] = float(run["macro_bpb"][-1])
@@ -154,7 +179,8 @@ def main() -> None:
 
     out = {
         "method": "power-law fit (y = a + b/step**alpha) on steps >= 1000; "
-                  "alpha-free residual bootstrap",
+                  "alpha-free residual bootstrap; one independent resampling "
+                  "stream per arm",
         "n_boot": args.n_boot,
         "seed": args.seed,
         "final_step": final_step,
@@ -180,7 +206,7 @@ def main() -> None:
     print()
     for key in VS_CONTROL:
         d = finals[key] - ctrl
-        p = paired_p(finals[key], ctrl)
+        p = diff_p(finals[key], ctrl)
         lo, hi = ci(d)
         out["comparisons"][f"{key}_vs_olmo_average"] = {
             "mean_diff_bpb": round(float(d.mean()), 6),
@@ -195,7 +221,7 @@ def main() -> None:
     print()
     for key in ("skillit-probe", "skillit-derivative"):
         d = finals[key] - finals["lightgbm"]
-        p = paired_p(finals[key], finals["lightgbm"])
+        p = diff_p(finals[key], finals["lightgbm"])
         lo, hi = ci(d)
         out["comparisons"][f"{key}_vs_lightgbm"] = {
             "mean_diff_bpb": round(float(d.mean()), 6),
@@ -207,7 +233,7 @@ def main() -> None:
 
     # Seed-variance estimate quoted in the paper.
     d = finals[s1] - finals[s2]
-    p = paired_p(finals[s1], finals[s2])
+    p = diff_p(finals[s1], finals[s2])
     lo, hi = ci(d)
     out["seed_variance_estimate"] = {
         "description": "Olmo-mix-1124 seed 6198 minus seed 12345 (dataloader seed only)",

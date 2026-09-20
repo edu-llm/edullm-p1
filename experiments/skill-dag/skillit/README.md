@@ -175,21 +175,22 @@ the control.
 
 | Arm | Fitted final | Observed | 95% CI | vs Olmo control |
 |-----|-------------:|---------:|--------|-----------------|
-| Olmo-mix-1124 average (control) | 1.6291 | 1.6328 | [1.6252, 1.6333] | — |
+| Olmo-mix-1124 average (control) | 1.6291 | 1.6328 | [1.6246, 1.6335] | — |
 | LightGBM static (start mixture) | **1.6080** | 1.6077 | [1.6049, 1.6106] | \(p < 10^{-4}\) |
-| Offline probe | 1.6112 | 1.6124 | [1.6078, 1.6142] | \(p < 10^{-4}\) |
-| Online derivative | 1.6166 | 1.6216 | [1.6113, 1.6236] | \(p < 10^{-4}\) |
+| Offline probe | 1.6112 | 1.6124 | [1.6078, 1.6141] | \(p < 10^{-4}\) |
+| Online derivative | 1.6166 | 1.6216 | [1.6114, 1.6235] | \(p = 0.004\) |
 
-Lower is better. Both Skill-It arms beat the Olmo-mix-1124 control decisively.
-Neither beats the LightGBM static mixture they start from:
+Lower is better. Both Skill-It arms beat the Olmo-mix-1124 control (probe
+\(p < 10^{-4}\), derivative \(p = 0.004\)). Neither beats the LightGBM static
+mixture they start from:
 
-| Comparison | Δ bpb | 95% CI | paired \(p\) |
-|------------|------:|--------|-------------:|
-| Offline probe − LightGBM static | +0.0033 | [+0.0002, +0.0061] | 0.041 |
-| Online derivative − LightGBM static | +0.0086 | [+0.0025, +0.0178] | 0.0024 |
+| Comparison | Δ bpb | 95% CI | \(p\) |
+|------------|------:|--------|------:|
+| Offline probe − LightGBM static | +0.0033 | [-0.0011, +0.0075] | 0.14 |
+| Online derivative − LightGBM static | +0.0086 | [+0.0026, +0.0161] | 0.0020 |
 
 **Seed noise floor.** Two Olmo-mix-1124 runs differing only in dataloader seed
-land 0.0044 bpb apart (95% CI [-0.0062, 0.0130], \(p = 0.376\)). The probe arm's
+land 0.0044 bpb apart (95% CI [-0.0046, 0.0132], \(p = 0.34\)). The probe arm's
 0.0033 bpb deficit is *below* that floor; the derivative arm's 0.0086 bpb deficit
 is about twice it.
 
@@ -197,14 +198,15 @@ is about twice it.
 
 1. **Skill-It did not help** under this one-epoch 370M contract — neither arm
    improved on the static mixture it started from.
-2. **Offline probe ≈ LightGBM static.** The gap is nominally significant under a
-   paired bootstrap (\(p = 0.041\)) but smaller than the seed-to-seed spread, so
-   we do not claim the static mixture is genuinely better.
+2. **Offline probe ≈ LightGBM static.** The gap is not statistically
+   distinguishable (\(p = 0.14\); the 95% CI [-0.0011, +0.0075] spans zero) and
+   is smaller than the seed-to-seed spread, so we do not claim the static
+   mixture is genuinely better.
 3. **Online derivative clearly hurts** — 0.0086 bpb worse than its own starting
    mixture, ~2x the seed floor.
-4. **Both still beat the natural corpus weighting** by 0.013–0.018 bpb
-   (\(p < 10^{-4}\)); the failure is specific to beating an *already-optimized*
-   static mixture.
+4. **Both still beat the natural corpus weighting** by 0.013–0.018 bpb (probe
+   \(p < 10^{-4}\), derivative \(p = 0.004\)); the failure is specific to beating
+   an *already-optimized* static mixture.
 5. **Cost.** Two Skill-It trains 101.06 A100-hours and \(\approx 5.26\times10^{19}\)
    FLOPs (Online derivative alone 53.8 A100-h), plus \(\approx 1.22\times10^{18}\)
    FLOPs for the 60M probes.

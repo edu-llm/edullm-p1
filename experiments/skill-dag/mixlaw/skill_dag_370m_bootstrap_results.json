@@ -1,0 +1,160 @@
+{
+  "method": "power-law fit (y = a + b/step**alpha) on steps >= 1000; alpha-free residual bootstrap",
+  "n_boot": 10000,
+  "seed": 0,
+  "final_step": 2384,
+  "alpha_grid": {
+    "lo": 0.05,
+    "hi": 3.0,
+    "n": 400
+  },
+  "arms": {
+    "olmo-mix-1124-seed6198": {
+      "label": "Olmo-mix-1124 seed 6198",
+      "fitted_final": 1.631299,
+      "observed_final": 1.636967,
+      "ci95": [
+        1.626068,
+        1.635698
+      ]
+    },
+    "olmo-mix-1124-seed12345": {
+      "label": "Olmo-mix-1124 seed 12345",
+      "fitted_final": 1.626929,
+      "observed_final": 1.628494,
+      "ci95": [
+        1.61946,
+        1.634357
+      ]
+    },
+    "data-mixing-laws-paper": {
+      "label": "Data Mixing Laws paper mixture",
+      "fitted_final": 1.651465,
+      "observed_final": 1.651753,
+      "ci95": [
+        1.647369,
+        1.655521
+      ]
+    },
+    "mixlaw-fit": {
+      "label": "MixLaw fit (ours)",
+      "fitted_final": 1.605732,
+      "observed_final": 1.604829,
+      "ci95": [
+        1.601535,
+        1.609893
+      ]
+    },
+    "lightgbm": {
+      "label": "LightGBM fit (ours)",
+      "fitted_final": 1.607978,
+      "observed_final": 1.607718,
+      "ci95": [
+        1.604859,
+        1.61059
+      ]
+    },
+    "skillit-probe": {
+      "label": "Skill-It offline probe",
+      "fitted_final": 1.611232,
+      "observed_final": 1.612357,
+      "ci95": [
+        1.607753,
+        1.614173
+      ]
+    },
+    "skillit-derivative": {
+      "label": "Skill-It online derivative",
+      "fitted_final": 1.616643,
+      "observed_final": 1.621585,
+      "ci95": [
+        1.611345,
+        1.623646
+      ]
+    },
+    "olmo-mix-1124-average": {
+      "label": "Olmo-mix-1124 average",
+      "fitted_final": 1.629114,
+      "observed_final": 1.63273,
+      "ci95": [
+        1.625203,
+        1.633277
+      ]
+    }
+  },
+  "comparisons": {
+    "data-mixing-laws-paper_vs_olmo_average": {
+      "mean_diff_bpb": 0.022412,
+      "ci95": [
+        0.015866,
+        0.02873
+      ],
+      "p_value": 0.0001,
+      "p_display": "p < 0.0001"
+    },
+    "mixlaw-fit_vs_olmo_average": {
+      "mean_diff_bpb": -0.023279,
+      "ci95": [
+        -0.028828,
+        -0.016758
+      ],
+      "p_value": 0.0001,
+      "p_display": "p < 0.0001"
+    },
+    "lightgbm_vs_olmo_average": {
+      "mean_diff_bpb": -0.021051,
+      "ci95": [
+        -0.027362,
+        -0.016424
+      ],
+      "p_value": 0.0001,
+      "p_display": "p < 0.0001"
+    },
+    "skillit-probe_vs_olmo_average": {
+      "mean_diff_bpb": -0.017788,
+      "ci95": [
+        -0.024763,
+        -0.012495
+      ],
+      "p_value": 0.0001,
+      "p_display": "p < 0.0001"
+    },
+    "skillit-derivative_vs_olmo_average": {
+      "mean_diff_bpb": -0.012486,
+      "ci95": [
+        -0.015361,
+        -0.009141
+      ],
+      "p_value": 0.0001,
+      "p_display": "p < 0.0001"
+    },
+    "skillit-probe_vs_lightgbm": {
+      "mean_diff_bpb": 0.003263,
+      "ci95": [
+        0.000155,
+        0.006102
+      ],
+      "p_value": 0.0412,
+      "p_display": "p = 0.0412"
+    },
+    "skillit-derivative_vs_lightgbm": {
+      "mean_diff_bpb": 0.008565,
+      "ci95": [
+        0.002477,
+        0.017792
+      ],
+      "p_value": 0.0024,
+      "p_display": "p = 0.0024"
+    }
+  },
+  "seed_variance_estimate": {
+    "description": "Olmo-mix-1124 seed 6198 minus seed 12345 (dataloader seed only)",
+    "mean_diff_bpb": 0.00443,
+    "ci95": [
+      -0.006161,
+      0.012975
+    ],
+    "p_value": 0.3764,
+    "p_display": "p = 0.3764"
+  }
+}

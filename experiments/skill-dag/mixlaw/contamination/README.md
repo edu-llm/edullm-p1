@@ -106,8 +106,8 @@ Span-rate spread across these four arms: **3.08x** (lowest `mix01`,
 highest `ML-pilot_caps`; `exposure_by_arm.json` ->
 `span_rate_spread_across_arms`). MixLaw's exposure is more than double the
 control's (2.12x) while LightGBM's is close to or below it (0.79x), yet the
-paper reports both beating the control by a comparable margin (1.6062 and
-1.6087 fitted-final bpb respectively) -- so a contamination-driven
+paper reports both beating the control by a comparable margin (1.6057 and
+1.6080 fitted-final bpb respectively) -- so a contamination-driven
 explanation for the win would have to apply very differently to the two
 search methods, which is weak evidence for one. The Data Mixing Laws paper
 mixture has the lowest exposure of any arm (0.69x control) and is the only

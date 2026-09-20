@@ -90,6 +90,29 @@ A_{ij} = \max\!\big(0,\; -(dL_j/dr_i)\big) = \max\!\big(0,\; -t_{ij}(L_j(r)-c_j)
 
 So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \(t_{ij}\) / \(c_j\) / \(k_j\) are those from the MixLaw parametric fit.
 
+#### Which \(r\) a published derivative matrix is evaluated at
+
+Because \(A\) depends on \(r\), a single printed derivative matrix is a snapshot and
+the reference point has to be stated. Two are in play and they are not the same
+matrix. Run
+[`compare_offline_online_A.py`](compare_offline_online_A.py) to regenerate both.
+
+| Evaluated at | Density | Pearson \(r\) vs offline probe \(A\) | Edge-presence disagreements |
+|---|---:|---:|---:|
+| \(r_{\mathrm{DML}}\) (`mix01`) | 13/42 (31%) | **0.171** | 10/42 |
+| `LGB-min1pct` (the arm's own start) | 13/42 (31%) | **0.065** | 10/42 |
+
+\(r_{\mathrm{DML}}\) is the like-for-like point, since the offline probe matrix is
+also referenced to \(r_{\mathrm{DML}}\); `LGB-min1pct` is the matrix the derivative
+arm actually used at its first update. At \(r_{\mathrm{DML}}\) the entries are
+roughly twice as large (dclm → arc_challenge 0.154 vs 0.065). Density and the
+10-of-42 edge-presence disagreement are the same at both points; only the
+correlation and the magnitudes move.
+
+**The derivative panel of the paper's Figure IV is the \(r_{\mathrm{DML}}\) matrix**
+(every cell matches to 2 dp), while the \(r = 0.07\) quoted in the paper's body is
+the `LGB-min1pct` value. Quote both, or state which panel goes with which number.
+
 ### Arms actually run
 
 Skill-It reweighting follows [Chen et al., Skill-It!](https://arxiv.org/abs/2307.14430). Online derivative \(A\) additionally uses the MixLaw parametric form from [Ye et al., Data Mixing Laws](https://arxiv.org/abs/2403.16952).

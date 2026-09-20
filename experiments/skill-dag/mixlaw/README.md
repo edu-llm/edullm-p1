@@ -17,8 +17,22 @@
 | Full-run budget | 2384 steps ≈ one epoch (~10B tokens); cosine horizon $T_{\max}=2360$ after 24 warmup steps |
 | FLOPs / full arm | $2.63\times10^{19}$ (measured from W&B) |
 | Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels (task-loss) |
+| Seeds (as launched) | `--seed 12536` for all four static arms — data-stream *and* mixture-sampling seed — with `model.init_seed = 0` |
 
 **Shared recipe across arms:** same architecture, tokenizer, batch, LR schedule, and one-epoch step budget. Arms differ only in **domain mixture weights**.
+
+> **Read the seed row, not the code default.** `train_mixlaw_validation_370m.py`
+> falls back to `stream_seed = recipe_seed + mix_id` when `--seed` is not passed,
+> which would give the four arms *different* seeds (6198 / 6199 / 6223 / 6225).
+> That is not what ran: every one of the four was launched with an explicit
+> `--seed 12536`, so all four share one data order and one model initialization
+> and the only thing that differs between them is the domain mixture. The W&B
+> configs are the record (`eduLLM/mixlaw-1`:
+> `dataset.source_mixture_config.seed = 12536`, `data_loader.seed = 12536`,
+> `model.init_seed = 0` on all four). The second control (`olmo-mix-seed12345`)
+> is the same recipe re-run with the data-stream seed changed to 12345; despite
+> its name, the first control's stream seed is 12536, not 6198 — 6198 is the
+> recipe seed used to build the pools and to train the 60M pilots.
 
 ### Arms actually run (370M)
 
@@ -239,6 +253,33 @@ LOO grid: hand-picked default macro LOO RMSE 0.0439 → selected 0.0366
 ### Mixture optima and near-optimal candidates
 
 Surrogate optima plus nearby mixtures (within +0.04 bpb of that model’s optimum and ≥ 8 pp ($L_\infty$) from the optimum). None exactly match a pilot point.
+
+#### The two arms were optimized under different constraint sets
+
+`MIXTURE_OPT_CONSTRAINTS` (`mixlaw_common.py`) defines three settings, and the
+two arms that were trained do not come from the same one. The row labelled
+"optimum" in each table below is **the mixture that was trained**, not
+necessarily that surrogate's unconstrained argmin.
+
+| Setting | Caps | Floors | MixLaw argmin (pred. macro) | LightGBM argmin (pred. macro) |
+|---|---|---|---|---|
+| `uncapped` | wiki ≤ 0.30 | none | dclm .568 / pes2o .097 / owm .035 / wiki .300 (**1.7965**) | dclm .354 / arxiv .083 / scode .061 / pes2o .441 / owm .030 / alg .022 / wiki .009 (**1.8316**) |
+| `pilot_caps` | dclm ≤ 0.6, others ≤ 0.7, wiki ≤ 0.30 | wiki ≥ 0.005 | same as `uncapped` (**1.7965**) | same as `uncapped` (**1.8316**) |
+| `min1pct` | wiki ≤ 0.30 | every domain ≥ 0.01 | dclm .556 / arxiv .010 / scode .010 / pes2o .092 / owm .023 / alg .010 / wiki .300 (**1.7984**) | dclm .553 / arxiv .212 / scode .087 / pes2o .082 / owm .042 / alg .014 / wiki .011 (**1.8335**) |
+
+- **MixLaw arm = `ML-pilot_caps`**, i.e. the `pilot_caps` optimum, which is also
+  the unconstrained argmin. Three domains sit at zero.
+- **LightGBM arm = `LGB-min1pct`**, i.e. the `min1pct` optimum. It is **not** the
+  LightGBM argmin: the unconstrained optimum is a very different mixture
+  (35% dclm, 44% pes2o) with a *lower* predicted macro (1.8316 vs 1.8335). The
+  LightGBM arm has no zero weights **because a 1% floor was imposed**, not
+  because the fit preferred a balanced mixture — and a `min1pct` MixLaw variant
+  with the same property exists (1.7984, only 0.0019 worse than its own argmin).
+
+That a 1% floor moves the LightGBM argmin by ~40 pp of mass while changing the
+predicted macro by 0.0019 bpb — against a macro LOO RMSE of 0.0366 — says the
+tree surrogate's objective is a broad plateau over the simplex and its argmin is
+weakly identified. Treat the specific LightGBM weight vector accordingly.
 
 **Mixing law**
 

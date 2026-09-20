@@ -57,8 +57,8 @@ WHY ALPHA IS RE-ESTIMATED PER DRAW (ALPHA-FREE)
 Freezing ``alpha`` at its point estimate treats a quantity that was estimated
 from the same 11 points as if it were known exactly, so it understates
 uncertainty. Re-estimating it per draw propagates that uncertainty. It is also
-the more conservative of the two variants: mean CI width is 0.01063 bpb
-alpha-free vs 0.00749 bpb alpha-fixed, so every interval reported here is the
+the more conservative of the two variants: mean CI width is 0.01007 bpb
+alpha-free vs 0.00710 bpb alpha-fixed, so every interval reported here is the
 WIDER of the two. That is the basis on which the protocol was chosen.
 
 Data source
@@ -159,7 +159,10 @@ def load_curves_from_wandb() -> dict[str, tuple[np.ndarray, np.ndarray]]:
 
     api = wandb.Api()
     out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
-    for key in ORDER:
+    # ORDER holds only the seven *reported* arms; the random control's second seed is
+    # reported inside the pooled two-run fit, so it must be pulled as well or fit_all
+    # silently falls back to the seed-42-only control (see RANDOM_SEED_KEYS).
+    for key in [*ORDER, *(k for k in RANDOM_SEED_KEYS if k not in ORDER)]:
         run = api.run(f"{WANDB_PROJECT}/{WANDB_RUNS[key]}")
         rows = [
             (int(r["_step"]), float(r["eval/macro_bpb"]))
@@ -591,7 +594,7 @@ METHOD_STRING = (
     "alpha RE-ESTIMATED on every draw (alpha-free), numpy default_rng seed 0. No "
     "arm's profiled optimum sits on a grid boundary (largest 3.502 for REL-EMA, "
     "smallest 0.794 for BLADE). Alpha-free was chosen over alpha-fixed because it "
-    "is the more conservative of the two (mean CI width 0.01063 vs 0.00749 bpb)."
+    "is the more conservative of the two (mean CI width 0.01007 vs 0.00710 bpb)."
 )
 
 

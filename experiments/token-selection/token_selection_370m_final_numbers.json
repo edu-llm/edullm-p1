@@ -6,11 +6,12 @@
   "alpha_grid": "np.linspace(0.05, 6.0, 1192); no arm's profiled optimum sits on a grid boundary",
   "n_boot": 10000,
   "resample": "i.i.d. residual bootstrap on the fit-window residuals",
-  "alpha_treatment": "re-estimated on every bootstrap draw (alpha-free); selected because it yields the WIDER intervals (mean width 0.01063 vs 0.00749 bpb for alpha-fixed)",
+  "alpha_treatment": "re-estimated on every bootstrap draw (alpha-free); selected because it yields the WIDER intervals (mean width 0.01007 vs 0.00710 bpb for alpha-fixed, over the seven reported arms)",
   "fitted_final_at": "each arm's own final logged step (2360 for all seven arms)",
   "ci": "2.5/97.5 percentile of the bootstrap distribution",
   "rng_seed": 0,
-  "source": "eduLLM/token-selection W&B eval/macro_bpb histories, cached in token_selection_370m_wandb_curves.json; full-loss control is full-loss-control-regmix10b-v3 (matched seed/step/grid rerun, replaces v2)"
+  "source": "eduLLM/token-selection W&B eval/macro_bpb histories, cached in token_selection_370m_wandb_curves.json; full-loss control is full-loss-control-regmix10b-v3 (matched seed/step/grid rerun, replaces v2)",
+  "random_control": "reported as a single power law fitted to the union of both seeds' fit-window points (11 each, 22 total); per-seed fits are also listed in table1"
  },
  "table1": {
   "Full-loss control": {
@@ -20,9 +21,43 @@
     1.6653,
     1.6787
    ],
-   "alpha": 1.594,
+   "alpha": 1.5937,
    "final_step": 2360,
    "n_fit_points": 11
+  },
+  "Random control seed 42": {
+   "fitted_final": 1.6857,
+   "observed": 1.687,
+   "ci": [
+    1.6775,
+    1.692
+   ],
+   "alpha": 1.1591,
+   "final_step": 2360,
+   "n_fit_points": 11
+  },
+  "Random control seed 69": {
+   "fitted_final": 1.6939,
+   "observed": 1.6951,
+   "ci": [
+    1.6865,
+    1.6993
+   ],
+   "alpha": 1.9884,
+   "final_step": 2360,
+   "n_fit_points": 11
+  },
+  "Random control average": {
+   "fitted_final": 1.69,
+   "observed": 1.6911,
+   "ci": [
+    1.6841,
+    1.6947
+   ],
+   "alpha": 1.5587,
+   "final_step": 2360,
+   "n_fit_points": 22,
+   "n_seeds": 2
   },
   "RHO-1": {
    "fitted_final": 1.6824,
@@ -35,17 +70,6 @@
    "final_step": 2360,
    "n_fit_points": 11
   },
-  "Random control": {
-   "fitted_final": 1.6857,
-   "observed": 1.687,
-   "ci": [
-    1.6775,
-    1.692
-   ],
-   "alpha": 1.159,
-   "final_step": 2360,
-   "n_fit_points": 11
-  },
   "Attention": {
    "fitted_final": 1.6991,
    "observed": 1.7005,
@@ -53,7 +77,7 @@
     1.6935,
     1.7037
    ],
-   "alpha": 1.054,
+   "alpha": 1.0542,
    "final_step": 2360,
    "n_fit_points": 11
   },
@@ -64,7 +88,7 @@
     1.7028,
     1.7182
    ],
-   "alpha": 0.794,
+   "alpha": 0.7944,
    "final_step": 2360,
    "n_fit_points": 11
   },
@@ -75,7 +99,7 @@
     1.9007,
     1.9093
    ],
-   "alpha": 2.198,
+   "alpha": 2.1982,
    "final_step": 2360,
    "n_fit_points": 11
   },
@@ -86,19 +110,19 @@
     1.918,
     1.9217
    ],
-   "alpha": 3.502,
+   "alpha": 3.5021,
    "final_step": 2360,
    "n_fit_points": 11
   }
  },
  "delta_rho_vs_random": {
-  "delta": -0.0033,
+  "delta": -0.0075,
   "ci": [
-   -0.0102,
-   0.0042
+   -0.0146,
+   -0.0008
   ],
-  "p_one_sided": 0.1817,
-  "p_two_sided": 0.3634
+  "p_one_sided": 0.0146,
+  "p_two_sided": 0.0292
  },
  "deltas_vs_control": {
   "RHO-1": {
@@ -110,12 +134,12 @@
    "p_one_sided": 0.0005
   },
   "Random control": {
-   "delta": 0.0139,
+   "delta": 0.0181,
    "ci": [
-    0.0017,
-    0.0239
+    0.0092,
+    0.0264
    ],
-   "p_one_sided": 0.0121
+   "p_one_sided": 0.0
   },
   "Attention": {
    "delta": 0.0273,
@@ -152,50 +176,50 @@
  },
  "deltas_vs_random": {
   "Full-loss control": {
-   "delta": -0.0139,
+   "delta": -0.0181,
    "ci": [
-    -0.0239,
-    -0.0017
-   ],
-   "p_one_sided": 0.0121
-  },
-  "RHO-1": {
-   "delta": -0.0033,
-   "ci": [
-    -0.0102,
-    0.0042
-   ],
-   "p_one_sided": 0.1817
-  },
-  "Attention": {
-   "delta": 0.0134,
-   "ci": [
-    0.0085,
-    0.019
+    -0.0264,
+    -0.0092
    ],
    "p_one_sided": 0.0
   },
-  "BLADE": {
-   "delta": 0.0233,
+  "RHO-1": {
+   "delta": -0.0075,
    "ci": [
-    0.0149,
-    0.0334
+    -0.0146,
+    -0.0008
+   ],
+   "p_one_sided": 0.0146
+  },
+  "Attention": {
+   "delta": 0.0091,
+   "ci": [
+    0.0017,
+    0.0164
+   ],
+   "p_one_sided": 0.0074
+  },
+  "BLADE": {
+   "delta": 0.019,
+   "ci": [
+    0.0109,
+    0.0296
    ],
    "p_one_sided": 0.0
   },
   "Perplexity": {
-   "delta": 0.219,
+   "delta": 0.2148,
    "ci": [
-    0.2111,
-    0.2295
+    0.2085,
+    0.2222
    ],
    "p_one_sided": 0.0
   },
   "REL-EMA": {
-   "delta": 0.2343,
+   "delta": 0.23,
    "ci": [
-    0.2274,
-    0.2431
+    0.2248,
+    0.2359
    ],
    "p_one_sided": 0.0
   }
@@ -278,12 +302,12 @@
    "RHO-1"
   ],
   [
-   "Full-loss control",
+   "RHO-1",
    "Random control"
   ],
   [
-   "RHO-1",
-   "Random control"
+   "Random control",
+   "Attention"
   ],
   [
    "Attention",

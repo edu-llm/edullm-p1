@@ -48,13 +48,13 @@ MIN_PLOT_STEP = 875
 FINAL_STEP = 2384
 
 
-def add_arrow_label(ax, x: float, y: float, text: str) -> None:
+def add_arrow_label(ax, x: float, y: float, text: str, *, va: str = "bottom") -> None:
     ax.text(
         x,
         y,
         text,
         ha="center",
-        va="bottom",
+        va=va,
         fontsize=28,
         fontweight="bold",
         color="#111827",
@@ -223,7 +223,7 @@ def main() -> None:
     add_arrow_label(
         ax,
         (reach_control_final_step + FINAL_STEP) / 2,
-        faster_arrow_y + 0.020,
+        faster_arrow_y + 0.030,
         rf"$\mathbf{{{faster_pct:.1f}\%\ fewer\ steps}}$",
     )
 
@@ -232,8 +232,9 @@ def main() -> None:
     add_arrow_label(
         ax,
         (FINAL_STEP + control_match_step) / 2,
-        longer_arrow_y + 0.010,
+        longer_arrow_y - 0.004,
         rf"$\mathbf{{{longer_ratio:.2f}\times\ longer}}$",
+        va="top",
     )
 
     ax.set_xlabel("Training step", fontsize=24, fontweight="bold", labelpad=14)

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Figure III: MixLaw optimized mix vs control, with iso-loss compute arrows.
+"""Slideshow chart (16:9, large type): MixLaw optimized mix vs control.
+
+NOT the paper's Figure III -- that is plot_figure_iii_compute_savings.py,
+which reproduces the published panel. This is the talk slide, kept on the
+same data and the same estimator.
 
 Two revisions to the originally published panel:
 
@@ -263,7 +267,7 @@ def main() -> None:
             continue
         out_dir.mkdir(parents=True, exist_ok=True)
         for ext in ("png", "pdf"):
-            path = out_dir / f"figure_iii_compute_savings.{ext}"
+            path = out_dir / f"mixlaw_slideshow.{ext}"
             fig.savefig(path, dpi=300, facecolor="white")
             print(f"Wrote {path}")
     plt.close(fig)

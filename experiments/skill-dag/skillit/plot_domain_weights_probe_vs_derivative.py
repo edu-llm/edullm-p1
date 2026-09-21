@@ -31,7 +31,7 @@ FINAL_STEP = 2384
 # Bottom-to-top stacking order, matching the original figure.
 DOMAINS = ["wiki", "algebraic-stack", "open-web-math", "pes2o", "starcoder", "arxiv", "dclm"]
 LABELS = {
-    "wiki": "Wiki", "algebraic-stack": "AlgebraicStack", "open-web-math": "OpenWebMath",
+    "wiki": "Wikipedia", "algebraic-stack": "AlgebraicStack", "open-web-math": "OpenWebMath",
     "pes2o": "pes2o", "starcoder": "StarCoder", "arxiv": "arXiv", "dclm": "DCLM",
 }
 COLORS = {
@@ -102,10 +102,10 @@ def main() -> None:
     ordered_handles = [handles[d] for d in LEGEND_ORDER]
     ordered_labels = [LABELS[d] for d in LEGEND_ORDER]
     fig.legend(ordered_handles, ordered_labels, loc="lower center", ncol=7, fontsize=22,
-               frameon=False, bbox_to_anchor=(0.5, 0.005), columnspacing=1.4,
+               frameon=False, bbox_to_anchor=(0.5, -0.012), columnspacing=1.4,
                handlelength=1.6, handletextpad=0.5)
 
-    fig.subplots_adjust(bottom=0.17, top=0.92, wspace=0.14)
+    fig.subplots_adjust(bottom=0.20, top=0.92, wspace=0.14)
 
     for out_dir in OUT_DIRS:
         if not out_dir.parent.exists():

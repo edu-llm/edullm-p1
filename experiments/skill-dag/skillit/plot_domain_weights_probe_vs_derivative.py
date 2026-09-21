@@ -84,7 +84,7 @@ def draw_panel(ax, updates, *, title):
         handles[dom] = h
         prev_cum = cum
 
-    ax.set_title(title, fontsize=13, fontweight="bold", pad=10)
+    ax.set_title(title, fontsize=15, fontweight="bold", pad=10)
     ax.set_xlabel("Training step", labelpad=8)
     ax.set_xlim(0, FINAL_STEP)
     ax.set_ylim(0, 1)

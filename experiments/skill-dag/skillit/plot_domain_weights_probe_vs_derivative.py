@@ -10,6 +10,14 @@ Derivative panel uses arm 1's update history unchanged.
 Update data is read directly from each arm's `skillit_updates.jsonl` (written
 by the Skill-It controller under `<run_dir>/runs/<arm>/progress/`); paste in
 new `p_after` snapshots there if this is ever regenerated for a different run.
+
+Revision to the originally published panel: in a 0-1 stacked area the three
+smallest domains (wiki, AlgebraicStack, StarCoder) are ~1% slivers at the
+bottom of the stack, yet that is where much of the derivative arm's
+reweighting actually happens -- wiki rises roughly fourfold while the stack
+looks static. The stacked panels are unchanged in construction; they now
+carry thin white separators so adjacent slivers can be told apart, and a
+second row plots those three domains on their own scale.
 """
 from __future__ import annotations
 
@@ -18,7 +26,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-OUT_DIR = Path(__file__).resolve().parents[3] / "p1-whitepaper-overleaf" / "figures"
+SKILLIT = Path(__file__).resolve().parent
+OUT_DIRS = [SKILLIT / "figures", SKILLIT.parents[2] / "p1-whitepaper-overleaf" / "figures"]
 FINAL_STEP = 2384
 
 # Bottom-to-top stacking order, matching the original figure.
@@ -32,6 +41,9 @@ COLORS = {
     "pes2o": "#EF4444", "starcoder": "#14B8A6", "arxiv": "#F59E0B", "dclm": "#2563EB",
 }
 LEGEND_ORDER = ["wiki", "algebraic-stack", "open-web-math", "pes2o", "starcoder", "arxiv", "dclm"]
+# The three domains that are invisible in a 0-1 stack; broken out below it.
+SMALL_DOMAINS = ["wiki", "algebraic-stack", "starcoder"]
+SMALL_MARKERS = {"wiki": "o", "algebraic-stack": "s", "starcoder": "^"}
 
 # Probe: FarmShare rerun of arm 0, job 1730368 (skillit_updates.jsonl p_after).
 PROBE_UPDATES = [
@@ -68,7 +80,8 @@ def draw_panel(ax, updates, *, title):
     for dom in DOMAINS:
         vals = np.array([w[dom] for w in weights])
         cum = prev_cum + vals
-        h = ax.fill_between(steps, prev_cum, cum, step="post", color=COLORS[dom], linewidth=0)
+        h = ax.fill_between(steps, prev_cum, cum, step="post", color=COLORS[dom],
+                            edgecolor="white", linewidth=0.8)
         handles[dom] = h
         prev_cum = cum
 
@@ -82,27 +95,68 @@ def draw_panel(ax, updates, *, title):
     return handles
 
 
+def draw_small_panel(ax, updates, *, ymax) -> None:
+    """The three smallest domains on their own scale, same step semantics."""
+    steps = [s for s, _ in updates] + [FINAL_STEP]
+    weights = [w for _, w in updates] + [updates[-1][1]]
+
+    for dom in SMALL_DOMAINS:
+        vals = [w[dom] for w in weights]
+        ax.step(steps, vals, where="post", color=COLORS[dom], linewidth=3.0)
+        # Markers only at the real update boundaries, not the final-step repeat.
+        ax.plot([s for s, _ in updates], [w[dom] for _, w in updates],
+                linestyle="none", marker=SMALL_MARKERS[dom], markersize=9,
+                color=COLORS[dom], markeredgecolor="white", markeredgewidth=1.2)
+
+    ax.set_xlim(0, FINAL_STEP)
+    ax.set_ylim(0, ymax)
+    ax.set_xlabel("Training step", fontsize=30, fontweight="bold")
+    ax.tick_params(labelsize=22)
+    ax.grid(axis="y", linestyle=":", linewidth=0.9, color="#c9c9c9")
+    ax.set_axisbelow(True)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+
+
 def main() -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(20, 9), dpi=150)
-    draw_panel(axes[0], PROBE_UPDATES, title="Probe")
-    handles = draw_panel(axes[1], DERIVATIVE_UPDATES, title="Derivative")
-    axes[0].set_ylabel("Cumulative domain weight", fontsize=30, fontweight="bold")
+    fig, axes = plt.subplots(
+        2, 2, figsize=(20, 13), dpi=150,
+        gridspec_kw={"height_ratios": [3.0, 1.45]},
+    )
+    draw_panel(axes[0][0], PROBE_UPDATES, title="Probe")
+    handles = draw_panel(axes[0][1], DERIVATIVE_UPDATES, title="Derivative")
+    axes[0][0].set_ylabel("Cumulative domain weight", fontsize=30, fontweight="bold")
+    for ax in axes[0]:
+        ax.set_xlabel("")
+
+    # Shared scale across the two lower panels so the arms stay comparable.
+    small_max = max(
+        w[dom]
+        for updates in (PROBE_UPDATES, DERIVATIVE_UPDATES)
+        for _, w in updates
+        for dom in SMALL_DOMAINS
+    )
+    ymax = small_max * 1.15
+    draw_small_panel(axes[1][0], PROBE_UPDATES, ymax=ymax)
+    draw_small_panel(axes[1][1], DERIVATIVE_UPDATES, ymax=ymax)
+    axes[1][0].set_ylabel("Three smallest\ndomains, rescaled", fontsize=24, fontweight="bold")
 
     ordered_handles = [handles[d] for d in LEGEND_ORDER]
     ordered_labels = [LABELS[d] for d in LEGEND_ORDER]
     fig.legend(ordered_handles, ordered_labels, loc="lower center", ncol=4, fontsize=24,
-               frameon=False, bbox_to_anchor=(0.5, -0.1))
+               frameon=False, bbox_to_anchor=(0.5, -0.055))
 
-    fig.subplots_adjust(bottom=0.3, wspace=0.15)
+    fig.subplots_adjust(bottom=0.155, top=0.94, hspace=0.32, wspace=0.15)
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    png_path = OUT_DIR / "domain_weights_probe_vs_derivative.png"
-    pdf_path = OUT_DIR / "domain_weights_probe_vs_derivative.pdf"
-    fig.savefig(png_path, dpi=300, facecolor="white", bbox_inches="tight")
-    fig.savefig(pdf_path, facecolor="white", bbox_inches="tight")
+    for out_dir in OUT_DIRS:
+        if not out_dir.parent.exists():
+            continue
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for ext in ("png", "pdf"):
+            path = out_dir / f"domain_weights_probe_vs_derivative.{ext}"
+            fig.savefig(path, dpi=300, facecolor="white", bbox_inches="tight")
+            print(f"Wrote {path}")
     plt.close(fig)
-    print(f"Wrote {png_path}")
-    print(f"Wrote {pdf_path}")
 
 
 if __name__ == "__main__":

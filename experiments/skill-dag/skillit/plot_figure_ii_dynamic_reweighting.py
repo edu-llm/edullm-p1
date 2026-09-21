@@ -28,6 +28,7 @@ import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from figure_ii_curves import CURVES, OLMO_SEED6198, OLMO_SEED12345  # noqa: E402
@@ -52,6 +53,26 @@ SERIES = [
 ]
 
 CONTROL_BAND_COLOR = "#9CA3AF"
+X_LEFT = 700
+
+def lead_in(all_steps, all_y, window_min, x_left):
+    """Segment running left from the first in-window point.
+
+    Uses the slope to the last point *before* the window, i.e. the slope the
+    curve would have had if that checkpoint were still plotted, and returns
+    the two endpoints. The far endpoint is placed at x_left; when the implied
+    value there is off the top of the panel, matplotlib's clipping is what
+    makes the line leave through the top edge rather than the side.
+    """
+    before = all_steps < window_min
+    after = all_steps >= window_min
+    if not before.any() or not after.any():
+        return None
+    s0, y0 = all_steps[before][-1], all_y[before][-1]
+    s1, y1 = all_steps[after][0], all_y[after][0]
+    slope = (y1 - y0) / (s1 - s0)
+    return (np.array([x_left, s1]), np.array([y1 + slope * (x_left - s1), y1]))
+
 
 
 def control_band(min_step: int) -> tuple[list[int], list[float], list[float]]:
@@ -84,6 +105,29 @@ for key, label, color, ls, marker in SERIES:
     vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= MIN_STEP and s not in drop]
     ax.plot(steps, vals, color=color, linestyle=ls, marker=marker,
             markersize=3.5, linewidth=1.8, label=label, zorder=3)
+
+# This panel leaves its y-limits to autoscale, so freeze them before adding the
+# lead-in segments -- otherwise an off-panel endpoint would stretch the axis.
+_ylim = ax.get_ylim()
+
+# Lead-in: extend each curve off the left edge at the slope implied by the
+# checkpoint before the window, so it reads as a run already in progress.
+for key, label, color, ls, marker in SERIES:
+    d = CURVES[key]
+    _seg = lead_in(np.array(d["steps"], dtype=float), np.array(d["curve"], dtype=float),
+                   MIN_STEP, X_LEFT)
+    if _seg is not None:
+        ax.plot(_seg[0], _seg[1], color=color, linestyle=ls, linewidth=1.8, zorder=3)
+
+_a = lead_in(np.array(OLMO_SEED6198["steps"], dtype=float),
+             np.array(OLMO_SEED6198["curve"], dtype=float), MIN_STEP, X_LEFT)
+_b = lead_in(np.array(OLMO_SEED12345["steps"], dtype=float),
+             np.array(OLMO_SEED12345["curve"], dtype=float), MIN_STEP, X_LEFT)
+if _a is not None and _b is not None:
+    ax.fill_between(_a[0], np.minimum(_a[1], _b[1]), np.maximum(_a[1], _b[1]),
+                    color=CONTROL_BAND_COLOR, alpha=0.38, linewidth=0, zorder=1)
+
+ax.set_ylim(_ylim)
 
 ax.set_xlabel("Training step", fontsize=15)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, \u2193 lower is better)", fontsize=15)

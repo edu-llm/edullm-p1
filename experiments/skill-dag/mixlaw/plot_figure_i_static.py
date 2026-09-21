@@ -44,12 +44,41 @@ OUT_DIRS = [MIXLAW / "figures", MIXLAW.parents[2] / "p1-whitepaper-overleaf" / "
 
 wb = json.loads((MIXLAW / "figure_i_wandb_curves.json").read_text(encoding="utf-8"))
 
+WINDOW_MIN = 700
+X_LEFT = 650
+
+
 def series(key):
     pts = wb[key]
     s = np.array([p[0] for p in pts], dtype=float)
     y = np.array([p[1] for p in pts], dtype=float)
-    keep = s >= 700
+    keep = s >= WINDOW_MIN
     return s[keep], y[keep]
+
+
+def full(key):
+    """Unfiltered series, so the lead-in can see the point before the window."""
+    pts = wb[key]
+    return (np.array([p[0] for p in pts], dtype=float),
+            np.array([p[1] for p in pts], dtype=float))
+
+def lead_in(all_steps, all_y, window_min, x_left):
+    """Segment running left from the first in-window point.
+
+    Uses the slope to the last point *before* the window, i.e. the slope the
+    curve would have had if that checkpoint were still plotted, and returns
+    the two endpoints. The far endpoint is placed at x_left; when the implied
+    value there is off the top of the panel, matplotlib's clipping is what
+    makes the line leave through the top edge rather than the side.
+    """
+    before = all_steps < window_min
+    after = all_steps >= window_min
+    if not before.any() or not after.any():
+        return None
+    s0, y0 = all_steps[before][-1], all_y[before][-1]
+    s1, y1 = all_steps[after][0], all_y[after][0]
+    slope = (y1 - y0) / (s1 - s0)
+    return (np.array([x_left, s1]), np.array([y1 + slope * (x_left - s1), y1]))
 
 def edge_interp(steps, y, xmin):
     """Clip to steps >= xmin, prepending a linearly-interpolated point at
@@ -91,6 +120,25 @@ ax.plot(s_ctrl, y_ctrl, color=COL_CONTROL, linestyle=(0, (5, 2)), linewidth=2.0,
 ax.plot(s_dml, y_dml, color=COL_DML_PAPER, linestyle=(0, (1, 1.8)), linewidth=2.2, marker="^", markersize=4.5, zorder=3)
 ax.plot(s_lgb, y_lgb, color=COL_LIGHTGBM, linestyle="-", linewidth=2.2, marker="D", markersize=4, zorder=4)
 ax.plot(s_ml, y_ml, color=COL_MIXLAW, linestyle="-", linewidth=2.4, marker="o", markersize=4, zorder=5)
+
+# Lead-in: run every curve off the left edge at the slope it would have had if
+# the checkpoint before the window were still plotted, so it is visible that
+# these runs start well before step 700. No markers: there is no datum here.
+for _key, _color, _ls, _lw, _z in (
+    ("olmo_mix_1124", COL_CONTROL, (0, (5, 2)), 2.0, 3),
+    ("dml_paper_mix01", COL_DML_PAPER, (0, (1, 1.8)), 2.2, 3),
+    ("lightgbm", COL_LIGHTGBM, "-", 2.2, 4),
+    ("mixlaw_optimum", COL_MIXLAW, "-", 2.4, 5),
+):
+    _seg = lead_in(*full(_key), WINDOW_MIN, X_LEFT)
+    if _seg is not None:
+        ax.plot(_seg[0], _seg[1], color=_color, linestyle=_ls, linewidth=_lw, zorder=_z)
+
+_a = lead_in(*full("olmo_mix_1124_seed6198"), WINDOW_MIN, X_LEFT)
+_b = lead_in(*full("olmo_mix_1124_seed12345"), WINDOW_MIN, X_LEFT)
+if _a is not None and _b is not None:
+    ax.fill_between(_a[0], np.minimum(_a[1], _b[1]), np.maximum(_a[1], _b[1]),
+                    color=COL_CONTROL_BAND, alpha=0.40, linewidth=0, zorder=1)
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")

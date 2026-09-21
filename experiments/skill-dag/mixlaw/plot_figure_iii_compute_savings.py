@@ -35,6 +35,27 @@ _ctrl_data = json.loads((MIXLAW / "figure_i_wandb_curves.json").read_text(encodi
 COL_CONTROL = "#6b7280"      # gray
 COL_MIXLAW = "#2563eb"       # blue
 COL_CONTROL_BAND = "#9ca3af"  # lighter gray, control seed envelope
+WINDOW_MIN = 700
+X_LEFT = 650
+
+def lead_in(all_steps, all_y, window_min, x_left):
+    """Segment running left from the first in-window point.
+
+    Uses the slope to the last point *before* the window, i.e. the slope the
+    curve would have had if that checkpoint were still plotted, and returns
+    the two endpoints. The far endpoint is placed at x_left; when the implied
+    value there is off the top of the panel, matplotlib's clipping is what
+    makes the line leave through the top edge rather than the side.
+    """
+    before = all_steps < window_min
+    after = all_steps >= window_min
+    if not before.any() or not after.any():
+        return None
+    s0, y0 = all_steps[before][-1], all_y[before][-1]
+    s1, y1 = all_steps[after][0], all_y[after][0]
+    slope = (y1 - y0) / (s1 - s0)
+    return (np.array([x_left, s1]), np.array([y1 + slope * (x_left - s1), y1]))
+
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -104,6 +125,20 @@ ax.plot(steps[keep], ctrl[keep], color=COL_CONTROL, linestyle="-", marker="s", m
         linewidth=2.0, zorder=3, label="Olmo-mix-1124 (control, 2-seed avg)")
 ax.plot(steps[keep], ml[keep], color=COL_MIXLAW, linestyle="-", marker="o", markersize=4,
         linewidth=2.4, zorder=4, label="MixLaw fit (ours, observed)")
+
+# Lead-in: extend both curves off the left edge at the slope implied by the
+# checkpoint before the window, so the panel reads as a run already under way
+# rather than one that begins at step 750.
+for _y, _color, _lw, _z in ((ctrl, COL_CONTROL, 2.0, 3), (ml, COL_MIXLAW, 2.4, 4)):
+    _seg = lead_in(steps, _y, WINDOW_MIN, X_LEFT)
+    if _seg is not None:
+        ax.plot(_seg[0], _seg[1], color=_color, linestyle="-", linewidth=_lw, zorder=_z)
+
+_a = lead_in(steps, band_lo, WINDOW_MIN, X_LEFT)
+_b = lead_in(steps, band_hi, WINDOW_MIN, X_LEFT)
+if _a is not None and _b is not None:
+    ax.fill_between(_a[0], _a[1], _b[1], color=COL_CONTROL_BAND, alpha=0.40,
+                    linewidth=0, zorder=1)
 
 ext = np.linspace(FINAL_STEP, cross_step2 * 1.03, 500)
 ax.plot(ext, powerlaw(ext, *popt_ctrl), color=COL_CONTROL, linestyle=(0, (2, 2)), linewidth=1.8,

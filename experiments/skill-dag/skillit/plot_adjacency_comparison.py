@@ -67,7 +67,7 @@ def lightgbm_min1pct_weights() -> list[float]:
 
 def draw_panel(ax, A: np.ndarray, *, title: str) -> None:
     im = ax.imshow(A, cmap="Blues", vmin=0.0, vmax=VMAX, aspect="auto")
-    ax.set_title(title, fontsize=13, fontweight="bold", pad=10)
+    ax.set_title(title, fontsize=11, fontweight="bold", pad=10)
     ax.set_xticks(range(len(FAMILIES)))
     ax.set_xticklabels([FAMILY_LABELS[f] for f in FAMILIES], fontsize=8)
     ax.set_yticks(range(len(DOMAINS)))
@@ -100,9 +100,15 @@ def main() -> None:
     A_probe = load_offline_A(SKILLIT / "artifacts/probes_full/A_offline.npy")
     A_deriv = online_A_from_fit(fit, lightgbm_min1pct_weights(), domains=DOMAINS, families=FAMILIES)
 
-    plt.rcParams.update({"font.family": "sans-serif"})
-    fig, axes = plt.subplots(1, 2, figsize=(9.5, 4.6), dpi=150)
-    fig.suptitle(TITLE, fontsize=12, fontweight="bold", y=0.98)
+    plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans"],
+    "font.size": 12,
+    "axes.edgecolor": "#333333",
+    "axes.linewidth": 0.9,
+})
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.6), dpi=200)
+    fig.suptitle(TITLE, fontsize=15, fontweight="bold", y=0.98)
 
     draw_panel(axes[0], A_probe, title=r"Probe adjacency $A_{ij}$")
     im = draw_panel(axes[1], A_deriv, title=r"Derivative adjacency $A_{ij}$")
@@ -122,8 +128,8 @@ def main() -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         png_path = out_dir / "adjacency_comparison.png"
         pdf_path = out_dir / "adjacency_comparison.pdf"
-        fig.savefig(png_path, dpi=300, facecolor="white", bbox_inches="tight")
-        fig.savefig(pdf_path, facecolor="white", bbox_inches="tight")
+        fig.savefig(png_path, facecolor="white")
+        fig.savefig(pdf_path, facecolor="white")
         print(f"Wrote {png_path}")
         print(f"Wrote {pdf_path}")
     plt.close(fig)

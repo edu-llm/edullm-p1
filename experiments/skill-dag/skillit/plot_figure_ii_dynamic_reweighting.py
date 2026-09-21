@@ -39,7 +39,10 @@ OUT_DIRS = [SKILLIT / "figures"]
 
 plt.rcParams.update({
     "font.family": "sans-serif",
-    "font.sans-serif": ["Segoe UI", "Helvetica Neue", "Arial", "DejaVu Sans"],
+    "font.sans-serif": ["DejaVu Sans"],
+    "font.size": 12,
+    "axes.edgecolor": "#333333",
+    "axes.linewidth": 0.9,
 })
 
 # Colorblind-safe: grey control, then blue / orange / purple. No red-green pair.
@@ -96,8 +99,9 @@ def control_band(min_step: int) -> tuple[list[int], list[float], list[float]]:
     hi = [max(a[s], b[s]) for s in steps]
     return steps, lo, hi
 
-fig, ax = plt.subplots(figsize=(9.5, 5.5), dpi=150)
-fig.suptitle("Mid-training reweighting does not beat a static mixture", fontsize=19.5, fontweight="bold", y=0.97)
+fig, ax = plt.subplots(figsize=(9.2, 5.8), dpi=200)
+ax.set_title("Mid-training reweighting does not beat a static mixture",
+             fontsize=15, fontweight="bold", pad=12)
 
 MIN_STEP = 700
 # The LightGBM static run has a stray off-cadence eval at step 2375 (125
@@ -146,15 +150,16 @@ if _lo_seg is not None and _hi_seg is not None:
 
 ax.set_ylim(_ylim)
 
-ax.set_xlabel("Training step", fontsize=15)
-ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, \u2193 lower is better)", fontsize=15)
-ax.tick_params(labelsize=15)
-ax.grid(True, color="0.85", linewidth=0.6)
-for spine in ("top", "right"):
-    ax.spines[spine].set_visible(False)
-ax.legend(loc="lower left", fontsize=10.5, frameon=True, framealpha=0.92,
+ax.set_xlabel("Training step", labelpad=8)
+ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, \u2193 lower is better)")
+ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
+ax.set_axisbelow(True)
+ax.legend(loc="lower left", fontsize=10, frameon=True, framealpha=0.92,
           edgecolor="none", facecolor="white", borderpad=0.5, labelspacing=0.35)
 ax.set_xlim(MIN_STEP, 2450)
+# Same axes rectangle as Figures I and III, so the 12pt type occupies the
+# same fraction of the canvas in all three.
+fig.subplots_adjust(left=0.115, right=0.97, top=0.90, bottom=0.13)
 
 # Inset: final steps, rescaled
 # (sized/positioned to leave room for the larger tick labels and title
@@ -190,11 +195,9 @@ if _ilo_seg is not None and _ihi_seg is not None:
 axins.set_xlim(_ins_xlim)
 axins.set_ylim(_ins_ylim)
 
-axins.set_title("final steps, rescaled", fontsize=10.5, style="italic")
-axins.tick_params(labelsize=9, length=2)
-axins.grid(True, color="0.85", linewidth=0.5)
-for spine in ("top", "right"):
-    axins.spines[spine].set_visible(False)
+axins.set_title("final steps, rescaled", fontsize=9.3, style="italic", pad=2)
+axins.tick_params(labelsize=8, length=2)
+axins.grid(True, linestyle=":", linewidth=0.6, color="#d5d5d5")
 axins.yaxis.set_major_locator(mticker.MaxNLocator(5))
 
 for out_dir in OUT_DIRS:
@@ -203,8 +206,8 @@ for out_dir in OUT_DIRS:
     out_dir.mkdir(parents=True, exist_ok=True)
     png_path = out_dir / "figure_ii_dynamic_reweighting.png"
     pdf_path = out_dir / "figure_ii_dynamic_reweighting.pdf"
-    fig.savefig(png_path, dpi=300, facecolor="white", bbox_inches="tight")
-    fig.savefig(pdf_path, facecolor="white", bbox_inches="tight")
+    fig.savefig(png_path, facecolor="white")
+    fig.savefig(pdf_path, facecolor="white")
     print(f"Wrote {png_path}")
     print(f"Wrote {pdf_path}")
 plt.close(fig)

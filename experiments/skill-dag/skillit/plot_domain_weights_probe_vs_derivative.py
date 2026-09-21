@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 SKILLIT = Path(__file__).resolve().parent
-OUT_DIRS = [SKILLIT / "figures", SKILLIT.parents[2] / "p1-whitepaper-overleaf" / "figures"]
+OUT_DIRS = [SKILLIT / "figures"]
 FINAL_STEP = 2384
 
 # Bottom-to-top stacking order, matching the original figure.

@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
 MIXLAW = Path(__file__).resolve().parent
-OUT_DIRS = [MIXLAW / "figures", MIXLAW.parents[2] / "p1-whitepaper-overleaf" / "figures"]
+OUT_DIRS = [MIXLAW / "figures"]
 
 mixlaw_curves = json.loads((MIXLAW / "mixlaw_370m_wandb_curves.json").read_text(encoding="utf-8"))
 # Two-seed control average and the individual seeds, written by

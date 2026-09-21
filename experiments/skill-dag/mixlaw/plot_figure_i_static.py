@@ -40,7 +40,7 @@ plt.rcParams.update({
 })
 
 MIXLAW = Path(__file__).resolve().parent
-OUT_DIRS = [MIXLAW / "figures", MIXLAW.parents[2] / "p1-whitepaper-overleaf" / "figures"]
+OUT_DIRS = [MIXLAW / "figures"]
 
 wb = json.loads((MIXLAW / "figure_i_wandb_curves.json").read_text(encoding="utf-8"))
 

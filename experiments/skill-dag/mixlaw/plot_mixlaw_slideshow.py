@@ -41,7 +41,7 @@ DATA_PATH = ROOT / "mixlaw_370m_wandb_curves.json"
 # The two-seed control average and the individual seeds live with Figure I's
 # data, written by figure_i_control_seed_average.py -- one source of truth.
 CONTROL_PATH = ROOT / "figure_i_wandb_curves.json"
-OUT_DIRS = [ROOT / "figures", ROOT.parents[2] / "p1-whitepaper-overleaf" / "figures"]
+OUT_DIRS = [ROOT / "figures"]
 
 COLORS = {
     "optimized": "#2563EB",

@@ -34,9 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from figure_ii_curves import CURVES, OLMO_SEED6198, OLMO_SEED12345  # noqa: E402
 
 SKILLIT = Path(__file__).resolve().parent
-# Committed alongside the experiment; the Overleaf tree gets a copy too when
-# it is present, so the paper and the repository never diverge.
-OUT_DIRS = [SKILLIT / "figures", SKILLIT.parents[2] / "p1-whitepaper-overleaf" / "figures"]
+# Committed alongside the experiment, next to the data it reads.
+OUT_DIRS = [SKILLIT / "figures"]
 
 plt.rcParams.update({
     "font.family": "sans-serif",

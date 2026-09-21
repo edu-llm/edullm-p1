@@ -167,7 +167,7 @@ ax.text((FINAL_STEP + cross_step2) / 2, ml_final_fitted - 0.016, f"{times_longer
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")
-ax.set_title("The optimized mixture reaches control quality with less training", fontsize=14.5, fontweight="bold", pad=12)
+ax.set_title("MixLaw fit and the control's power-law extrapolation", fontsize=15, fontweight="bold", pad=12)
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
 ax.set_xlim(650, cross_step2 * 1.05)

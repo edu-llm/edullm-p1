@@ -100,7 +100,7 @@ def control_band(min_step: int) -> tuple[list[int], list[float], list[float]]:
     return steps, lo, hi
 
 fig, ax = plt.subplots(figsize=(9.2, 5.8), dpi=200)
-ax.set_title("Mid-training reweighting does not beat a static mixture",
+ax.set_title("Validation loss for dynamic reweighting and static mixtures",
              fontsize=15, fontweight="bold", pad=12)
 
 MIN_STEP = 700

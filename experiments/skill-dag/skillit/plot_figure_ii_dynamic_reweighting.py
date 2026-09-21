@@ -164,7 +164,9 @@ fig.subplots_adjust(left=0.115, right=0.97, top=0.90, bottom=0.13)
 # Inset: final steps, rescaled
 # (sized/positioned to leave room for the larger tick labels and title
 # below without colliding with the main plot's right/top edges)
-axins = ax.inset_axes([0.52, 0.52, 0.46, 0.46])
+# Top at 0.88 of the axes, not 0.98: restoring the full axes box left the
+# inset title with no clearance and it collided with the top spine.
+axins = ax.inset_axes([0.52, 0.46, 0.46, 0.42])
 ins_steps, ins_lo, ins_hi = control_band(1900)
 axins.fill_between(ins_steps, ins_lo, ins_hi, color=CONTROL_BAND_COLOR, alpha=0.38,
                    linewidth=0, zorder=1)

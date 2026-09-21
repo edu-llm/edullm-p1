@@ -80,24 +80,18 @@ def lead_in(all_steps, all_y, window_min, x_left):
     slope = (y1 - y0) / (s1 - s0)
     return (np.array([x_left, s1]), np.array([y1 + slope * (x_left - s1), y1]))
 
-def lead_in_envelope(steps_a, y_a, y_b, window_min, x_left, n=64, steps_b=None):
-    """Envelope of the two control seeds across the lead-in span.
+def seed_envelope(steps_a, y_a, steps_b, y_b):
+    """Per-step control envelope, on the steps the two seeds share.
 
-    Sampled rather than taken at the endpoints alone: the seeds can cross
-    inside the span, and the envelope is then the pointwise min/max of the two
-    extrapolated lines, not a straight taper between their end widths.
-
-    Pass steps_b when the seeds sit on different step grids -- control seed
-    6198 carries an extra eval at step 2375 that seed 12345 does not.
+    Returned as series so the lower and upper boundary can each be extended
+    at its own slope, the same way the plotted lines are.
     """
-    a = lead_in(steps_a, y_a, window_min, x_left)
-    b = lead_in(steps_a if steps_b is None else steps_b, y_b, window_min, x_left)
-    if a is None or b is None:
-        return None
-    xs = np.linspace(x_left, min(a[0][1], b[0][1]), n)
-    ya = np.interp(xs, a[0], a[1])
-    yb = np.interp(xs, b[0], b[1])
-    return xs, np.minimum(ya, yb), np.maximum(ya, yb)
+    a = dict(zip(steps_a, y_a))
+    b = dict(zip(steps_b, y_b))
+    st = np.array(sorted(set(a) & set(b)), dtype=float)
+    lo = np.array([min(a[s], b[s]) for s in st], dtype=float)
+    hi = np.array([max(a[s], b[s]) for s in st], dtype=float)
+    return st, lo, hi
 
 def edge_interp(steps, y, xmin):
     """Clip to steps >= xmin, prepending a linearly-interpolated point at
@@ -153,11 +147,12 @@ for _key, _color, _ls, _lw, _z in (
     if _seg is not None:
         ax.plot(_seg[0], _seg[1], color=_color, linestyle=_ls, linewidth=_lw, zorder=_z)
 
-_s6, _y6 = full("olmo_mix_1124_seed6198")
-_s12, _y12 = full("olmo_mix_1124_seed12345")
-_env = lead_in_envelope(_s6, _y6, _y12, WINDOW_MIN, X_LEFT)
-if _env is not None:
-    ax.fill_between(_env[0], _env[1], _env[2], color=COL_CONTROL_BAND,
+_bst, _blo, _bhi = seed_envelope(*full("olmo_mix_1124_seed6198"),
+                                 *full("olmo_mix_1124_seed12345"))
+_lo_seg = lead_in(_bst, _blo, WINDOW_MIN, X_LEFT)
+_hi_seg = lead_in(_bst, _bhi, WINDOW_MIN, X_LEFT)
+if _lo_seg is not None and _hi_seg is not None:
+    ax.fill_between(_lo_seg[0], _lo_seg[1], _hi_seg[1], color=COL_CONTROL_BAND,
                     alpha=0.40, linewidth=0, zorder=1)
 
 ax.set_xlabel("Training step", labelpad=8)
@@ -186,10 +181,10 @@ INSET_XMIN = 1700
 
 axins = fig.add_axes([0.60, 0.505, 0.34, 0.255])
 zoom_mask = lambda s: s >= INSET_XMIN
-_is6, _iy6 = edge_interp(*full("olmo_mix_1124_seed6198"), INSET_XMIN)
-_is12, _iy12 = edge_interp(*full("olmo_mix_1124_seed12345"), INSET_XMIN)
-axins.fill_between(_is6, np.minimum(_iy6, _iy12), np.maximum(_iy6, _iy12),
-                   color=COL_CONTROL_BAND, alpha=0.40, linewidth=0, zorder=1)
+_ix, _ilo = edge_interp(_bst, _blo, INSET_XMIN)
+_, _ihi = edge_interp(_bst, _bhi, INSET_XMIN)
+axins.fill_between(_ix, _ilo, _ihi, color=COL_CONTROL_BAND, alpha=0.40,
+                   linewidth=0, zorder=1)
 for s, y, c, ls, mk in [
     (s_ctrl, y_ctrl, COL_CONTROL, (0, (5, 2)), "s"),
     (s_dml, y_dml, COL_DML_PAPER, (0, (1, 1.8)), "^"),

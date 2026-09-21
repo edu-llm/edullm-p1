@@ -115,11 +115,14 @@ panel is evaluated at **`LGB-min1pct`**, which is the point the paper's body
 describes and the point its \(r = 0.07\) is computed at; the committed output is
 [`figures/adjacency_comparison.png`](figures/adjacency_comparison.png).
 
-An earlier version of that figure was evaluated at \(r_{\mathrm{DML}}\) instead,
-which put entries roughly twice as large in the derivative panel (dclm →
-arc_challenge 0.154 rather than 0.065) and would have made a reader who
-recomputed the correlation from the figure get 0.17 rather than the 0.07 in the
-text. Every qualitative claim in the paper's Appendix E holds at either point —
+An earlier version of that figure was evaluated at \(r_{\mathrm{DML}}\) instead.
+It put entries roughly twice as large in the derivative panel (dclm →
+arc_challenge 0.154 rather than 0.065), so a reader who recomputed the
+correlation from it got 0.17 rather than the 0.07 in the text. That version
+survives in PDF exports of the paper taken before 2026-09-17, and three
+independent reviewers working from one of those exports each flagged it; the
+live document has carried the `LGB-min1pct` panel since then. Every qualitative
+claim in the paper's Appendix E holds at either point —
 StarCoder and Algebraic Stack all-zero, arXiv all-zero, OpenWebMath helping only
 ARC Easy, pes2o trivial on both ARC skills, Wikipedia and DCLM broadly helpful,
 31% density, 10 of 42 edge-presence disagreements — so only the printed

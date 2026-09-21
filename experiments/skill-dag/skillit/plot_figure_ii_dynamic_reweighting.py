@@ -153,6 +153,28 @@ for key, label, color, ls, marker in SERIES:
     vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= 1900 and s not in drop]
     axins.plot(steps, vals, color=color, linestyle=ls, marker=marker, markersize=3,
                linewidth=1.5, zorder=3)
+# Same lead-in treatment in the inset. Both of its axes are autoscaled, so
+# capture the limits first and restore them after, then extend each curve to
+# the left spine at the slope implied by the checkpoint before the zoom window.
+_ins_xlim, _ins_ylim = axins.get_xlim(), axins.get_ylim()
+for key, label, color, ls, marker in SERIES:
+    d = CURVES[key]
+    _seg = lead_in(np.array(d["steps"], dtype=float), np.array(d["curve"], dtype=float),
+                   1900, _ins_xlim[0])
+    if _seg is not None:
+        axins.plot(_seg[0], _seg[1], color=color, linestyle=ls, linewidth=1.5, zorder=3)
+
+_ia = lead_in(np.array(OLMO_SEED6198["steps"], dtype=float),
+              np.array(OLMO_SEED6198["curve"], dtype=float), 1900, _ins_xlim[0])
+_ib = lead_in(np.array(OLMO_SEED12345["steps"], dtype=float),
+              np.array(OLMO_SEED12345["curve"], dtype=float), 1900, _ins_xlim[0])
+if _ia is not None and _ib is not None:
+    axins.fill_between(_ia[0], np.minimum(_ia[1], _ib[1]), np.maximum(_ia[1], _ib[1]),
+                       color=CONTROL_BAND_COLOR, alpha=0.38, linewidth=0, zorder=1)
+
+axins.set_xlim(_ins_xlim)
+axins.set_ylim(_ins_ylim)
+
 axins.set_title("final steps, rescaled", fontsize=10.5, style="italic")
 axins.tick_params(labelsize=9, length=2)
 axins.grid(True, color="0.85", linewidth=0.5)

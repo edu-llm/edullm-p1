@@ -80,6 +80,25 @@ def lead_in(all_steps, all_y, window_min, x_left):
     slope = (y1 - y0) / (s1 - s0)
     return (np.array([x_left, s1]), np.array([y1 + slope * (x_left - s1), y1]))
 
+def lead_in_envelope(steps_a, y_a, y_b, window_min, x_left, n=64, steps_b=None):
+    """Envelope of the two control seeds across the lead-in span.
+
+    Sampled rather than taken at the endpoints alone: the seeds can cross
+    inside the span, and the envelope is then the pointwise min/max of the two
+    extrapolated lines, not a straight taper between their end widths.
+
+    Pass steps_b when the seeds sit on different step grids -- control seed
+    6198 carries an extra eval at step 2375 that seed 12345 does not.
+    """
+    a = lead_in(steps_a, y_a, window_min, x_left)
+    b = lead_in(steps_a if steps_b is None else steps_b, y_b, window_min, x_left)
+    if a is None or b is None:
+        return None
+    xs = np.linspace(x_left, min(a[0][1], b[0][1]), n)
+    ya = np.interp(xs, a[0], a[1])
+    yb = np.interp(xs, b[0], b[1])
+    return xs, np.minimum(ya, yb), np.maximum(ya, yb)
+
 def edge_interp(steps, y, xmin):
     """Clip to steps >= xmin, prepending a linearly-interpolated point at
     exactly x = xmin (using the nearest point just outside the window) so
@@ -134,11 +153,12 @@ for _key, _color, _ls, _lw, _z in (
     if _seg is not None:
         ax.plot(_seg[0], _seg[1], color=_color, linestyle=_ls, linewidth=_lw, zorder=_z)
 
-_a = lead_in(*full("olmo_mix_1124_seed6198"), WINDOW_MIN, X_LEFT)
-_b = lead_in(*full("olmo_mix_1124_seed12345"), WINDOW_MIN, X_LEFT)
-if _a is not None and _b is not None:
-    ax.fill_between(_a[0], np.minimum(_a[1], _b[1]), np.maximum(_a[1], _b[1]),
-                    color=COL_CONTROL_BAND, alpha=0.40, linewidth=0, zorder=1)
+_s6, _y6 = full("olmo_mix_1124_seed6198")
+_s12, _y12 = full("olmo_mix_1124_seed12345")
+_env = lead_in_envelope(_s6, _y6, _y12, WINDOW_MIN, X_LEFT)
+if _env is not None:
+    ax.fill_between(_env[0], _env[1], _env[2], color=COL_CONTROL_BAND,
+                    alpha=0.40, linewidth=0, zorder=1)
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")
@@ -166,8 +186,10 @@ INSET_XMIN = 1700
 
 axins = fig.add_axes([0.60, 0.505, 0.34, 0.255])
 zoom_mask = lambda s: s >= INSET_XMIN
-ibs, iblo, ibhi = control_band(INSET_XMIN)
-axins.fill_between(ibs, iblo, ibhi, color=COL_CONTROL_BAND, alpha=0.40, linewidth=0, zorder=1)
+_is6, _iy6 = edge_interp(*full("olmo_mix_1124_seed6198"), INSET_XMIN)
+_is12, _iy12 = edge_interp(*full("olmo_mix_1124_seed12345"), INSET_XMIN)
+axins.fill_between(_is6, np.minimum(_iy6, _iy12), np.maximum(_iy6, _iy12),
+                   color=COL_CONTROL_BAND, alpha=0.40, linewidth=0, zorder=1)
 for s, y, c, ls, mk in [
     (s_ctrl, y_ctrl, COL_CONTROL, (0, (5, 2)), "s"),
     (s_dml, y_dml, COL_DML_PAPER, (0, (1, 1.8)), "^"),

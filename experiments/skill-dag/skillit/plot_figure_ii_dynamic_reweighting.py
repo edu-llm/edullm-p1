@@ -73,6 +73,25 @@ def lead_in(all_steps, all_y, window_min, x_left):
     slope = (y1 - y0) / (s1 - s0)
     return (np.array([x_left, s1]), np.array([y1 + slope * (x_left - s1), y1]))
 
+def lead_in_envelope(steps_a, y_a, y_b, window_min, x_left, n=64, steps_b=None):
+    """Envelope of the two control seeds across the lead-in span.
+
+    Sampled rather than taken at the endpoints alone: the seeds can cross
+    inside the span, and the envelope is then the pointwise min/max of the two
+    extrapolated lines, not a straight taper between their end widths.
+
+    Pass steps_b when the seeds sit on different step grids -- control seed
+    6198 carries an extra eval at step 2375 that seed 12345 does not.
+    """
+    a = lead_in(steps_a, y_a, window_min, x_left)
+    b = lead_in(steps_a if steps_b is None else steps_b, y_b, window_min, x_left)
+    if a is None or b is None:
+        return None
+    xs = np.linspace(x_left, min(a[0][1], b[0][1]), n)
+    ya = np.interp(xs, a[0], a[1])
+    yb = np.interp(xs, b[0], b[1])
+    return xs, np.minimum(ya, yb), np.maximum(ya, yb)
+
 
 
 def control_band(min_step: int) -> tuple[list[int], list[float], list[float]]:
@@ -119,13 +138,14 @@ for key, label, color, ls, marker in SERIES:
     if _seg is not None:
         ax.plot(_seg[0], _seg[1], color=color, linestyle=ls, linewidth=1.8, zorder=3)
 
-_a = lead_in(np.array(OLMO_SEED6198["steps"], dtype=float),
-             np.array(OLMO_SEED6198["curve"], dtype=float), MIN_STEP, X_LEFT)
-_b = lead_in(np.array(OLMO_SEED12345["steps"], dtype=float),
-             np.array(OLMO_SEED12345["curve"], dtype=float), MIN_STEP, X_LEFT)
-if _a is not None and _b is not None:
-    ax.fill_between(_a[0], np.minimum(_a[1], _b[1]), np.maximum(_a[1], _b[1]),
-                    color=CONTROL_BAND_COLOR, alpha=0.38, linewidth=0, zorder=1)
+_env = lead_in_envelope(np.array(OLMO_SEED6198["steps"], dtype=float),
+                        np.array(OLMO_SEED6198["curve"], dtype=float),
+                        np.array(OLMO_SEED12345["curve"], dtype=float),
+                        MIN_STEP, X_LEFT,
+                        steps_b=np.array(OLMO_SEED12345["steps"], dtype=float))
+if _env is not None:
+    ax.fill_between(_env[0], _env[1], _env[2], color=CONTROL_BAND_COLOR,
+                    alpha=0.38, linewidth=0, zorder=1)
 
 ax.set_ylim(_ylim)
 
@@ -164,13 +184,14 @@ for key, label, color, ls, marker in SERIES:
     if _seg is not None:
         axins.plot(_seg[0], _seg[1], color=color, linestyle=ls, linewidth=1.5, zorder=3)
 
-_ia = lead_in(np.array(OLMO_SEED6198["steps"], dtype=float),
-              np.array(OLMO_SEED6198["curve"], dtype=float), 1900, _ins_xlim[0])
-_ib = lead_in(np.array(OLMO_SEED12345["steps"], dtype=float),
-              np.array(OLMO_SEED12345["curve"], dtype=float), 1900, _ins_xlim[0])
-if _ia is not None and _ib is not None:
-    axins.fill_between(_ia[0], np.minimum(_ia[1], _ib[1]), np.maximum(_ia[1], _ib[1]),
-                       color=CONTROL_BAND_COLOR, alpha=0.38, linewidth=0, zorder=1)
+_ienv = lead_in_envelope(np.array(OLMO_SEED6198["steps"], dtype=float),
+                         np.array(OLMO_SEED6198["curve"], dtype=float),
+                         np.array(OLMO_SEED12345["curve"], dtype=float),
+                         1900, _ins_xlim[0],
+                         steps_b=np.array(OLMO_SEED12345["steps"], dtype=float))
+if _ienv is not None:
+    axins.fill_between(_ienv[0], _ienv[1], _ienv[2], color=CONTROL_BAND_COLOR,
+                       alpha=0.38, linewidth=0, zorder=1)
 
 axins.set_xlim(_ins_xlim)
 axins.set_ylim(_ins_ylim)

@@ -11,6 +11,15 @@ series were the last place it survived. Three series carried it --
 (1.6526831656694412) and ``OLMO_SEED6198`` (1.6374929308891297) -- and each is
 now 20 points like the rest.
 
+The probe series' final point (step 2384, 1.612356647849083) is the one value
+here that did not come from W&B. Slurm job 1730368 was cancelled, so that run
+stopped logging at step 2383 and W&B marks it crashed; the step-2384 checkpoint
+had already been written and the full 20-label suite was evaluated from it
+minutes earlier. That eval is complete and is committed at
+``artifacts/probe_arm/step2384_task_loss.json``, whose ``macro_mean`` is exactly
+the unweighted mean of its 20 labels and exactly the value used here. It is the
+probe arm's observed final task loss (1.6124) in the paper.
+
 ``OLMO_AVERAGE`` is unaffected: it is built from the intersection of the two
 seeds' steps, and seed 12345 never had a 2375 eval, so the average never
 included it.

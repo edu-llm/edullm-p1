@@ -53,7 +53,7 @@ FAMILY_LABELS = {
     "mmlu_stem": "mmlu\nstem",
 }
 
-TITLE = "The two adjacency matrices agree on the extremes, disagree in the middle"
+TITLE = r"Domain-to-skill adjacency matrices ($A_{ij}$)"
 VMAX = 0.5
 
 

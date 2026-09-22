@@ -84,11 +84,10 @@ def draw_panel(ax, updates, *, title):
         handles[dom] = h
         prev_cum = cum
 
-    ax.set_title(title, fontsize=11, fontweight="bold", pad=10)
+    ax.set_title(title, fontsize=15, fontweight="bold", pad=10)
     ax.set_xlabel("Training step", labelpad=8)
     ax.set_xlim(0, FINAL_STEP)
     ax.set_ylim(0, 1)
-    ax.tick_params(labelsize=10)
     return handles
 
 
@@ -102,7 +101,7 @@ def main() -> None:
     # figure height below them.
     ordered_handles = [handles[d] for d in LEGEND_ORDER]
     ordered_labels = [LABELS[d] for d in LEGEND_ORDER]
-    fig.legend(ordered_handles, ordered_labels, loc="lower center", ncol=7, fontsize=9,
+    fig.legend(ordered_handles, ordered_labels, loc="lower center", ncol=7, fontsize=10,
                frameon=False, bbox_to_anchor=(0.5, 0.005), columnspacing=1.1,
                handlelength=1.4, handletextpad=0.4)
 

@@ -1,11 +1,17 @@
 """Partial vendor of the token-selection OLMo-core extensions.
 
-Only the four modules the experiments in this repository actually import are
-vendored here: the checkpoint ladder, the task-loss eval hook, the durability
-marker, and the W&B task-loss logging. The upstream package also carries the
-token-scoring machinery (``attention_score``, ``ema``, ``frozen_ref``,
-``scorers``, ``metrics``, ``train_module``, ``refhq_materialize``), which the
-token-selection experiment itself needs but nothing here does.
+Five modules are vendored here: the checkpoint ladder, the task-loss eval
+hook, the durability marker, the W&B task-loss logging, and the RefHQ
+reference materializer. The upstream package also carries the token-scoring
+machinery (``attention_score``, ``ema``, ``frozen_ref``, ``scorers``,
+``metrics``, ``train_module``), which the token-selection experiment itself
+needs but nothing here does.
+
+``refhq_materialize`` was vendored in df0b7b8 and then removed by 489049f
+("Vendor the code that actually ran; delete the superseded stack"), which left
+``reference/export_refhq_reference.py`` importing a module that was no longer
+present -- the importer survived the sweep but its dependency did not. It has
+been restored from df0b7b8, and its four tests pass.
 
 The copy of this file that came across with the vendor was the full upstream
 one, so it re-exported all eight modules and raised ImportError on the six

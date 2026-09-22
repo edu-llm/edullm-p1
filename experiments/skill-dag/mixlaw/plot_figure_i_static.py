@@ -157,7 +157,7 @@ if _lo_seg is not None and _hi_seg is not None:
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")
-ax.set_title("Fitted static domain mixtures beat both fixed baselines", fontsize=15, fontweight="bold", pad=12)
+ax.set_title("Task loss for four static domain mixtures", fontsize=15, fontweight="bold", pad=12)
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
 ax.set_xlim(650, FINAL_STEP + 60)

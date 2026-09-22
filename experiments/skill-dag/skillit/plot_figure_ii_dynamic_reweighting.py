@@ -104,10 +104,6 @@ ax.set_title("Task loss for dynamic reweighting and static mixtures",
              fontsize=15, fontweight="bold", pad=12)
 
 MIN_STEP = 700
-# The LightGBM static run has a stray off-cadence eval at step 2375 (125
-# steps before the final-step eval at 2384) that no other arm has; drop it
-# so the curve doesn't show a spurious extra point right before the end.
-DROP_STEPS = {"lgbm_control": {2375}}
 
 BAND_ST, BAND_LO, BAND_HI = seed_envelope(
     np.array(OLMO_SEED6198["steps"], dtype=float),
@@ -123,9 +119,8 @@ ax.fill_between(band_steps, band_lo, band_hi, color=CONTROL_BAND_COLOR, alpha=0.
 
 for key, label, color, ls, marker in SERIES:
     d = CURVES[key]
-    drop = DROP_STEPS.get(key, set())
-    steps = [s for s in d["steps"] if s >= MIN_STEP and s not in drop]
-    vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= MIN_STEP and s not in drop]
+    steps = [s for s in d["steps"] if s >= MIN_STEP]
+    vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= MIN_STEP]
     ax.plot(steps, vals, color=color, linestyle=ls, marker=marker,
             markersize=3.5, linewidth=1.8, label=label, zorder=3)
 
@@ -172,9 +167,8 @@ axins.fill_between(ins_steps, ins_lo, ins_hi, color=CONTROL_BAND_COLOR, alpha=0.
                    linewidth=0, zorder=1)
 for key, label, color, ls, marker in SERIES:
     d = CURVES[key]
-    drop = DROP_STEPS.get(key, set())
-    steps = [s for s in d["steps"] if s >= 1900 and s not in drop]
-    vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= 1900 and s not in drop]
+    steps = [s for s in d["steps"] if s >= 1900]
+    vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= 1900]
     axins.plot(steps, vals, color=color, linestyle=ls, marker=marker, markersize=3,
                linewidth=1.5, zorder=3)
 # Same lead-in treatment in the inset. Both of its axes are autoscaled, so

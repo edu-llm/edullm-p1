@@ -173,7 +173,7 @@ legend_handles = [
     Line2D([0], [0], color=COL_LIGHTGBM, linestyle="-", marker="D", markersize=6, linewidth=2.2,
            label="LightGBM fit"),
     Line2D([0], [0], color=COL_MIXLAW, linestyle="-", marker="o", markersize=6, linewidth=2.4,
-           label="MixLaw fit (ours, best)"),
+           label="MixLaw fit (ours)"),
 ]
 ax.legend(handles=legend_handles, loc="lower left", frameon=False, fontsize=10, labelspacing=0.7)
 

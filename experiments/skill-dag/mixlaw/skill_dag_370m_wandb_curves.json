@@ -298,7 +298,7 @@
     1.6125769406557082,
     1.612356647849083
    ],
-   "final_step_provenance": "The step-2384 point is NOT from the W&B run history. Slurm job 1730368 was cancelled, so that run stopped logging at step 2383 and W&B marks it crashed. The step-2384 checkpoint was written first and the full 20-label suite was evaluated from it; that eval is complete (raw_label_count=20, suite_complete=true) and is committed at experiments/skill-dag/skillit/artifacts/probe_arm/step2384_task_loss.json. Every other point in this series does come from the W&B run."
+   "final_step_provenance": "The step-2384 point is not in the W&B run's METRICS HISTORY. Slurm job 1730368 was cancelled, so eduLLM/skillit/87ad0201... stopped logging scalars at step 2383 (lastHistoryStep=2383) and W&B marks it crashed; an unfiltered history scan confirms no step-2384 row. The eval itself is nonetheless committed in W&B as artifacts -- eval-step0002384:v5 and skillit-probe-farmshare-20260918-231434-task-loss:v19 both hold step2384_task_loss.json -- alongside the step-0002384 checkpoint artifact and a progress artifact carrying last_durable_step.json (last_durable_step 2384, task_loss_complete true). That file is byte-identical (sha256 68f8d78b3b16ef6d8c82fcb9, 2603 bytes) to the copy committed at experiments/skill-dag/skillit/artifacts/probe_arm/step2384_task_loss.json, whose macro_mean is exactly the unweighted mean of its 20 labels. So only the scalar chart is short a point; the measurement is durably recorded in both W&B and this repo. Every other point in this series does come from the run's metrics history."
   },
   "skillit-derivative": {
    "label": "Skill-It online derivative",

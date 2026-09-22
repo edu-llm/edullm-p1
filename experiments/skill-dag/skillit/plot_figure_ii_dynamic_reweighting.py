@@ -18,7 +18,7 @@ Two revisions to the originally published panel:
   own dash pattern and marker, so the panel survives grayscale printing.
 * The control is drawn as the envelope of its two seeds rather than as a
   bare average line. That band is the only uncertainty in this figure that
-  the data actually supports: the control was run at two seeds (6198 and
+  the data actually supports: the control was run at two seeds (12536 and
   12345), while every reweighting arm was run once. The band therefore sets
   the scale against which the single-seed arms should be read, and no band
   is drawn for those arms because none was measured.

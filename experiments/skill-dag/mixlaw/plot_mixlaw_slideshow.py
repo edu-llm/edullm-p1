@@ -7,8 +7,8 @@ same data and the same estimator.
 
 Two revisions to the originally published panel:
 
-* The control is now the average of its two seeds (6198 and 12345) instead
-  of seed 6198 alone, and its seed-to-seed envelope is shaded. The control
+* The control is now the average of its two seeds (12536 and 12345) instead
+  of seed 12536 alone, and its seed-to-seed envelope is shaded. The control
   is the only arm that was run twice, so that band is the only uncertainty
   this figure can honestly draw; no band is drawn for the single-seed
   optimized arm because none was measured.

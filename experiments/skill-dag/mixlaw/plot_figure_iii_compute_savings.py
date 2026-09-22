@@ -3,8 +3,8 @@
 This is the generator behind the paper's Figure III. Two changes from the
 originally published panel, both to the numbers rather than the styling:
 
-* The control is the average of its two seeds (6198 and 12345) instead of seed
-  6198 alone, and its seed-to-seed envelope is shaded. The control is the only
+* The control is the average of its two seeds (12536 and 12345) instead of seed
+  12536 alone, and its seed-to-seed envelope is shaded. The control is the only
   arm that was run twice, so that band is the only uncertainty this panel can
   honestly show; no band is drawn for the single-seed optimized arm.
 * Both arrows are measured between the two arms' fitted power laws. The

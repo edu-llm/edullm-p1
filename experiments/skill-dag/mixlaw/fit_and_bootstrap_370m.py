@@ -236,13 +236,13 @@ def main() -> None:
     p = diff_p(finals[s1], finals[s2])
     lo, hi = ci(d)
     out["seed_variance_estimate"] = {
-        "description": "Olmo-mix-1124 seed 6198 minus seed 12345 (dataloader seed only)",
+        "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (dataloader seed only)",
         "mean_diff_bpb": round(float(d.mean()), 6),
         "ci95": [round(lo, 6), round(hi, 6)],
         "p_value": p,
         "p_display": fmt_p(p, args.n_boot),
     }
-    print(f"\nseed variance (6198 - 12345): {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
+    print(f"\nseed variance (12536 - 12345): {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
     args.out.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
     print(f"\nwrote {args.out}")

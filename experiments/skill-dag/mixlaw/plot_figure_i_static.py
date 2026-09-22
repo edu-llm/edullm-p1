@@ -7,7 +7,7 @@ Two revisions to the originally published panel:
   same value, which made them hard to tell apart at print size. They now
   differ in dash pattern, marker and lightness, so each is identifiable
   without relying on the legend order or on color.
-* The control is drawn as the envelope of its two seeds (6198 and 12345)
+* The control is drawn as the envelope of its two seeds (12536 and 12345)
   rather than as a bare average line. That band is the only uncertainty
   this figure can honestly show: the control ran at two seeds, while each
   fitted mixture ran once. It sets the scale a reader should apply to the

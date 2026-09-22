@@ -12,7 +12,7 @@
  },
  "runs": {
   "olmo-mix-1124-seed6198": {
-   "label": "Olmo-mix-1124 seed 6198",
+   "label": "Olmo-mix-1124 seed 12536",
    "wandb_run": "eduLLM/mixlaw-1/f8adf30b7d9d5754221bf27cd86aed2f",
    "steps": [
     0,

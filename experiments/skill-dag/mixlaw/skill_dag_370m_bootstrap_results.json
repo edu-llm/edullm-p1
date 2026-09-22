@@ -10,7 +10,7 @@
   },
   "arms": {
     "olmo-mix-1124-seed6198": {
-      "label": "Olmo-mix-1124 seed 6198",
+      "label": "Olmo-mix-1124 seed 12536",
       "fitted_final": 1.631299,
       "observed_final": 1.636967,
       "ci95": [
@@ -148,7 +148,7 @@
     }
   },
   "seed_variance_estimate": {
-    "description": "Olmo-mix-1124 seed 6198 minus seed 12345 (dataloader seed only)",
+    "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (dataloader seed only)",
     "mean_diff_bpb": 0.004445,
     "ci95": [
       -0.004611,

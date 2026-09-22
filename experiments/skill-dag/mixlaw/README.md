@@ -384,7 +384,7 @@ Task-loss is evaluated periodically on the shared 20-label suite. Final performa
 Regenerate with [`fit_and_bootstrap_370m.py`](fit_and_bootstrap_370m.py) from the
 committed curves in [`skill_dag_370m_wandb_curves.json`](skill_dag_370m_wandb_curves.json);
 full output in [`skill_dag_370m_bootstrap_results.json`](skill_dag_370m_bootstrap_results.json).
-The control is the **average of the two Olmo-mix-1124 dataloader seeds** (6198, 12345),
+The control is the **average of the two Olmo-mix-1124 dataloader seeds** (12536, 12345),
 whose bootstrap distribution is the element-by-element mean of the two seeds' own
 alpha-free bootstrap distributions. Every arm is resampled from its own
 independent random stream, so between-arm intervals are not coupled through a
@@ -394,7 +394,7 @@ shared generator.
 |-----|-------------:|---------:|--------|------------|
 | **MixLaw** | **1.6057** | 1.6048 | [1.6015, 1.6099] | $p < 10^{-4}$ |
 | **LightGBM** | **1.6080** | 1.6077 | [1.6049, 1.6106] | $p < 10^{-4}$ |
-| Olmo-mix-1124 seed 6198 | 1.6313 | 1.6370 | [1.6261, 1.6357] | — |
+| Olmo-mix-1124 seed 12536 | 1.6313 | 1.6370 | [1.6261, 1.6357] | — |
 | Olmo-mix-1124 seed 12345 | 1.6269 | 1.6285 | [1.6195, 1.6343] | — |
 | Olmo-mix-1124 average (control) | 1.6291 | 1.6328 | [1.6246, 1.6335] | — |
 | Data Mixing Laws paper | 1.6515 | 1.6518 | [1.6473, 1.6556] | worse, $p < 10^{-4}$ |

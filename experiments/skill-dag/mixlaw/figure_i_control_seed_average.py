@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-seed6198 = [
+seed12536 = [
     [0, 4.426135], [125, 2.682668], [250, 2.339392], [375, 2.187189],
     [500, 2.029042], [625, 1.927281], [750, 1.854915], [875, 1.801895],
     [1000, 1.767333], [1125, 1.729474], [1250, 1.717138], [1375, 1.697052],
@@ -21,11 +21,11 @@ seed12345 = [
     [2250, 1.6377677768468857], [2384, 1.6284936755895614],
 ]
 
-steps_a = [s for s, _ in seed6198]
+steps_a = [s for s, _ in seed12536]
 steps_b = [s for s, _ in seed12345]
 assert steps_a == steps_b, (steps_a, steps_b)
 
-averaged = [[s, (va + vb) / 2] for (s, va), (_, vb) in zip(seed6198, seed12345)]
+averaged = [[s, (va + vb) / 2] for (s, va), (_, vb) in zip(seed12536, seed12345)]
 
 PATH = Path(__file__).resolve().parent / "figure_i_wandb_curves.json"
 
@@ -39,7 +39,7 @@ def main() -> None:
     """
     data = json.loads(PATH.read_text(encoding="utf-8"))
     data["olmo_mix_1124"] = averaged
-    data["olmo_mix_1124_seed6198"] = [list(p) for p in seed6198]
+    data["olmo_mix_1124_seed6198"] = [list(p) for p in seed12536]
     data["olmo_mix_1124_seed12345"] = [list(p) for p in seed12345]
     PATH.write_text(json.dumps(data, indent=1), encoding="utf-8")
     print(f"Wrote {PATH} (control average + 2 seeds)")

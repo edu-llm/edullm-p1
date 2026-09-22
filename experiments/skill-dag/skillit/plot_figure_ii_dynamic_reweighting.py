@@ -31,7 +31,7 @@ import matplotlib.ticker as mticker
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from figure_ii_curves import CURVES, OLMO_SEED6198, OLMO_SEED12345  # noqa: E402
+from figure_ii_curves import CURVES, OLMO_SEED12536, OLMO_SEED12345  # noqa: E402
 
 SKILLIT = Path(__file__).resolve().parent
 # Committed alongside the experiment, next to the data it reads.
@@ -92,7 +92,7 @@ def seed_envelope(steps_a, y_a, steps_b, y_b):
 
 def control_band(min_step: int) -> tuple[list[int], list[float], list[float]]:
     """Per-step envelope of the two control seeds, on their shared steps."""
-    a = dict(zip(OLMO_SEED6198["steps"], OLMO_SEED6198["curve"]))
+    a = dict(zip(OLMO_SEED12536["steps"], OLMO_SEED12536["curve"]))
     b = dict(zip(OLMO_SEED12345["steps"], OLMO_SEED12345["curve"]))
     steps = [s for s in sorted(set(a) & set(b)) if s >= min_step]
     lo = [min(a[s], b[s]) for s in steps]
@@ -106,8 +106,8 @@ ax.set_title("Task loss for dynamic reweighting and static mixtures",
 MIN_STEP = 700
 
 BAND_ST, BAND_LO, BAND_HI = seed_envelope(
-    np.array(OLMO_SEED6198["steps"], dtype=float),
-    np.array(OLMO_SEED6198["curve"], dtype=float),
+    np.array(OLMO_SEED12536["steps"], dtype=float),
+    np.array(OLMO_SEED12536["curve"], dtype=float),
     np.array(OLMO_SEED12345["steps"], dtype=float),
     np.array(OLMO_SEED12345["curve"], dtype=float),
 )

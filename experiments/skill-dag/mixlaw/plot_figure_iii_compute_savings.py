@@ -68,14 +68,14 @@ plt.rcParams.update({
 steps = np.array(mixlaw_curves["steps"], dtype=float)
 ml = np.array(mixlaw_curves["runs"]["ML-pilot_caps"]["curve"], dtype=float)
 _avg = {int(p[0]): float(p[1]) for p in _ctrl_data["olmo_mix_1124"]}
-_s6198 = {int(p[0]): float(p[1]) for p in _ctrl_data["olmo_mix_1124_seed6198"]}
+_s12536 = {int(p[0]): float(p[1]) for p in _ctrl_data["olmo_mix_1124_seed6198"]}
 _s12345 = {int(p[0]): float(p[1]) for p in _ctrl_data["olmo_mix_1124_seed12345"]}
 _missing = [int(x) for x in steps if int(x) not in _avg]
 if _missing:
     raise SystemExit(f"two-seed control average is missing steps {_missing}")
 ctrl = np.array([_avg[int(x)] for x in steps], dtype=float)
-band_lo = np.array([min(_s6198[int(x)], _s12345[int(x)]) for x in steps], dtype=float)
-band_hi = np.array([max(_s6198[int(x)], _s12345[int(x)]) for x in steps], dtype=float)
+band_lo = np.array([min(_s12536[int(x)], _s12345[int(x)]) for x in steps], dtype=float)
+band_hi = np.array([max(_s12536[int(x)], _s12345[int(x)]) for x in steps], dtype=float)
 mask = steps >= 1000
 
 def powerlaw(x, a, b, alpha):

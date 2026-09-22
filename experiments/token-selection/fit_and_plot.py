@@ -110,6 +110,15 @@ N_PARAMS = 3
 # on average, so resampling them unrescaled understates the spread -- badly
 # here, where n is 11 (22 for the pooled random control) against p = 3.
 RESCALE_RESIDUALS = True
+# Font scale, applied to the original (1.0x) sizes in each figure. Figure 2 has
+# room for the full 1.5. Figure 1 does not: its legend sits inside the axes and
+# widens toward the inset as the type grows, and once the last legend entry
+# reaches the inset's topmost y-ticklabel the two overprint. Measured on the
+# rendered figure, 1.28 clears it by ~24px and 1.29 does not -- the legend wraps
+# wider there. Anchoring the legend at the axes' left edge and tightening its
+# internal padding (both below) are what raise the ceiling from ~1.05 to this.
+F1 = 1.28
+F2 = 1.5
 # Wide enough that no arm's profiled optimum lands on a boundary; see docstring.
 ALPHA_GRID = np.linspace(0.05, 6.0, 1192)
 ALPHA_FREE = True
@@ -450,9 +459,7 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
-    # Height only: the paper scales this to 	extwidth, so extra height costs
-    # no on-page text size, while extra width would shrink every label.
-    fig, ax = plt.subplots(figsize=(12, 8.6), dpi=150)
+    fig, ax = plt.subplots(figsize=(12, 6.9333), dpi=150)
 
     for key in ORDER:
         r = results[key]
@@ -468,25 +475,32 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
             label=LEGEND[key],
         )
 
-    ax.set_xlabel("Training step", fontsize=25.5)
-    ax.set_ylabel("Macro task-loss bits-per-byte (lower is better)", fontsize=22.5)
+    ax.set_xlabel("Training step", fontsize=17 * F1)
+    ax.set_ylabel("Macro task-loss bits-per-byte (lower is better)", fontsize=15 * F1)
     # No in-figure title: the LaTeX caption carries it, and duplicating it both
     # wastes vertical space and reads as a typo in print.
     ax.set_xlim(500, 2420)
-    ax.tick_params(labelsize=21)
+    ax.tick_params(labelsize=14 * F1)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
-    # Small headroom only: the legend now sits above the axes, not inside them.
+    # Headroom above the highest curve so the legend does not sit on top of
+    # REL-EMA's first few points.
     vals = [r["loss"][r["steps"] >= 500] for r in (results[k] for k in ORDER)]
-    ax.set_ylim(min(v.min() for v in vals) - 0.02, max(v.max() for v in vals) + 0.06)
-    # Above the axes, not inside: at this font size an in-axes legend covers
-    # the y-tick labels and runs into the inset.
+    ax.set_ylim(min(v.min() for v in vals) - 0.02, max(v.max() for v in vals) + 0.20)
+    # Anchored at the axes' left edge rather than centred, and with tighter
+    # internal padding than the matplotlib defaults. Both exist to widen the gap
+    # to the inset: the legend now grows rightward only, from a fixed left edge,
+    # so the larger type still clears the inset's y-ticklabels.
     ax.legend(
-        fontsize=18.75,
-        ncol=4,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 1.005),
-        frameon=False,
+        fontsize=12.5 * F1,
+        ncol=2,
+        loc="upper left",
+        bbox_to_anchor=(0.005, 0.99),
+        columnspacing=1.0,
+        handletextpad=0.4,
+        handlelength=1.6,
+        borderpad=0.35,
+        labelspacing=0.35,
     )
 
     # Rescaled inset over the final steps.
@@ -533,8 +547,8 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
     # topmost label is drawn over the inset frame and reads as clipped.
     inset.set_ylim(min(tail) - 0.012, max(tail) + 0.024)
     inset.set_yticks(np.arange(1.66, 1.741, 0.02))
-    inset.set_title("final steps, rescaled", fontsize=18.75, style="italic")
-    inset.tick_params(labelsize=16.5)
+    inset.set_title("final steps, rescaled", fontsize=12.5 * F1, style="italic")
+    inset.tick_params(labelsize=11 * F1)
     inset.set_facecolor("white")
     inset.set_zorder(6)
     inset.patch.set_alpha(1.0)
@@ -608,14 +622,14 @@ def figure2(results: dict[str, dict], fig_dir: Path) -> None:
             zorder=4,
         )
     for yi, val, hi in zip(y, fitted, ci_hi):
-        ax.text(hi + 0.0045, yi, f"{val:.4f}", va="center", ha="left", fontsize=18)
+        ax.text(hi + 0.0045, yi, f"{val:.4f}", va="center", ha="left", fontsize=12 * F2)
 
     ax.set_yticks(y)
-    ax.set_yticklabels([LABEL[k] for k in order], fontsize=19.5)
+    ax.set_yticklabels([LABEL[k] for k in order], fontsize=13 * F2)
     ax.set_ylim(-0.65, len(order) - 0.35)
     ax.set_xlim(ci_lo.min() - 0.012, ci_hi.max() + 0.075)
-    ax.set_xlabel("Fitted-final macro task-loss bpb (lower is better)", fontsize=19.5)
-    ax.tick_params(axis="x", labelsize=18)
+    ax.set_xlabel("Fitted-final macro task-loss bpb (lower is better)", fontsize=13 * F2)
+    ax.tick_params(axis="x", labelsize=12 * F2)
     ax.grid(axis="x", color="#dddddd", linewidth=0.8)
     ax.set_axisbelow(True)
     for side in ("top", "right", "left"):

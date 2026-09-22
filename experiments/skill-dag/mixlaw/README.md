@@ -17,7 +17,7 @@
 | Full-run budget | 2384 steps ≈ one epoch (~10B tokens); cosine horizon $T_{\max}=2360$ after 24 warmup steps |
 | FLOPs / full arm | $2.63\times10^{19}$ (measured from W&B) |
 | Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels (task-loss) |
-| Seeds (as launched) | `--seed 12536` for all four static arms — data-stream *and* mixture-sampling seed — with `model.init_seed = 0` |
+| Seeds (as launched) | `--seed 12536` for all four static arms — data-stream, mixture-sampling *and* model-initialization seed, the last of those via `seed_all(stream_seed + rank)`. The `model.init_seed = 0` visible in the W&B config is an **unset default, not a choice**: the trainer never assigns `init_seed`, so it never reaches `TransformerConfig` (the same defect is recorded in `experiments/token-selection/ARMS.md`). |
 
 **Shared recipe across arms:** same architecture, tokenizer, batch, LR schedule, and one-epoch step budget. Arms differ only in **domain mixture weights**.
 

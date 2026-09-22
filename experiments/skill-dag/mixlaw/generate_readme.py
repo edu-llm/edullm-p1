@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""Regenerate README.md from fit artifacts and mixtures.json."""
+"""Regenerate a README draft from fit artifacts and mixtures.json.
+
+**This no longer regenerates the checked-in README, and must not be pointed
+at it.** It has drifted ~800 diff lines from `README.md`: it emits a different
+title ("Skill-DAG mixing-law pilot"), a different structure, and it does not
+emit the hand-written "370M validation setup" section at all -- including the
+seed row and the "Read the seed row, not the code default" warning that
+records which seed each control actually ran with. It would also re-inject a
+"Platform three-arm array" section for a platform this repository no longer
+uses.
+
+`README.md` is hand-maintained. The tables this builds from the JSON artifacts
+are still useful to diff against by hand, so it writes `README.generated.md`.
+Pass --overwrite-readme only after reconciling the two.
+"""
 from __future__ import annotations
 
 import json
@@ -375,7 +389,7 @@ lines += [
     "| `build_working_pool_from_shards.py` | **Deprecated** — peak pool from `tokenized_manifest.json` |",
     "| `check_validation_pool.py` | Peak demand vs olmohq inventory |",
     "| `validation_mixtures_10b.json` | Eight 10B-mix recipe for 370M scale-up |",
-    "| `generate_readme.py` | Regenerate this README from JSON artifacts |",
+    "| `generate_readme.py` | Build `README.generated.md` from the JSON artifacts, to diff against by hand; it does **not** regenerate the hand-maintained README |",
     "",
     "---",
     "",
@@ -651,5 +665,15 @@ lines += [
 lines += validation_corpora_lines()
 lines += [""]
 
-(ROOT / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-print(f"wrote {ROOT / 'README.md'} ({len(lines)} lines)")
+import sys as _sys
+
+_name = "README.md" if "--overwrite-readme" in _sys.argv else "README.generated.md"
+_target = ROOT / _name
+if _name == "README.md":
+    print(
+        "WARNING: overwriting the hand-maintained README.md. This drops the "
+        "370M validation setup section, the seed row and the seed warning. "
+        "See this file's docstring."
+    )
+_target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+print(f"wrote {_target} ({len(lines)} lines)")

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
+from fit_chinchilla import build_targets
 from fit_mixing_law import DOMAINS, _predict
-from mixlaw_common import macro_curve
 
 ROOT = Path(__file__).parent
 N_SAMPLES = 1000
@@ -27,10 +27,16 @@ def load_thetas(path: Path) -> dict[str, np.ndarray]:
     }
 
 
-def summarize(thetas: dict[str, np.ndarray], R: np.ndarray, obs_macro: list[float]) -> dict:
+def summarize(
+    thetas: dict[str, np.ndarray],
+    R: np.ndarray,
+    target_macro: np.ndarray,
+) -> dict:
     fams = sorted(thetas)
     pred = np.stack([_predict(thetas[f], R) for f in fams])
     macro = pred.mean(0)
+    target_min = float(target_macro.min())
+    target_max = float(target_macro.max())
     return {
         "macro": {
             "min": float(macro.min()),
@@ -41,9 +47,11 @@ def summarize(thetas: dict[str, np.ndarray], R: np.ndarray, obs_macro: list[floa
             "max": float(macro.max()),
             "mean": float(macro.mean()),
             "std": float(macro.std()),
-            "pct_in_pilot_range": float(
-                np.mean((macro >= min(obs_macro)) & (macro <= max(obs_macro))) * 100
+            "pct_in_chinchilla_target_range": float(
+                np.mean((macro >= target_min) & (macro <= target_max)) * 100
             ),
+            "n_below_chinchilla_target_range": int(np.sum(macro < target_min)),
+            "n_above_chinchilla_target_range": int(np.sum(macro > target_max)),
             "n_gt_3": int(np.sum(macro > 3)),
             "n_gt_5": int(np.sum(macro > 5)),
             "n_gt_10": int(np.sum(macro > 10)),
@@ -56,19 +64,25 @@ def summarize(thetas: dict[str, np.ndarray], R: np.ndarray, obs_macro: list[floa
 
 def main() -> None:
     data = json.loads((ROOT / "mixlaw_data.json").read_text(encoding="utf-8"))
-    obs_macro = [macro_curve(r["task_loss_families"]) for r in data["runs"]]
+    chin = json.loads((ROOT / "mixlaw_chinchilla_extrapolated.json").read_text(encoding="utf-8"))
+    families, y_by_fam = build_targets(data, chin)
+    target_macro = np.mean(np.stack([y_by_fam[f] for f in families]), axis=0)
     rng = np.random.default_rng(SEED)
     R = rng.dirichlet(np.ones(7), N_SAMPLES)
 
     stats = summarize(
-        load_thetas(ROOT / "mixlaw_fit_chinchilla.json"), R, obs_macro
+        load_thetas(ROOT / "mixlaw_fit_chinchilla.json"), R, target_macro
     )
     out = {
         "n_samples": N_SAMPLES,
         "sampling": "dirichlet_alpha=1",
         "seed": SEED,
         "fit_file": "mixlaw_fit_chinchilla.json",
-        "observed_pilot_macro_range": [min(obs_macro), max(obs_macro)],
+        "range_basis": "Chinchilla-extrapolated six-family pilot targets",
+        "chinchilla_target_macro_range": [
+            float(target_macro.min()),
+            float(target_macro.max()),
+        ],
         **stats,
     }
     out_path = ROOT / "mixlaw_random_simplex_plausibility.json"

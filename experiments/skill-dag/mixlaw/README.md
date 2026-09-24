@@ -17,7 +17,7 @@
 | Full-run budget | 2384 steps ≈ one epoch (~10B tokens); cosine horizon $T_{\max}=2360$ after 24 warmup steps |
 | FLOPs / full arm | $2.63\times10^{19}$ (measured from W&B) |
 | Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels (task-loss) |
-| Seeds (as launched) | `--seed 12536` for all four static arms — data-stream, mixture-sampling *and* model-initialization seed, the last of those via `seed_all(stream_seed + rank)`. The `model.init_seed = 0` visible in the W&B config is an **unset default, not a choice**: the trainer never assigns `init_seed`, so it never reaches `TransformerConfig` (the same defect is recorded in `experiments/token-selection/ARMS.md`). |
+| Seeds (as launched) | `--seed 12536` for all four static arms — data-stream and mixture-sampling seed; `seed_all(stream_seed + rank)` also seeds the process RNGs. Model weights are initialized from `TransformerConfig`'s own `init_seed`, and the `model.init_seed = 0` visible in the W&B config is an **unset default, not a choice**: the trainer never assigns `init_seed` (the same defect is recorded in `experiments/token-selection/ARMS.md`). The realized initialization therefore follows the parallel layout, not the stream seed: every 8×A100 arm starts at step-0 task loss 4.4261 bpb, and every 4×L40S run (the seed-12345 control and both Skill-It arms, at stream seeds 12345 and 42) at 4.4728 bpb. |
 
 **Shared recipe across arms:** same architecture, tokenizer, batch, LR schedule, and one-epoch step budget. Arms differ only in **domain mixture weights**.
 
@@ -30,7 +30,9 @@
 > configs are the record (`eduLLM/mixlaw-1`:
 > `dataset.source_mixture_config.seed = 12536`, `data_loader.seed = 12536`,
 > `model.init_seed = 0` on all four). The second control (`olmo-mix-seed12345`)
-> is the same recipe re-run with the data-stream seed changed to 12345; despite
+> is the same recipe re-run with the data-stream seed changed to 12345, on
+> FarmShare 4×L40S (`oat-04`) rather than 8×A100, which also changed the realized
+> model initialization (step-0 task loss 4.4728 vs 4.4261 bpb); despite
 > its name, the first control's stream seed is 12536, not 6198 — 6198 is the
 > recipe seed used to build the pools and to train the 60M pilots.
 
@@ -331,7 +333,7 @@ weakly identified. Treat the specific LightGBM weight vector accordingly.
 
 ### Random-simplex plausibility
 
-1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Pilot observed macro range: **2.0444 – 2.2888 bpb**.
+1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Both surrogates predict the Chinchilla-extrapolated loss, so they are compared against the pilots' Chinchilla-extrapolated macro range, **1.8369 – 2.0561 bpb** (the raw observed pilot range, 2.0444 – 2.2888 bpb, is on a different basis).
 
 | Metric | Mixing law | LightGBM |
 |--------|-----------:|---------:|
@@ -341,7 +343,7 @@ weakly identified. Treat the specific LightGBM weight vector accordingly.
 | Macro p99 | 2.0460 | 2.0217 |
 | Macro max | 2.1064 | 2.0339 |
 | Macro mean ± std | 1.8968 ± 0.0542 | 1.9393 ± 0.0441 |
-| % inside pilot macro range | 1.1% | 0.0% |
+| % inside pilots' extrapolated macro range | 87.6% (117 below, 7 above) | 100.0% |
 | Mixtures with macro > 3 bpb | 0 | 0 |
 | Mixtures with macro > 5 bpb | 0 | 0 |
 
@@ -423,7 +425,9 @@ Lower is better. Both fitted mixtures beat the Olmo-mix-1124 control. The Data M
 Laws paper mixture is significantly **worse** than the control.
 
 **Seed-variance reference.** The two control seeds differ by 0.0044 bpb
-(95% CI [-0.0046, 0.0132], $p = 0.34$) — dataloader seed only, model init held fixed.
+(95% CI [-0.0046, 0.0132], $p = 0.34$). The two runs differ in dataloader seed and in
+platform (8×A100 vs 4×L40S), which also changed the realized model initialization
+(step-0 task loss 4.4261 vs 4.4728 bpb), so this is not a pure data-order contrast.
 Any effect smaller than ~0.004 bpb is inside that noise floor.
 
 ### Takeaways

@@ -107,15 +107,15 @@ The random-60% arm was run at two seeds:
 
 | Run | Seed | W&B | Fitted final | 95% CI |
 | --- | --- | --- | --- | --- |
-| `random-control-regmix10b-v1` | 42 | `fa841187ff07e9164da282efd353c217` | 1.6857 | [1.6775, 1.6920] |
-| `random-control-regmix10b-seed69-v1` | 69 | `123189f79a722b3481d06bc48b61fad9` | 1.6939 | [1.6865, 1.6993] |
+| `random-control-regmix10b-v1` | 42 | `fa841187ff07e9164da282efd353c217` | 1.6857 | [1.6761, 1.6930] |
+| `random-control-regmix10b-seed69-v1` | 69 | `123189f79a722b3481d06bc48b61fad9` | 1.6939 | [1.6852, 1.7002] |
 
-The two differ by **0.0082 bpb** (95% CI [0.0033, 0.0126], two-sided **p = 0.0002**), which is
+The two differ by **0.0082 bpb** (95% CI [0.0025, 0.0133], two-sided **p = 0.003**), which is
 larger than several of the between-arm gaps, so a single run of this arm cannot carry the baseline.
 It is therefore **reported as one two-run fit**: a single power law fitted to the union of both
 runs' fit-window points (11 each, 22 total), with the bootstrap taken over the pooled residuals, so
 the interval carries seed-to-seed spread as well as within-run noise. Pooled: **1.6900**, 95% CI
-**[1.6841, 1.6947]**. Every comparison involving the random control uses this fit.
+**[1.6837, 1.6950]**. Every comparison involving the random control uses this fit.
 
 The seed-69 run's step-1500 evaluation was recovered from its on-disk `task_loss` artifact; a resume
 collided with W&B's monotonic-step rule and dropped it from the logged history.

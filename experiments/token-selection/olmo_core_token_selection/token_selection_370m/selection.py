@@ -110,6 +110,9 @@ def selection_weights(
         return valid.float()
     if method == "random":
         generator = torch.Generator(device=valid.device)
+        # The seed has no rank term, so every data-parallel rank draws the same
+        # mask for its local batch at a given step. Each token is still kept
+        # with the same marginal probability.
         generator.manual_seed(int(seed) + int(step) * 1_000_003)
         scores = torch.rand(valid.shape, device=valid.device, generator=generator)
         mask = per_row_topk(scores, keep_fraction, valid)

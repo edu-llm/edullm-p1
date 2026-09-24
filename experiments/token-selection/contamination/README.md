@@ -80,6 +80,12 @@ superseded audit's 40,087 used -- see
 | `hq-reference-v1` | HQ reference corpus (Reference A) | `hq-reference-v1/out/<domain>/`, one directory per domain | 3,367,856 | 2,298,753,521 |
 | `refhq-new-v1` | Instruct reference corpus (Reference B) | `refhq-new-v1/out/<source>/<category>/documents/`, `category` is the aggregation domain | 6,193,748 | 2,738,073,602 |
 
+`hq-reference-v1` is an earlier build of the HQ reference corpus. The HQ
+reference model was trained on `refhq-regmix-5p5b-v1`, which
+[`submit_refhq_regmix_5p5.sh`](../datasets/refhq/scripts/submit_refhq_regmix_5p5.sh)
+rebuilt from the same raw downloads for every domain except DCLM (freshly
+sampled) under the `regmix-5p5` budget. That build was not rescanned.
+
 All three share the domain set `{algebraic-stack, arxiv, dclm, open-web-math,
 pes2o, starcoder, wiki}` except `refhq-new-v1`, which is organized by
 `{chat, code, general, math, science}` instead (its 23 source/category
@@ -113,9 +119,15 @@ this is the rate to read as an estimate of standalone-question leakage, and
 it is now computed the same way for every benchmark including MMLU (see
 [Methodology](#methodology)).
 
+In the training corpus, BoolQ contributes 521 of the 957 items matched in any
+field (54.4%), and its 15.93% stem rate supplies 1.59 of the 2.00 points of
+the macro stem rate (79.5%).
+
 Contamination in the training corpus is shared by every arm trained on it,
-so it cannot explain a gap between arms. The Instruct reference corpus --
-used as the frozen reference model for the RHO-1 and BLADE arms -- is
+although each arm's loss mask decides which contaminated tokens it trains on,
+which this audit does not measure. The Instruct reference corpus -- used to
+train RHO-1's frozen reference model and to update BLADE's dynamic reference --
+is
 matched by roughly **2.5x** more items than the training corpus (2,432 vs
 957). A reference model that has memorized more evaluation items would raise
 excess loss on those items and bias its arm toward *outperforming* the

@@ -13,7 +13,7 @@ Top-60% token selection by RHO-1 excess loss `L_curr − L_ref` on RegMix 10B.
 | GBS / microbatch | `4_194_304` / `65_536` (tune microbatch for GPU memory) |
 | LR / warmup / `alpha_f` | `4e-4` / 24 / 0.1 |
 | Compile | `compile_model=true` (YAML + FarmShare default) |
-| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens; one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
+| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens, 98.94% of one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
 | Permanent ckpts | `{0, 125, …, 2125, 2360}` (omit 2250); `max_checkpoints=None`; no ephemeral |
 | Frozen reference | Instruct-v3 (`refhq-instruct`) 370M **step940** |
 | `run_id` | `rho-1-regmix10b-v1` |

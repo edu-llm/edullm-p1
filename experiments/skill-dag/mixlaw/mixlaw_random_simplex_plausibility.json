@@ -3,9 +3,10 @@
   "sampling": "dirichlet_alpha=1",
   "seed": 42,
   "fit_file": "mixlaw_fit_chinchilla.json",
-  "observed_pilot_macro_range": [
-    2.044371406237284,
-    2.288793126742045
+  "range_basis": "Chinchilla-extrapolated six-family pilot targets",
+  "chinchilla_target_macro_range": [
+    1.8368673299194356,
+    2.0561396799338345
   ],
   "macro": {
     "min": 1.7838449321397036,
@@ -16,7 +17,9 @@
     "max": 2.106399066123419,
     "mean": 1.896836737380225,
     "std": 0.05419340288614924,
-    "pct_in_pilot_range": 1.0999999999999999,
+    "pct_in_chinchilla_target_range": 87.6,
+    "n_below_chinchilla_target_range": 117,
+    "n_above_chinchilla_target_range": 7,
     "n_gt_3": 0,
     "n_gt_5": 0,
     "n_gt_10": 0

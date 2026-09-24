@@ -32,7 +32,9 @@ come from closed-form OLS and we keep the grid point with the lowest SSE.
   * Fit window: ``step >= 1000``. Not because of warmup -- that is 24 steps --
     but because the early curve is far noisier: the two random-control seeds
     differ by 0.0181 bpb on average over steps 125-875 against 0.0047 bpb
-    inside the window.
+    inside the window. Across fit windows starting at 500, 625, ..., 1500,
+    RHO-1's advantage over the two-run random control ranges from 0.0009 to
+    0.0076 bpb, and this window gives the largest.
   * Alpha grid: ``np.linspace(0.05, 6.0, 1192)``.
   * 10,000 i.i.d. residual bootstrap draws. Residuals are resampled with
     replacement from the fit-window residuals and added back to the fitted
@@ -72,10 +74,12 @@ are 0.01007 and 0.00710.)
 
 Data source
 -----------
-``token_selection_370m_wandb_curves.json`` (committed) is the default and is
-identical to the live W&B histories on the fit window, so the script runs
-offline with no credentials. Pass ``--source wandb`` to re-pull from
-``eduLLM/token-selection`` instead.
+``token_selection_370m_wandb_curves.json`` (committed) is the default, so the
+script runs offline with no credentials. Pass ``--source wandb`` to re-pull
+from ``eduLLM/token-selection`` instead. The live histories match the cache on
+the fit window except that the seed-69 random control's W&B history has no
+step-1500 evaluation (a resume collided with W&B's monotonic-step rule); the
+live path restores that one point from the cache.
 
 Usage
 -----
@@ -180,7 +184,11 @@ def load_curves_from_json(path: Path = CURVES_PATH) -> dict[str, tuple[np.ndarra
 
 
 def load_curves_from_wandb() -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    """Pull eval/macro_bpb histories live from W&B."""
+    """Pull eval/macro_bpb histories live from W&B.
+
+    Restores the one evaluation W&B dropped from the seed-69 random control
+    (step 1500) from the committed cache; any other gap is left alone.
+    """
     import wandb  # imported lazily so the offline path needs no wandb
 
     api = wandb.Api()
@@ -201,6 +209,20 @@ def load_curves_from_wandb() -> dict[str, tuple[np.ndarray, np.ndarray]]:
             np.asarray([r[1] for r in rows], dtype=float),
         )
         print(f"  W&B {key:<15} n={len(rows):3d} final_step={rows[-1][0]} final={rows[-1][1]:.4f}")
+
+    # A resume of the seed-69 run collided with W&B's monotonic-step rule, so its
+    # step-1500 evaluation is in the run's task-loss output and the committed
+    # cache but not in the W&B history.
+    key, step = "random_control_seed69", 1500
+    steps, losses = out[key]
+    if step not in steps:
+        cached_steps, cached_losses = load_curves_from_json()[key]
+        hit = np.flatnonzero(cached_steps == step)
+        if hit.size != 1:
+            raise ValueError(f"{key}@{step} is missing from W&B and from the cache")
+        order = np.argsort(np.append(steps, step), kind="stable")
+        out[key] = (np.append(steps, step)[order], np.append(losses, cached_losses[hit[0]])[order])
+        print(f"  restored {key}@{step} from the committed cache")
     return out
 
 

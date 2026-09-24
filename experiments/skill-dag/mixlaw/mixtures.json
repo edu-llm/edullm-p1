@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "description": "24 pilot mixtures for Ye et al. (arXiv:2403.16952) data mixing law fitting, sampled with Algorithm 2 (double-diminishing grid, delta=0.05, seed 42) over r_max derived from a 30B target corpus, plus 3 injected mid-high DCLM points that the coarse grid cannot reach with all domains positive.",
+  "description": "24 pilot mixtures for Ye et al. (arXiv:2403.16952) data mixing law fitting, sampled with Algorithm 2 (double-diminishing grid, delta=0.05, seed 42) over r_max derived from the planned per-domain inventory for a 30B target corpus, plus 3 injected mid-high DCLM points that the coarse grid cannot reach with all domains positive.",
   "seed": 42,
   "delta": 0.05,
   "constraints": {
@@ -27,6 +27,7 @@
     "algebraic-stack": 0.3933,
     "wiki": 0.122
   },
+  "r_max_30b_note": "r_max_30b is the planned per-domain inventory the grid was sampled against. The measured reservoir (paper Appendix A) supports dclm 0.9897, arxiv 0.7383, starcoder 0.618, pes2o 0.8793, open-web-math 0.4413, algebraic-stack 0.4301, wiki 0.1251 at 30B, so pilot 2's 0.65 StarCoder share exceeds the measured StarCoder cap; its 285M-token pilot run itself was feasible.",
   "base_weights": {
     "dclm": 0.375,
     "arxiv": 0.25,

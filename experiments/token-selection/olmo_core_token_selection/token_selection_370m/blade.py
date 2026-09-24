@@ -297,6 +297,9 @@ class BladeCallback(Callback):
             for k_idx in range(self.schedule.k_steps):
                 self._write_k_progress(trainer_step=trainer_step, k_step=k_idx + 1)
                 self.reference_optim.zero_grad(set_to_none=True)
+                # Both terms are the unmasked mean cross-entropy of one batch.
+                # BLADE's Eq. 4 instead weights the training-corpus term by the
+                # current selection; the reported run used the unmasked form.
                 self._backward_mean_ce(
                     self.reference,
                     self.reference_train_stream.next(),
@@ -425,6 +428,8 @@ class BladeCallback(Callback):
             valid = labels != self.trainer.train_module.label_ignore_index
             # Equation 5 minimizes L_ref - L_proxy over a fixed-size mask, so
             # ranking in descending order must use the equivalent L_proxy - L_ref.
+            # The threshold is taken over this rank's local batch, not the global
+            # batch, and >= keeps every token tied at the threshold.
             selection_scores = proxy_ce - ref_ce
             flat_scores = selection_scores[valid]
             keep = max(1, int(torch.ceil(torch.tensor(self.schedule.gamma * flat_scores.numel()))))

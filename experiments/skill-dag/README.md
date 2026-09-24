@@ -16,7 +16,8 @@ third arm that was never run). FLOPs: \(2.63\times10^{19}\) per 370M
 arm (W&B); MixLaw 60M pilot grid \(\approx 4.17\times10^{18}\); Skill-It 60M
 probes \(\approx 1.22\times10^{18}\).
 
-**Seed noise floor.** Two Olmo-mix-1124 runs differing only in dataloader seed
+**Seed noise floor.** Two Olmo-mix-1124 runs differing in dataloader seed and platform
+(8×A100 vs 4×L40S, which also changed the realized initialization)
 land 0.0044 bpb apart (\(p = 0.34\)); treat differences below ~0.004 bpb as
 indistinguishable.
 

@@ -90,6 +90,17 @@ A_{ij} = \max\!\big(0,\; -(dL_j/dr_i)\big) = \max\!\big(0,\; -t_{ij}(L_j(r)-c_j)
 
 So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \(t_{ij}\) / \(c_j\) / \(k_j\) are those from the MixLaw parametric fit.
 
+**This adjacency depends on the fit's gauge.** On the simplex \(\sum_i r_i = 1\), so
+replacing \(t_{ij} \to t_{ij} + q_j\) for every domain \(i\) and \(k_j \to k_j e^{-q_j}\)
+leaves \(L_j(r)\) unchanged for every mixture but moves every \(A_{ij}\), including
+which ones are zero. The fitted \(t\) values are pinned only by the fit's
+regularization, so the derivative arm's edges inherit that choice. The gauge-invariant
+alternative is the benefit of moving mass from \(r\) toward domain \(i\),
+\(\max\!\big(0,\;(\sum_q r_q t_{qj} - t_{ij})(L_j(r)-c_j)\big)\), available as
+`online_A_from_fit(..., gauge_invariant=True)` in [`skillit_math.py`](skillit_math.py).
+The reported run used the default (historical) form, which `train_skillit_370m.py`
+still calls so the run stays reproducible.
+
 #### Which \(r\) a published derivative matrix is evaluated at
 
 Because \(A\) depends on \(r\), a single printed derivative matrix is a snapshot and
@@ -247,8 +258,8 @@ mixture they start from:
 | Offline probe − LightGBM static | +0.0033 | [-0.0011, +0.0075] | 0.14 |
 | Online derivative − LightGBM static | +0.0086 | [+0.0026, +0.0161] | 0.0020 |
 
-**Seed noise floor.** Two Olmo-mix-1124 runs differing only in dataloader seed
-land 0.0044 bpb apart (95% CI [-0.0046, 0.0132], \(p = 0.34\)). The probe arm's
+**Seed noise floor.** Two Olmo-mix-1124 runs differing in dataloader seed and platform
+(8×A100 vs 4×L40S, which also changed the realized initialization) land 0.0044 bpb apart (95% CI [-0.0046, 0.0132], \(p = 0.34\)). The probe arm's
 0.0033 bpb deficit is *below* that floor; the derivative arm's 0.0086 bpb deficit
 is about twice it.
 

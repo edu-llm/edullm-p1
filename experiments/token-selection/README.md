@@ -15,7 +15,7 @@
 | Train corpus                 | `pretrain/regmix-10b` **v1** — realized **10,004,807,041** tokens, flat shuffle; identical dataset for all seven arms |
 | Global batch / seq / LR      | 4,194,304 / 2048 / 4\times10^{-4} cosine (warmup 24, \alpha_f=0.1)                              |
 | Steps                        | 2360 = 9,898,557,440 tokens for every arm — one epoch, no wrap |
-| FLOPs / arm                  | **analytic**, 26.03-49.21\times10^{18} depending on arm - see [Cost and FLOPs](#cost-and-flops). The logged W&B throughput counter (2.63\times10^{19} for every arm) **excludes the scoring forward passes** and so understates every selection arm. |
+| FLOPs / arm                  | **analytic**, 26.03-49.31\times10^{18} depending on arm - see [Cost and FLOPs](#cost-and-flops). The logged W&B throughput counter (2.63\times10^{19} for every arm) **excludes the scoring forward passes** and so understates every selection arm. |
 | Keep rate (where applicable) | top / middle **60%** of valid target tokens per sequence; **realized 0.599609** (1228 kept of 2047 valid target positions, logged over all 2048 positions) — see [Realized keep rate](#realized-keep-rate) |
 | Primary metric               | Macro mean CE bits-per-byte over the **20 (task, split) labels** of the OLMo ladder — 10 OLMES benchmarks × val/test. MMLU supplies 8 of the 20 (**40% of the macro weight**), and 7 of the 20 are **test** splits, so "validation macro bpb" is a misnomer. |
 
@@ -65,7 +65,7 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 
 **ρ-1 (excess loss).** For each target token, score L_{\mathrm{curr}} - L_{\mathrm{ref}} under the live student vs a **frozen** reference model of the same architecture. Keep the top 60% (largest excess loss — tokens where the student is worst relative to the reference). Selection is active from step 0. Method from [RHO-1](https://arxiv.org/abs/2404.07965).
 
-**Attention top-k.** No external reference. Score each token by **causal attention received** on the last transformer layer (mean over heads of attention mass from later positions). Keep the top 60%. Active from step 0. Manipulation: prefer tokens that the model currently “attends to” as context for later predictions. Method from [ssToken](https://arxiv.org/abs/2510.18250) (attention-based score).
+**Attention top-k.** No external reference. Score each token by **causal attention received** on the last transformer layer (mean over heads of the attention mass it receives from positions j >= i, including itself). Keep the top 60%. Active from step 0. Manipulation: prefer tokens that the model currently “attends to” as context for later predictions. Method from [ssToken](https://arxiv.org/abs/2510.18250) (attention-based score).
 
 **Middle-PPL.** Score tokens by **late-checkpoint average** token CE under **Reference A**. Keep the **middle 60%** of the per-sequence score distribution (drop both easiest and hardest tails). Masks can be precomputed. Manipulation: train on “medium difficulty” tokens under that frozen scorer, excluding extremes. Method from [Marion et al., Investigating Data Pruning for Pretraining LLMs at Scale](https://arxiv.org/abs/2309.04564).
 
@@ -91,7 +91,7 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 | REL-EMA (exponential) | 34.71 | 1.33x |
 | rho-1 | 45.08 | 1.73x |
 | BLADE | 47.98 | 1.84x |
-| Middle-PPL | 49.21 | 1.89x |
+| Middle-PPL | 49.31 | 1.89x |
 
 The rho-1, BLADE and Middle-PPL totals include pretraining their reference models.
 Middle-PPL's figure also covers precomputing its masks with one forward pass over the
@@ -135,8 +135,11 @@ Every fitted-final number and every CI in this README comes from the following
 procedure. It is the matched protocol used for every number in this file.
 
 1. **Model.** `y = a + b * step^(-alpha)` fitted to the macro task-loss curve.
-2. **Fit window.** Only steps **>= 1000** are used; earlier points are dominated by the
-   LR warmup transient and bias `alpha`.
+2. **Fit window.** Only steps **>= 1000** are used. Not because of warmup, which is 24
+   steps, but because the early curve is far noisier: the two random-control seeds differ
+   by 0.0181 bpb on average over steps 125-875 against 0.0047 bpb inside the window.
+   Across fit windows starting at 500, 625, ..., 1500, rho-1's advantage over the two-run
+   random control ranges from 0.0009 to 0.0076 bpb, and this window gives the largest.
 3. **alpha search.** `alpha` is chosen by grid search over
    `np.linspace(0.05, 6.0, 1192)`, with `a` and `b` solved in closed form by least
    squares at each `alpha`. The bounds are wide enough that **no arm's fitted
@@ -146,9 +149,9 @@ procedure. It is the matched protocol used for every number in this file.
    are rescaled by `sqrt(n/(n-p))` with `p=3` (1.173 at `n=11`, 1.076 at `n=22`),
    then resampled with replacement and added back to the fitted curve. OLS residuals
    are shrunk relative to the true errors by that factor on average, so resampling
-   them raw understates the spread. Without the rescaling every interval here would
-   be ~15% narrower and the rho-1-vs-random p-value would read 0.029 rather than
-   0.048.
+   them raw understates the spread. Without the rescaling the single-run intervals
+   would be ~15% narrower, the two-run interval ~7% narrower, and the rho-1-vs-random
+   p-value would read 0.029 rather than 0.048.
 5. **alpha re-estimated on every draw.** Each bootstrap replicate re-runs the full
    `alpha` grid search rather than holding `alpha` at its point estimate. This was
    chosen deliberately **because it yields the wider intervals** -- it propagates
@@ -171,7 +174,7 @@ within-run noise. Every comparison involving the random control uses that fit.
 for a SINGLE run**, quantifying only how well a power law pins down the endpoint of one
 observed trajectory, with **no seed-to-seed variance**. The one direct measurement we
 have of that variance is the random control's two seeds, which differ by **0.0082 bpb**
-(95% CI [0.0033, 0.0126], two-sided **p = 0.0002**) — larger than several between-arm
+(95% CI [0.0025, 0.0133], two-sided **p = 0.003**) — larger than several between-arm
 gaps. Treat any single-seed gap of that order as unresolved.
 
 **Pairwise significance.** Paired bootstrap on the fitted finals: both arms' 10k draws
@@ -209,23 +212,23 @@ Against the full-CE control:
 
 | Arm | Delta | 95% CI | One-sided p |
 | --- | --- | --- | --- |
-| rho-1 | +0.0106 | [+0.0039, +0.0172] | 0.0005 |
-| Random control (two-run) | +0.0181 | [+0.0092, +0.0264] | 0.0000 |
-| Attention top-k | +0.0273 | [+0.0192, +0.0344] | 0.0000 |
-| BLADE | +0.0372 | [+0.0318, +0.0426] | 0.0000 |
-| Middle-PPL | +0.2329 | [+0.2252, +0.2418] | 0.0000 |
-| REL-EMA | +0.2482 | [+0.2406, +0.2551] | 0.0000 |
+| rho-1 | +0.0106 | [+0.0027, +0.0184] | 0.0035 |
+| Random control (two-run) | +0.0182 | [+0.0080, +0.0275] | 0.0005 |
+| Attention top-k | +0.0273 | [+0.0179, +0.0357] | 0.0000 |
+| BLADE | +0.0372 | [+0.0309, +0.0436] | 0.0000 |
+| Middle-PPL | +0.2329 | [+0.2239, +0.2433] | 0.0000 |
+| REL-EMA | +0.2482 | [+0.2394, +0.2563] | 0.0000 |
 
 Against the two-run random control:
 
 | Arm | Delta | 95% CI | One-sided p |
 | --- | --- | --- | --- |
-| Control (full-CE) | -0.0181 | [-0.0264, -0.0092] | 0.0000 |
+| Control (full-CE) | -0.0182 | [-0.0275, -0.0080] | 0.0005 |
 | **rho-1** | **-0.0075** | **[-0.0155, -0.0001]** | **0.024** |
-| Attention top-k | +0.0091 | [+0.0017, +0.0164] | 0.0074 |
-| BLADE | +0.0190 | [+0.0109, +0.0296] | 0.0000 |
-| Middle-PPL | +0.2148 | [+0.2085, +0.2222] | 0.0000 |
-| REL-EMA | +0.2300 | [+0.2248, +0.2359] | 0.0000 |
+| Attention top-k | +0.0091 | [+0.0007, +0.0172] | 0.0155 |
+| BLADE | +0.0191 | [+0.0100, +0.0312] | 0.0000 |
+| Middle-PPL | +0.2148 | [+0.2077, +0.2231] | 0.0000 |
+| REL-EMA | +0.2300 | [+0.2243, +0.2364] | 0.0000 |
 
 **rho-1 does beat random token masking** (two-sided p = 0.048) once the random control is
 fitted across both of its seeds — under the single seed-42 control the same test returned
@@ -276,7 +279,7 @@ is incomplete.
 | REL-EMA (exponential) | 34.71 | 34.71 | 1.33x |
 | rho-1 | 34.71 | 45.08 | 1.73x |
 | BLADE | 39.71 | 47.98 | 1.84x |
-| Perplexity (Middle-PPL) | 34.71 | 49.21 | 1.89x |
+| Perplexity (Middle-PPL) | 34.80 | 49.31 | 1.89x |
 
 Reading the table: Attention top-k is essentially free -- the score is read off
 attention already computed in the forward pass, and dropping 40% of tokens from the
@@ -307,8 +310,8 @@ forward+backward, on top of the 2360 training steps. At 2.6298e9 FLOPs/token tha
    outlier.
 3. **rho-1 beats random masking, but only just, and only against the two-run control.**
    The two-run random control lands at 1.6900 and rho-1 at 1.6824, a -0.0075 bpb edge
-   (two-sided **p = 0.048**). Against the seed-42 run alone the same test gave -0.0033,
-   **p = 0.363** -- no difference. The conclusion flips with the choice of control run,
+   (two-sided **p = 0.048**). Against the seed-42 run alone the same test gave -0.0032,
+   **p = 0.434** -- no difference. The conclusion flips with the choice of control run,
    which is why the two-run fit is the reported baseline and why this edge should be
    read as suggestive rather than settled. Every *other* selection arm (Attention,
    BLADE, Middle-PPL, REL-EMA) is clearly worse than the random control.

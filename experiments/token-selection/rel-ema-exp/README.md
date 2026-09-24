@@ -19,7 +19,7 @@ that run.
 | `t0` | **0** (selection from step 0) |
 | `k` / γ | 0.6 |
 | Arch | `olmo2_370M` (RefHQ-matched) |
-| Data | `pretrain/regmix-10b` v1 on `s3://edullm-data/` — realized **10,004,807,041** tokens — one epoch → **2360** steps = 9,898,557,440 tokens, no wrap |
+| Data | `pretrain/regmix-10b` v1 on `s3://edullm-data/` — realized **10,004,807,041** tokens — **2360** steps = 9,898,557,440 tokens, 98.94% of one epoch, no wrap |
 | Checkpoints | `{0, 125, …, 2125, 2360}` (skip 2250) |
 | Eval | Full 20-label `task_loss_bpb` on every permanent save |
 | `run_id` | `rel-ema-exp-10b-scratch-v1` (**not** `rel-ema-10b-scratch-v1`) |

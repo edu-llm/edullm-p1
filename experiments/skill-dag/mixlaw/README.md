@@ -83,8 +83,8 @@ metrics.
 - Tokenizer: dolma2 (100,352 embedding rows); untied LM head
 - Body params 37.8M; **non-embedding params 57.1M** (tokens/param denominator); total ~114.8M with dolma2 vocab
 - **Budget:** tokens/param = 5 → **285M tokens / 1451 steps** per mixture
-- **Pilot FLOPs.** We use the Kaplan et al. (2020) forward-pass estimate including the
-  attention term, $C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D$,
+- **Pilot FLOPs.** We use the 6ND training estimate of Kaplan et al. (2020) plus the
+  attention term of Chowdhery et al. (2023, PaLM), $C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D$,
   evaluated at the **trained** model's $N_{\text{non-emb}} = 76{,}296{,}576$ (dolma2 vocab):
   $\approx 1.74\times10^{17}$ per mix → **$\approx 4.17\times10^{18}$** for 24.
   (Plain $6ND$ at the DataDecide budget-setting count $N=57.1$M gives $9.8\times10^{16}$,

@@ -53,7 +53,7 @@ and (for one arm) **where \(p\) starts**.
    \]
    where \(L_j(i)\) is family \(j\)’s extrapolated loss after training on 100% domain \(i\), and \(r_{\mathrm{DML}}\) is the Data Mixing Laws paper mixture. Positive \(A_{ij}\) means domain \(i\) beat that paper mix on family \(j\).
 
-**Probe FLOPs.** Kaplan et al. (2020) estimate including the attention term,
+**Probe FLOPs.** The 6ND estimate of Kaplan et al. (2020) plus the attention term of Chowdhery et al. (2023, PaLM),
 \(C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D\),
 at the trained model's \(N_{\text{non-emb}} = 76{,}296{,}576\):
 \(\approx 1.74\times10^{17}\) per probe → **\(\approx 1.22\times10^{18}\)** for all 7.

@@ -5,7 +5,7 @@ audit of the three corpora used in the token-selection experiment. It
 **replaces** an earlier verbatim-13-gram audit that lived at this path: that
 audit's own denominator (40,087 items) and per-corpus match counts (358 /
 438 / 1,472) did not match the numbers this paper's text now reports (40,582
-items; 957 / 1,010 / 2,432), and neither the scanner nor the eval-item index
+items; 957 / 1,010 / 2,432, with the HQ count since rescanned on the trained build as 1,180), and neither the scanner nor the eval-item index
 that produced them had ever been committed here, so the discrepancy was not
 reproducible from this repo. This directory now vendors the code that
 produced the *current* numbers, so the join can be checked directly rather
@@ -77,14 +77,20 @@ superseded audit's 40,087 used -- see
 | Corpus | Role | Path scanned (FarmShare scratch) | Docs scanned | Words scanned |
 | --- | --- | --- | --- | --- |
 | `regmix-10b` | 10B training corpus (`pretrain/regmix-10b` v1) | `regmix-10b-20260725-124810/trim/<domain>/<domain>-trimmed.json.gz`, one file per domain | 4,748,990 | 5,879,719,994 |
-| `hq-reference-v1` | HQ reference corpus (Reference A) | `hq-reference-v1/out/<domain>/`, one directory per domain | 3,367,856 | 2,298,753,521 |
+| `refhq-regmix-5p5b-v1` | HQ reference corpus (Reference A) | `refhq-regmix-5p5b-v1/out/<domain>/`, one directory per domain | 3,265,570 | 3,214,596,137 |
 | `refhq-new-v1` | Instruct reference corpus (Reference B) | `refhq-new-v1/out/<source>/<category>/documents/`, `category` is the aggregation domain | 6,193,748 | 2,738,073,602 |
 
-`hq-reference-v1` is an earlier build of the HQ reference corpus. The HQ
-reference model was trained on `refhq-regmix-5p5b-v1`, which
-[`submit_refhq_regmix_5p5.sh`](../datasets/refhq/scripts/submit_refhq_regmix_5p5.sh)
-rebuilt from the same raw downloads for every domain except DCLM (freshly
-sampled) under the `regmix-5p5` budget. That build was not rescanned.
+The HQ row is `refhq-regmix-5p5b-v1`, the build the HQ reference model trained
+on. The original audit scanned `hq-reference-v1` instead, an earlier build
+(3,367,856 docs, 2,298,753,521 words; 1,010 items, 2.49%, stem rate 2.22%) whose
+raw downloads [`submit_refhq_regmix_5p5.sh`](../datasets/refhq/scripts/submit_refhq_regmix_5p5.sh)
+reused for every domain except DCLM (freshly sampled) when it built the trained
+corpus under the `regmix-5p5` budget. `hq-reference-v1` has since been deleted from
+scratch; its reduced results stay in `results_hq-reference-v1.json` for reference.
+The 2026-09-24 rescan of `refhq-regmix-5p5b-v1` used the same `scan_corpus.py`,
+item index (`item_index_summary.json`) and `aggregate_by_domain.py`; re-reducing the
+original `hq-reference-v1` hits with this directory's aggregator reproduces
+`results_hq-reference-v1.json` exactly.
 
 All three share the domain set `{algebraic-stack, arxiv, dclm, open-web-math,
 pes2o, starcoder, wiki}` except `refhq-new-v1`, which is organized by
@@ -100,7 +106,7 @@ committed to this repo.
 
 ## Results
 
-From `results_regmix-10b.json`, `results_hq-reference-v1.json`,
+From `results_regmix-10b.json`, `results_refhq-regmix-5p5b-v1.json`,
 `results_refhq-new-v1.json` -> `totals`. Percentages rounded to 2 decimal
 places except where the source table needs more precision to show a
 difference.
@@ -108,7 +114,7 @@ difference.
 | Corpus | Matched items (any field) | Item rate | Self-contained-stem rate | Matched-span word rate |
 | --- | --- | --- | --- | --- |
 | `regmix-10b` (training) | 957 / 40,582 | **2.36%** | **2.00%** | 1.095e-05 |
-| `hq-reference-v1` (HQ reference) | 1,010 / 40,582 | **2.49%** | **2.22%** | 2.643e-05 |
+| `refhq-regmix-5p5b-v1` (HQ reference) | 1,180 / 40,582 | **2.91%** | **2.43%** | 2.424e-05 |
 | `refhq-new-v1` (Instruct reference) | 2,432 / 40,582 | **5.99%** | **7.50%** | 2.195e-04 |
 
 "Item rate" is `distinct_items_any / n_items` (union of the stem and gold
@@ -172,13 +178,13 @@ exemplar effect, since CSQA has no per-subject exemplar block to strip.
 | Corpus | `csqa` stem rate | `mmlu` stem rate | `mmlu` gold rate |
 | --- | --- | --- | --- |
 | `regmix-10b` | 0.52% | 1.85% | 1.03% |
-| `hq-reference-v1` | 0.09% | 1.89% | 1.22% |
+| `refhq-regmix-5p5b-v1` | 0.43% | 2.50% | 1.92% |
 | `refhq-new-v1` | 34.11% | 5.27% | 4.66% |
 
 The Instruct corpus's `csqa` rate is nearly two orders of magnitude above the
-training and HQ-reference corpora's (34.11% vs 0.52% / 0.09%); its `mmlu`
-rate is smaller in relative terms but still roughly 3x theirs (5.27% vs
-1.85% / 1.89%). CSQA and MMLU's dev/validation splits are both widely
+training and HQ-reference corpora's (34.11% vs 0.52% / 0.43%); its `mmlu`
+rate is smaller in relative terms but still roughly 2-3x theirs (5.27% vs
+1.85% / 2.50%). CSQA and MMLU's dev/validation splits are both widely
 redistributed inside public instruction-tuning mixtures, which is exactly
 what this measures.
 
@@ -231,7 +237,7 @@ dump regenerated with ai2-olmo.
 
 Not vendored, and why:
 
-- **The raw corpora** (`regmix-10b`, `hq-reference-v1`, `refhq-new-v1`) --
+- **The raw corpora** (`regmix-10b`, `refhq-regmix-5p5b-v1`, `refhq-new-v1`) --
   tens of billions of words each, and not something a paper's code repo
   should carry. Their FarmShare paths are recorded above for provenance.
 - **`item_index.pkl`** (172 MB; see `item_index_summary.json` ->
@@ -355,11 +361,11 @@ for d in algebraic-stack arxiv dclm open-web-math pes2o starcoder wiki; do
     "/scratch/users/nzhao2/agent-runs/regmix-10b-20260725-124810/trim/$d/$d-trimmed.json.gz"
 done > regmix-10b.tsv
 
-# hq-reference-v1: one line per domain, the corpus's per-domain directory
+# refhq-regmix-5p5b-v1: one line per domain, the corpus's per-domain directory
 # (scan_corpus.py reads every *.json.gz/*.jsonl.zstd shard inside, sorted).
 for d in algebraic-stack arxiv dclm open-web-math pes2o starcoder wiki; do
-  printf '%s\t0000\t%s\n' "$d" "/scratch/users/nzhao2/hq-reference-v1/out/$d"
-done > hq-reference-v1.tsv
+  printf '%s\t0000\t%s\n' "$d" "/scratch/users/nzhao2/refhq-regmix-5p5b-v1/out/$d"
+done > refhq-regmix-5p5b-v1.tsv
 
 # refhq-new-v1: one line per (source, category) documents directory; category
 # is the aggregation domain, source becomes the shard id so several sources
@@ -372,7 +378,7 @@ find /scratch/users/nzhao2/refhq-new-v1/out -maxdepth 3 -type d -name documents 
     done > refhq-new-v1.tsv
 
 # Scan each corpus (Slurm array, one task per task-list line).
-for corpus in regmix-10b hq-reference-v1 refhq-new-v1; do
+for corpus in regmix-10b refhq-regmix-5p5b-v1 refhq-new-v1; do
   N=$(wc -l < "$corpus.tsv")
   CN_TASKLIST="$PWD/$corpus.tsv" CN_INDEX=/path/to/item_index.pkl \
     CN_OUT="/scratch/users/nzhao2/agent-runs/<run>/$corpus/hits" \
@@ -386,9 +392,9 @@ python "$CONTAM/aggregate_by_domain.py" \
   --corpus-name regmix-10b --out "$CONTAM/results_regmix-10b.json"
 
 python "$CONTAM/aggregate_by_domain.py" \
-  --hits /scratch/.../hq-reference-v1/hits --items "$CONTAM/eval_items.jsonl.gz" \
+  --hits /scratch/.../refhq-regmix-5p5b-v1/hits --items "$CONTAM/eval_items.jsonl.gz" \
   --domains algebraic-stack,arxiv,dclm,open-web-math,pes2o,starcoder,wiki \
-  --corpus-name hq-reference-v1 --out "$CONTAM/results_hq-reference-v1.json"
+  --corpus-name refhq-regmix-5p5b-v1 --out "$CONTAM/results_refhq-regmix-5p5b-v1.json"
 
 python "$CONTAM/aggregate_by_domain.py" \
   --hits /scratch/.../refhq-new-v1/hits --items "$CONTAM/eval_items.jsonl.gz" \

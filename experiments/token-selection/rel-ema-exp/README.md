@@ -4,13 +4,8 @@
 
 Online token selection: keep top **60%** by `REL = L_curr − L_hist`.
 
-**Polarity corrected 2026-09-05.** This arm was originally documented and run with
-`REL = L_hist − L_curr`, which is inverted relative to the `rho_excess` / BLADE convention
-(current minus reference/history) and therefore selected the tokens the live model had already
-*mastered* relative to its own history. The scorer computes `current − history`, and the arm was
-re-run on 2026-09-05 with the fixed polarity. **The reported arm is W&B
-`eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e`**, which ran on 4xL40S; cite only
-that run.
+**The reported arm is W&B `eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e`**,
+which ran on 4xL40S.
 
 | Knob | Value |
 |------|--------|

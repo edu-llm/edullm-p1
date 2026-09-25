@@ -1,9 +1,6 @@
 # REL no-init exponential-α arm (Arm 2).
 # Selection: top 60% by REL = L_curr − L_hist from step 0 (t0=0).
-# Polarity corrected 2026-09-05: this was originally L_hist − L_curr, inverted
-# relative to the rho_excess/BLADE convention. The scorer computes
-# current − history; only the 2026-09-05 polarity-corrected re-run is reported
-# (W&B eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e).
+# Reported run: W&B eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e.
 # EMA: bias-corrected from zero (NO RefHQ / θ0 seed); α(t)=1−exp(−t/300).
 # Architecture: RefHQ-matched olmo2_370M. Corpus: RegMix one-epoch
 # (pretrain/regmix-10b v1, realized 10,004,807,041 tokens; 9.9B budget → 2360 steps).

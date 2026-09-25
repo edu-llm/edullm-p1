@@ -672,15 +672,12 @@ def _save(fig, fig_dir: Path, stem: str) -> None:
 
 
 # -------------------------------------------------------------------- json ---
-# Full run provenance. The curve cache's own "source" field omits the REL-EMA
-# polarity note, so it is spelled out here rather than inherited.
+# Full run provenance, spelled out here rather than inherited from the curve cache.
 SOURCE_STRING = (
     "wandb eduLLM/token-selection; full-loss control is "
     "full-loss-control-regmix10b-v3 (native FarmShare rerun 2026-09-14, matched "
     "to the selection arms on init, data seed, step count and eval grid; replaces "
-    "the hpo-ladder-derived full-loss-control-regmix10b-v2); rel_ema re-run "
-    "2026-09-05 with corrected selection polarity (current-minus-history, "
-    "matching rho_excess/blade), replaces the inverted-polarity run"
+    "the hpo-ladder-derived full-loss-control-regmix10b-v2)"
 )
 
 METHOD_STRING = (

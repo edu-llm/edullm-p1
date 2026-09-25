@@ -1,5 +1,5 @@
 {
- "source": "wandb eduLLM/token-selection + full-loss-control-regmix10b-v3 (matched-seed/init/step FarmShare rerun, 2026-09-14, replaces the hpo-ladder-derived full-loss-control-regmix10b-v2); rel_ema re-run 2026-09-05 with corrected selection polarity (current-minus-history, matching rho_excess/blade), replaces the inverted-polarity run; random_control replicated at a second seed (random-control-regmix10b-seed69-v1); the step-1500 eval of that replicate was recovered from its on-disk task_loss artifact after a resume dropped it from W&B",
+ "source": "wandb eduLLM/token-selection + full-loss-control-regmix10b-v3 (matched-seed/init/step FarmShare rerun, 2026-09-14, replaces the hpo-ladder-derived full-loss-control-regmix10b-v2); random_control replicated at a second seed (random-control-regmix10b-seed69-v1); the step-1500 eval of that replicate was recovered from its on-disk task_loss artifact after a resume dropped it from W&B",
  "metric": "eval/macro_bpb",
  "arms": {
   "control": {

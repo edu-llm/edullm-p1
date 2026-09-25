@@ -71,7 +71,7 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 
 **BLADE.** Bi-level setup with a **proxy** (trained student) and a **dynamic reference** that is periodically reset from the proxy. Steps 0–499: full CE on the proxy only (no selection). At sync steps 500, 875, 1250, 1625, 2000: copy proxy → reference, run K=75 reference updates, then keep proxy tokens with largest L_{\mathrm{proxy}}-L_{\mathrm{ref}} at keep-rate \gamma=0.6 (\tau=375). After the last sync, hold that reference to the end. Manipulation: select tokens where the fast proxy outruns a lagged copy of itself. Method from [BLADE](https://arxiv.org/abs/2606.18650).
 
-**REL-EMA (exponential).** Online relative loss vs an **EMA of the student** (bias-corrected from zero; no external seed). EMA rate \alpha(t)=1-e^{-t/300}. Score \mathrm{REL}=L_{\mathrm{curr}}-L_{\mathrm{hist}}; keep top 60%. Active from step 0. Manipulation: prefer tokens where the live model is worse than its own exponential history. Method from [ssToken](https://arxiv.org/abs/2510.18250) (retrospective excess loss / REL). Corrected 2026-09-05: the score was previously computed as $L_{\mathrm{hist}}-L_{\mathrm{curr}}$ (inverted relative to rho\_excess/blade's convention); re-run with the fixed polarity.
+**REL-EMA (exponential).** Online relative loss vs an **EMA of the student** (bias-corrected from zero; no external seed). EMA rate \alpha(t)=1-e^{-t/300}. Score \mathrm{REL}=L_{\mathrm{curr}}-L_{\mathrm{hist}}; keep top 60%. Active from step 0. Manipulation: prefer tokens where the live model is worse than its own exponential history. Method from [ssToken](https://arxiv.org/abs/2510.18250) (retrospective excess loss / REL).
 
 ### Arms actually run
 
@@ -304,8 +304,7 @@ forward+backward, on top of the 2360 training steps. At 2.6298e9 FLOPs/token tha
    this budget.
 2. **Ranking among failures.** rho-1 < Random control < Attention top-k < BLADE <<
    Middle-PPL ~ REL-EMA. Excess loss vs a strong frozen reference is least damaging;
-   middle-percentile perplexity and EMA-relative selection (once corrected to the same
-   current-minus-history polarity as rho-1/BLADE) land in the same worst tier, close to
+   middle-percentile perplexity and EMA-relative selection land in the same worst tier, close to
    each other (~+0.25 bpb over full-CE) rather than REL-EMA being a catastrophic
    outlier.
 3. **rho-1 beats random masking, but only just, and only against the two-run control.**

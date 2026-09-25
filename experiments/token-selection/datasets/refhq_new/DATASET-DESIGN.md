@@ -49,6 +49,19 @@ Metadata drops run **before** Dolma English. Rules live in [`exclusion_rules.yam
 | **SmolTalk** | all configs except listed | `apigen-80k`, `smol-constraints` |
 | **Dolci** | everything else | `domain == Safety`; Precise IF; CoCoNot; Aya; WildGuard/WildJailbreak; Tool Use `source_dataset`; any row with non-null `function_calls`/`functions` |
 
+**As built (`refhq-new-v1`, published as `pretrain/refhq-instruct` v3), two rows differ from this design:**
+
+- **SmolTalk.** The download kept `all` together with the 11 configs other than
+  `apigen-80k` and `smol-constraints` (`logs/refhqn-download-1674284_4.out`), and
+  normalization streamed `config=all` first. The aggregate config contains every
+  subset, so `apigen-80k` and `smol-constraints` are included once and the other 11
+  configs twice (1,043,917 + 926,349 = 1,970,266 kept rows; 1.607B tokens).
+- **Tulu-3.** The `tulu-3-sft-personas-instruction-following` needle matched nothing:
+  the Persona IF rows come from `ai2-adapt-dev/personahub_ifdata_manual_seed_v3_29980`
+  with `personahub_…` ids, so that subset (29,980 rows) is retained. The 211,103 dropped
+  rows are CoCoNot, WildJailbreak, WildGuardMix and Aya, plus 120 rows whose random ids
+  contain `aya`.
+
 ### Dolma English filter (all kept docs)
 
 Configs under [`configs/`](configs/); tag+mix wrapper in [`process.py`](process.py) (mirrors RefHQ).

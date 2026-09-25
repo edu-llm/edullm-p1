@@ -46,16 +46,16 @@ Several arms score tokens against a **frozen** same-architecture CE model. Two r
 
 dolma2 tokenizer. Training FLOPs \approx 1.45\times10^{19}. Used as the frozen scorer for Middle-PPL late-average scores (mean of late checkpoints).
 
-**Reference B — instruct mix.** Plain CE on a one-pass **English-filtered instruct** corpus (no upsampling to a fixed 5.5B cap; realized size is whatever the filtered unique pass yields). Sources are instruction / chat / math / code SFT-style collections with safety / tool / IFEval-oriented subsets dropped, then Dolma English document-score ≥ 0.5:
+**Reference B — instruct mix.** Plain CE on a one-pass **English-filtered instruct** corpus (no upsampling to a fixed 5.5B cap; realized size is whatever the filtered unique pass yields). Sources are instruction / chat / math / code SFT-style collections with Dolci's and Tulu-3's safety subsets and Dolci's tool-use and precise-IF subsets dropped, then Dolma English document-score ≥ 0.5:
 
 
 | Source family  | Kept (summary)                                                                                                                                                                   |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Tulu-v2        | all                                                                                                                                                                              |
 | OpenHermes-2.5 | all (optional non-English metadata drop)                                                                                                                                         |
-| Tulu-3         | FLAN, WildChat, math/code/science personas, Numina-TIR, Evol CodeAlpaca, SciRIFF, TableGPT, No Robots, OASST, etc.; drop WildGuard / WildJailbreak / CoCoNot / Aya / IF personas |
+| Tulu-3         | FLAN, WildChat, math/code/science personas, Numina-TIR, Evol CodeAlpaca, SciRIFF, TableGPT, No Robots, OASST, etc.; drop WildGuard / WildJailbreak / CoCoNot / Aya (the IF-persona exclusion matched nothing, so IF personas are kept) |
 | Hermes-3       | all                                                                                                                                                                              |
-| SmolTalk       | all configs except API-gen / constraint suites                                                                                                                                   |
+| SmolTalk       | the aggregate `all` config plus the 11 other configs except API-gen / constraints, so those two appear once and the other 11 twice |
 | Dolci          | keep non-safety / non-tool / non-IF / non-Aya rows                                                                                                                               |
 
 

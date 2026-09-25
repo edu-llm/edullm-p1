@@ -82,7 +82,7 @@ olmo_core:
   revision: 98ea67c948fd93ccbfd2633e1ae818c3ae1d2ad7
 
 train:
-  # One epoch of published pretrain/regmix-10b v1 (realized 10,004,807,041
+  # 98.94% of one epoch of published pretrain/regmix-10b v1 (realized 10,004,807,041
   # tokens). Budget 9.9B -> 2360 steps at GBS 4_194_304 = 9,898,557,440 tokens,
   # so no second-epoch wrap. Same dataset for all seven arms.
   max_tokens: 9900000000

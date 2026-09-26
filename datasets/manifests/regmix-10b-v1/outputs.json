@@ -1,0 +1,2224 @@
+{
+ "corpus_id": "regmix-10b-v1",
+ "published_as": "pretrain/regmix-10b v1 (edullm-data), tokens/<source>/ layout",
+ "format": {
+  "dtype": "uint32",
+  "endianness": "little",
+  "header": "none (raw token stream; the .npy files are headerless numpy memmaps despite the extension)",
+  "document_separator": "EOS token 100257 appended after every document; no BOS",
+  "eos_token_id": 100257
+ },
+ "layout": {
+  "tokenized": "tokenized/<d>/<d>.npy = the documents of domain d in documents/<d>.tsv.gz order, each as tokens + [EOS].",
+  "publish": "tokens/<d>/ cut from the same stream: val_bytes = int(stream_bytes * 0.0015) rounded down to a multiple of 4; the last val_bytes form val-00000.u32le.bin; the remaining prefix is split into train-NNNNN.u32le.bin shards of exactly 1 GiB (1073741824 bytes) except the last. Shard and train/val boundaries fall at token boundaries, not document boundaries.",
+  "shard_bytes": 1073741824,
+  "val_fraction": 0.0015
+ },
+ "totals": {
+  "docs": 4748990,
+  "tokens_content": 10000058051,
+  "tokens_with_eos": 10004807041,
+  "tokens_val": 15007207,
+  "tokens_train": 9989799834,
+  "objects": 55
+ },
+ "outputs": [
+  {
+   "name": "tokenized/dclm/dclm.npy",
+   "domain": "dclm",
+   "layout": "tokenized",
+   "bytes": 15011207364,
+   "sha256": "131cb8aae5b71ba06317aa1f726c1954b22abed3f4d9762905ea5c1f8384bdd8",
+   "tokens": 3752801841,
+   "docs": 2800640,
+   "docs_complete": 2800640
+  },
+  {
+   "name": "tokenized/arxiv/arxiv.npy",
+   "domain": "arxiv",
+   "layout": "tokenized",
+   "bytes": 10000651620,
+   "sha256": "9a76d5aed5b0fc358b0d42bf47936ab0bb9bc644fab8358e1f20af5de2e9288a",
+   "tokens": 2500162905,
+   "docs": 130087,
+   "docs_complete": 130087
+  },
+  {
+   "name": "tokenized/starcoder/starcoder.npy",
+   "domain": "starcoder",
+   "layout": "tokenized",
+   "bytes": 5627945540,
+   "sha256": "6d12a1c93102e2491f6dadcbe7df3cef779813e3c58986848be4d021022d5420",
+   "tokens": 1406986385,
+   "docs": 985925,
+   "docs_complete": 985925
+  },
+  {
+   "name": "tokenized/pes2o/pes2o.npy",
+   "domain": "pes2o",
+   "layout": "tokenized",
+   "bytes": 3752629240,
+   "sha256": "ab42d8586c7fe843f42c3349e1e914d2f8bd9dfbbd6a04207090eb5e6a32327e",
+   "tokens": 938157310,
+   "docs": 150710,
+   "docs_complete": 150710
+  },
+  {
+   "name": "tokenized/open-web-math/open-web-math.npy",
+   "domain": "open-web-math",
+   "layout": "tokenized",
+   "bytes": 2540395112,
+   "sha256": "aac692663221fe3cae013fb64274e705a3164f714e0ba1f9afcdb699a8642b1f",
+   "tokens": 635098778,
+   "docs": 97937,
+   "docs_complete": 97937
+  },
+  {
+   "name": "tokenized/algebraic-stack/algebraic-stack.npy",
+   "domain": "algebraic-stack",
+   "layout": "tokenized",
+   "bytes": 2460956068,
+   "sha256": "279119d804f5627be79c9516bcdfad4ce16c2ab41ded007ff71016b326c2aa20",
+   "tokens": 615239017,
+   "docs": 223705,
+   "docs_complete": 223705
+  },
+  {
+   "name": "tokenized/wiki/wiki.npy",
+   "domain": "wiki",
+   "layout": "tokenized",
+   "bytes": 625443220,
+   "sha256": "c1382e6c201c44922b84bb96adad0f3b279313c13180400394329289a3051afa",
+   "tokens": 156360805,
+   "docs": 359986,
+   "docs_complete": 359986
+  },
+  {
+   "name": "tokens/algebraic-stack/train-00000.u32le.bin",
+   "domain": "algebraic-stack",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "4308659988f127d3b82f90eaffe5b813eabdc3650b093c68b302651597a99766",
+   "tokens": 268435456,
+   "domain_token_range": [
+    0,
+    268435456
+   ],
+   "docs_touched": 97657
+  },
+  {
+   "name": "tokens/algebraic-stack/train-00001.u32le.bin",
+   "domain": "algebraic-stack",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "daced2447d35822276638b80f99dd18c8ef65c247dec1c6808938e9171ac64f1",
+   "tokens": 268435456,
+   "domain_token_range": [
+    268435456,
+    536870912
+   ],
+   "docs_touched": 98030
+  },
+  {
+   "name": "tokens/algebraic-stack/train-00002.u32le.bin",
+   "domain": "algebraic-stack",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 309780988,
+   "sha256": "3a940953a32341f05dc725b1301d8ba607ee242a5d06710707e4c253380c05e8",
+   "tokens": 77445247,
+   "domain_token_range": [
+    536870912,
+    614316159
+   ],
+   "docs_touched": 27526
+  },
+  {
+   "name": "tokens/algebraic-stack/val-00000.u32le.bin",
+   "domain": "algebraic-stack",
+   "layout": "publish",
+   "split": "val",
+   "bytes": 3691432,
+   "sha256": "997509a9916e762c1685e738b81547e4c2dde49e5abbcafd6c21a1c26d6b5afa",
+   "tokens": 922858,
+   "domain_token_range": [
+    614316159,
+    615239017
+   ],
+   "docs_touched": 495
+  },
+  {
+   "name": "tokens/arxiv/train-00000.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "42051ad044b5b2f3dd368e1e480f6ecb6a34685677ca086c7261a2df73327470",
+   "tokens": 268435456,
+   "domain_token_range": [
+    0,
+    268435456
+   ],
+   "docs_touched": 13875
+  },
+  {
+   "name": "tokens/arxiv/train-00001.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "3ad8e5a63ca7307001ec35695c95877d8dc2dc0903b9c51653c70c07decf85f0",
+   "tokens": 268435456,
+   "domain_token_range": [
+    268435456,
+    536870912
+   ],
+   "docs_touched": 13788
+  },
+  {
+   "name": "tokens/arxiv/train-00002.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "8eae99ede67b1ced697c3e24b875ca6e561471fa28c95f543d0dda4c6b942bf0",
+   "tokens": 268435456,
+   "domain_token_range": [
+    536870912,
+    805306368
+   ],
+   "docs_touched": 14082
+  },
+  {
+   "name": "tokens/arxiv/train-00003.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "2aef3fc2d3e9c25f31227371f1e268868b7d208086b078e81de9045d32917b26",
+   "tokens": 268435456,
+   "domain_token_range": [
+    805306368,
+    1073741824
+   ],
+   "docs_touched": 14218
+  },
+  {
+   "name": "tokens/arxiv/train-00004.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "d8a07dd6cfa291c080c6c2b160ae4131a6fbd493e77fcf84ca14dcf432682f10",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1073741824,
+    1342177280
+   ],
+   "docs_touched": 14032
+  },
+  {
+   "name": "tokens/arxiv/train-00005.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "f02a78b68f05530a35381139f17d8c3e30339621cee28bedc7d1fcc1ea83c8b6",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1342177280,
+    1610612736
+   ],
+   "docs_touched": 14070
+  },
+  {
+   "name": "tokens/arxiv/train-00006.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "85f871a7d02bf880438c0c87cf982e6b0b10b33e6e134f23263cf51a66ad51ed",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1610612736,
+    1879048192
+   ],
+   "docs_touched": 13743
+  },
+  {
+   "name": "tokens/arxiv/train-00007.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "5eedec879dbc24526888b99e6e80357ab76ae1b15f781442927ce153f36c91b1",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1879048192,
+    2147483648
+   ],
+   "docs_touched": 13935
+  },
+  {
+   "name": "tokens/arxiv/train-00008.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "3325af57d75c8cea874534fbdeea6790dafc4250b14afb1125a75a597b75ec92",
+   "tokens": 268435456,
+   "domain_token_range": [
+    2147483648,
+    2415919104
+   ],
+   "docs_touched": 13966
+  },
+  {
+   "name": "tokens/arxiv/train-00009.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 321974228,
+   "sha256": "d8822b65f3ac65c5d14d80ba8ed60294b65d7abf921253d6943156f90aa61f05",
+   "tokens": 80493557,
+   "domain_token_range": [
+    2415919104,
+    2496412661
+   ],
+   "docs_touched": 4220
+  },
+  {
+   "name": "tokens/arxiv/val-00000.u32le.bin",
+   "domain": "arxiv",
+   "layout": "publish",
+   "split": "val",
+   "bytes": 15000976,
+   "sha256": "684844c335a0dda5fdd7059afe8dc4bba476115769cb6c8e7ca957e8f9226a2e",
+   "tokens": 3750244,
+   "domain_token_range": [
+    2496412661,
+    2500162905
+   ],
+   "docs_touched": 168
+  },
+  {
+   "name": "tokens/dclm/train-00000.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "b5703b543ab7b2700320fb8c6cb7e55c6c78b6b78161887fdd64297ef4b5f187",
+   "tokens": 268435456,
+   "domain_token_range": [
+    0,
+    268435456
+   ],
+   "docs_touched": 199932
+  },
+  {
+   "name": "tokens/dclm/train-00001.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "0a4fe27930c5f371b78944d12d50dcb71b4facf5d1f58e82ee5ae5a3a88f0c31",
+   "tokens": 268435456,
+   "domain_token_range": [
+    268435456,
+    536870912
+   ],
+   "docs_touched": 199919
+  },
+  {
+   "name": "tokens/dclm/train-00002.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "1db1d6a24937a7e799bf4e7190aaa4f85e3031346debadf4a4ae00ff3256918b",
+   "tokens": 268435456,
+   "domain_token_range": [
+    536870912,
+    805306368
+   ],
+   "docs_touched": 200390
+  },
+  {
+   "name": "tokens/dclm/train-00003.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "0e97407dcc914f56f97fb80124cd257a209509bcb62b87816ff99a83fb03f723",
+   "tokens": 268435456,
+   "domain_token_range": [
+    805306368,
+    1073741824
+   ],
+   "docs_touched": 201513
+  },
+  {
+   "name": "tokens/dclm/train-00004.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "bc8569cbeecea53ae1bf14110f38477f6ca1e5989b3a9cdcfb95b0fa2a72c2eb",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1073741824,
+    1342177280
+   ],
+   "docs_touched": 201166
+  },
+  {
+   "name": "tokens/dclm/train-00005.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "908fb755d81ff470753b5e16b291e1a18bcb10ad1949ca4ecfe7167fb0d16082",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1342177280,
+    1610612736
+   ],
+   "docs_touched": 201202
+  },
+  {
+   "name": "tokens/dclm/train-00006.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "23c8f1576ce13f5dc610ff5aae9312022b52243fc1ba9f19461e385c1656ccff",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1610612736,
+    1879048192
+   ],
+   "docs_touched": 199552
+  },
+  {
+   "name": "tokens/dclm/train-00007.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "caa78e0ae1c1fab43d740d6ec739407470929a43e470336ef9face1e42f306b1",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1879048192,
+    2147483648
+   ],
+   "docs_touched": 199520
+  },
+  {
+   "name": "tokens/dclm/train-00008.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "4c7d2bb125454920f9a2d8bf64cd4d9f8781f291f161cce0aa3a43558205cc15",
+   "tokens": 268435456,
+   "domain_token_range": [
+    2147483648,
+    2415919104
+   ],
+   "docs_touched": 200515
+  },
+  {
+   "name": "tokens/dclm/train-00009.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "d9728514c65fd5ba9a93332e8de13f2dcfb6a3f26e204c20ff181918268da370",
+   "tokens": 268435456,
+   "domain_token_range": [
+    2415919104,
+    2684354560
+   ],
+   "docs_touched": 200623
+  },
+  {
+   "name": "tokens/dclm/train-00010.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "da3ee691e14378630bff9b9a190e7bd4ac29e0cacd33ac8b088e654ba6e0792b",
+   "tokens": 268435456,
+   "domain_token_range": [
+    2684354560,
+    2952790016
+   ],
+   "docs_touched": 199615
+  },
+  {
+   "name": "tokens/dclm/train-00011.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "b9cf260df1db5c2062461ddcf8cdc90fde07af883823a233c26f55a8f2baf71f",
+   "tokens": 268435456,
+   "domain_token_range": [
+    2952790016,
+    3221225472
+   ],
+   "docs_touched": 199807
+  },
+  {
+   "name": "tokens/dclm/train-00012.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "8d63293c1131e1d499f16cdf60de83d6d0b8172202849ee9e9d0461aa4d412e0",
+   "tokens": 268435456,
+   "domain_token_range": [
+    3221225472,
+    3489660928
+   ],
+   "docs_touched": 200785
+  },
+  {
+   "name": "tokens/dclm/train-00013.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1030046844,
+   "sha256": "1c257d8d3602b5830975e64f18f80f141cbaa3d831396cc6689234e7a4f8a88b",
+   "tokens": 257511711,
+   "domain_token_range": [
+    3489660928,
+    3747172639
+   ],
+   "docs_touched": 192282
+  },
+  {
+   "name": "tokens/dclm/val-00000.u32le.bin",
+   "domain": "dclm",
+   "layout": "publish",
+   "split": "val",
+   "bytes": 22516808,
+   "sha256": "288d6fbed854e769c5de5ad1af1a48552d64fa47eaf594e394f6a9cc708569ad",
+   "tokens": 5629202,
+   "domain_token_range": [
+    3747172639,
+    3752801841
+   ],
+   "docs_touched": 3833
+  },
+  {
+   "name": "tokens/open-web-math/train-00000.u32le.bin",
+   "domain": "open-web-math",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "5ff06c06edde26b4de0256929bce6b70602d4365569e5b0d88412c64e0607065",
+   "tokens": 268435456,
+   "domain_token_range": [
+    0,
+    268435456
+   ],
+   "docs_touched": 41544
+  },
+  {
+   "name": "tokens/open-web-math/train-00001.u32le.bin",
+   "domain": "open-web-math",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "3be7e03022f8e7788e1c73a4072014ae6b7394b246a16b64c84a1bbaebad3a82",
+   "tokens": 268435456,
+   "domain_token_range": [
+    268435456,
+    536870912
+   ],
+   "docs_touched": 41540
+  },
+  {
+   "name": "tokens/open-web-math/train-00002.u32le.bin",
+   "domain": "open-web-math",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 389100872,
+   "sha256": "ebca7f5ef2c6e7bfd7fa450bccafaf8561944d09f08f9523d0d47060bede30b8",
+   "tokens": 97275218,
+   "domain_token_range": [
+    536870912,
+    634146130
+   ],
+   "docs_touched": 14711
+  },
+  {
+   "name": "tokens/open-web-math/val-00000.u32le.bin",
+   "domain": "open-web-math",
+   "layout": "publish",
+   "split": "val",
+   "bytes": 3810592,
+   "sha256": "10057fb04c8d1113403de8dfb7f7718ae8f23a1763a94957955b345095bb27e8",
+   "tokens": 952648,
+   "domain_token_range": [
+    634146130,
+    635098778
+   ],
+   "docs_touched": 145
+  },
+  {
+   "name": "tokens/pes2o/train-00000.u32le.bin",
+   "domain": "pes2o",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "7f30d2b951057c0f01cf0ced6e1b919a93c29a96651f37bc8f88aacf5e8a5115",
+   "tokens": 268435456,
+   "domain_token_range": [
+    0,
+    268435456
+   ],
+   "docs_touched": 43291
+  },
+  {
+   "name": "tokens/pes2o/train-00001.u32le.bin",
+   "domain": "pes2o",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "381a933b99d9a9de9df8049808b77b9f8c7df9eba036948e8506c92e977f95be",
+   "tokens": 268435456,
+   "domain_token_range": [
+    268435456,
+    536870912
+   ],
+   "docs_touched": 43084
+  },
+  {
+   "name": "tokens/pes2o/train-00002.u32le.bin",
+   "domain": "pes2o",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "73ca3e7c0ce20e465f661877d670c1aad04104b2180b561aeb8e127640c90def",
+   "tokens": 268435456,
+   "domain_token_range": [
+    536870912,
+    805306368
+   ],
+   "docs_touched": 43070
+  },
+  {
+   "name": "tokens/pes2o/train-00003.u32le.bin",
+   "domain": "pes2o",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 525774828,
+   "sha256": "f576bee83fcfe986a7dbed4fff9e76b8cf02d367f0960b8bd9ba71ffadadb5e8",
+   "tokens": 131443707,
+   "domain_token_range": [
+    805306368,
+    936750075
+   ],
+   "docs_touched": 21025
+  },
+  {
+   "name": "tokens/pes2o/val-00000.u32le.bin",
+   "domain": "pes2o",
+   "layout": "publish",
+   "split": "val",
+   "bytes": 5628940,
+   "sha256": "8ec4139a51a02d412453fada192e0aa098058af7f456193600898b94f4b70f90",
+   "tokens": 1407235,
+   "domain_token_range": [
+    936750075,
+    938157310
+   ],
+   "docs_touched": 244
+  },
+  {
+   "name": "tokens/starcoder/train-00000.u32le.bin",
+   "domain": "starcoder",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "402d94e6c37f06f8755d0defd11c14bb055dffe9d3f488179c90a6634ee50813",
+   "tokens": 268435456,
+   "domain_token_range": [
+    0,
+    268435456
+   ],
+   "docs_touched": 188426
+  },
+  {
+   "name": "tokens/starcoder/train-00001.u32le.bin",
+   "domain": "starcoder",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "e4d47a871460e84b7414801bac7c400b407c965145ae6489a39f7f24184035a9",
+   "tokens": 268435456,
+   "domain_token_range": [
+    268435456,
+    536870912
+   ],
+   "docs_touched": 187216
+  },
+  {
+   "name": "tokens/starcoder/train-00002.u32le.bin",
+   "domain": "starcoder",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "891ea1f16bed62c011f8a9b426ed1aed7bdb73ea30a73c321f034be84e84dfc1",
+   "tokens": 268435456,
+   "domain_token_range": [
+    536870912,
+    805306368
+   ],
+   "docs_touched": 188725
+  },
+  {
+   "name": "tokens/starcoder/train-00003.u32le.bin",
+   "domain": "starcoder",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "6e949293b27a9697d5541d7ae37bf76b36d6270d1a102123e7a4a5d360f092ec",
+   "tokens": 268435456,
+   "domain_token_range": [
+    805306368,
+    1073741824
+   ],
+   "docs_touched": 187798
+  },
+  {
+   "name": "tokens/starcoder/train-00004.u32le.bin",
+   "domain": "starcoder",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 1073741824,
+   "sha256": "6741ca715b7f58cf368284dd6f348ff58cbccfa8b9974d041207f0943fe114c6",
+   "tokens": 268435456,
+   "domain_token_range": [
+    1073741824,
+    1342177280
+   ],
+   "docs_touched": 188690
+  },
+  {
+   "name": "tokens/starcoder/train-00005.u32le.bin",
+   "domain": "starcoder",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 250794504,
+   "sha256": "79bfbcd837e4ca301ef038ffddb734ca2ad852ee42a6fca7129fc0a608b6999c",
+   "tokens": 62698626,
+   "domain_token_range": [
+    1342177280,
+    1404875906
+   ],
+   "docs_touched": 43560
+  },
+  {
+   "name": "tokens/starcoder/val-00000.u32le.bin",
+   "domain": "starcoder",
+   "layout": "publish",
+   "split": "val",
+   "bytes": 8441916,
+   "sha256": "b9de04633d89db741410c95a3acebc682ecd2e2ba53e792fec20a6260808fc45",
+   "tokens": 2110479,
+   "domain_token_range": [
+    1404875906,
+    1406986385
+   ],
+   "docs_touched": 1516
+  },
+  {
+   "name": "tokens/wiki/train-00000.u32le.bin",
+   "domain": "wiki",
+   "layout": "publish",
+   "split": "train",
+   "bytes": 624505056,
+   "sha256": "8d5feebbad1daebc130f20c671db18b0312f10bf1ca8f5bd17f3476987aebf7d",
+   "tokens": 156126264,
+   "domain_token_range": [
+    0,
+    156126264
+   ],
+   "docs_touched": 359392
+  },
+  {
+   "name": "tokens/wiki/val-00000.u32le.bin",
+   "domain": "wiki",
+   "layout": "publish",
+   "split": "val",
+   "bytes": 938164,
+   "sha256": "83d8c753c898d6418a7f800f6afdfe2a87f44ffe4886c8e6e8aa7394d15b23d9",
+   "tokens": 234541,
+   "domain_token_range": [
+    156126264,
+    156360805
+   ],
+   "docs_touched": 595
+  }
+ ],
+ "domains": {
+  "dclm": {
+   "documents_file": "documents/dclm.tsv.gz",
+   "docs": 2800640,
+   "tokens_content": 3750001201,
+   "tokens_with_eos": 3752801841,
+   "target_tokens": 3750000000,
+   "selection": {
+    "rule": "materialize the files below in this order (every JSON line whose doc_text() is non-empty, in file order) into one list of docs_before documents; order = list(range(docs_before)); random.Random(42).shuffle(order); keep order[:docs_after] in that order. No document is truncated: the trim stops after the first whole document that brings content tokens to >= target_tokens; the 0.98/1.02 skip rule never fired (docs_scanned == docs_after).",
+    "docs_before": 3441178,
+    "docs_scanned": 2800640,
+    "docs_after": 2800640,
+    "files_in_materialization_order": [
+     {
+      "src": 13,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_03_of_10/local-shard_5_of_10/shard_00000134_processed.jsonl.zstd",
+      "docs_in_file": 110443,
+      "docs_selected": 89934,
+      "tokens_selected": 119338048,
+      "rows_min": 0,
+      "rows_max": 110442,
+      "lines_in_file": 110443,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 10,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_02_of_10/local-shard_4_of_10/shard_00000061_processed.jsonl.zstd",
+      "docs_in_file": 106940,
+      "docs_selected": 87172,
+      "tokens_selected": 117357082,
+      "rows_min": 0,
+      "rows_max": 106939,
+      "lines_in_file": 106940,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 16,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_04_of_10/local-shard_2_of_10/shard_00000193_processed.jsonl.zstd",
+      "docs_in_file": 123235,
+      "docs_selected": 100200,
+      "tokens_selected": 142156778,
+      "rows_min": 0,
+      "rows_max": 123234,
+      "lines_in_file": 123235,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 15,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_03_of_10/local-shard_7_of_10/shard_00000161_processed.jsonl.zstd",
+      "docs_in_file": 122581,
+      "docs_selected": 99601,
+      "tokens_selected": 134666244,
+      "rows_min": 1,
+      "rows_max": 122580,
+      "lines_in_file": 122581,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 33,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_10_of_10/local-shard_4_of_10/shard_00000161_processed.jsonl.zstd",
+      "docs_in_file": 97290,
+      "docs_selected": 79270,
+      "tokens_selected": 94983914,
+      "rows_min": 0,
+      "rows_max": 97289,
+      "lines_in_file": 97290,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 30,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_09_of_10/local-shard_3_of_10/shard_00000047_processed.jsonl.zstd",
+      "docs_in_file": 95616,
+      "docs_selected": 77663,
+      "tokens_selected": 93291844,
+      "rows_min": 0,
+      "rows_max": 95615,
+      "lines_in_file": 95616,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 12,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_03_of_10/local-shard_5_of_10/shard_00000005_processed.jsonl.zstd",
+      "docs_in_file": 97399,
+      "docs_selected": 79350,
+      "tokens_selected": 100764094,
+      "rows_min": 1,
+      "rows_max": 97398,
+      "lines_in_file": 97399,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 34,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_10_of_10/local-shard_7_of_10/shard_00000176_processed.jsonl.zstd",
+      "docs_in_file": 127448,
+      "docs_selected": 103851,
+      "tokens_selected": 148882054,
+      "rows_min": 0,
+      "rows_max": 127447,
+      "lines_in_file": 127448,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 21,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_07_of_10/local-shard_2_of_10/shard_00000103_processed.jsonl.zstd",
+      "docs_in_file": 92252,
+      "docs_selected": 75260,
+      "tokens_selected": 96068268,
+      "rows_min": 0,
+      "rows_max": 92251,
+      "lines_in_file": 92252,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 17,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_04_of_10/local-shard_5_of_10/shard_00000164_processed.jsonl.zstd",
+      "docs_in_file": 107871,
+      "docs_selected": 87843,
+      "tokens_selected": 117445910,
+      "rows_min": 0,
+      "rows_max": 107870,
+      "lines_in_file": 107871,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 6,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_01_of_10/local-shard_2_of_10/shard_00000244_processed.jsonl.zstd",
+      "docs_in_file": 138527,
+      "docs_selected": 112518,
+      "tokens_selected": 159977597,
+      "rows_min": 1,
+      "rows_max": 138526,
+      "lines_in_file": 138527,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 25,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_08_of_10/local-shard_0_of_10/shard_00000146_processed.jsonl.zstd",
+      "docs_in_file": 118542,
+      "docs_selected": 96448,
+      "tokens_selected": 136180965,
+      "rows_min": 0,
+      "rows_max": 118541,
+      "lines_in_file": 118542,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 27,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_08_of_10/local-shard_6_of_10/shard_00000192_processed.jsonl.zstd",
+      "docs_in_file": 110711,
+      "docs_selected": 90146,
+      "tokens_selected": 112365134,
+      "rows_min": 0,
+      "rows_max": 110710,
+      "lines_in_file": 110711,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 8,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_01_of_10/local-shard_8_of_10/shard_00000140_processed.jsonl.zstd",
+      "docs_in_file": 115815,
+      "docs_selected": 94183,
+      "tokens_selected": 127531338,
+      "rows_min": 0,
+      "rows_max": 115814,
+      "lines_in_file": 115815,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 24,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_07_of_10/local-shard_5_of_10/shard_00000167_processed.jsonl.zstd",
+      "docs_in_file": 123671,
+      "docs_selected": 100867,
+      "tokens_selected": 139131605,
+      "rows_min": 1,
+      "rows_max": 123669,
+      "lines_in_file": 123671,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 22,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_07_of_10/local-shard_3_of_10/shard_00000090_processed.jsonl.zstd",
+      "docs_in_file": 110650,
+      "docs_selected": 90082,
+      "tokens_selected": 110332824,
+      "rows_min": 0,
+      "rows_max": 110648,
+      "lines_in_file": 110650,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 7,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_01_of_10/local-shard_2_of_10/shard_00000272_processed.jsonl.zstd",
+      "docs_in_file": 112543,
+      "docs_selected": 91576,
+      "tokens_selected": 124364505,
+      "rows_min": 1,
+      "rows_max": 112542,
+      "lines_in_file": 112543,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 9,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_02_of_10/local-shard_1_of_10/shard_00000110_processed.jsonl.zstd",
+      "docs_in_file": 96070,
+      "docs_selected": 78257,
+      "tokens_selected": 92690110,
+      "rows_min": 0,
+      "rows_max": 96068,
+      "lines_in_file": 96070,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 28,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_09_of_10/local-shard_0_of_10/shard_00000254_processed.jsonl.zstd",
+      "docs_in_file": 146318,
+      "docs_selected": 118997,
+      "tokens_selected": 169922751,
+      "rows_min": 0,
+      "rows_max": 146317,
+      "lines_in_file": 146318,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 23,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_07_of_10/local-shard_3_of_10/shard_00000150_processed.jsonl.zstd",
+      "docs_in_file": 96414,
+      "docs_selected": 78486,
+      "tokens_selected": 101329609,
+      "rows_min": 0,
+      "rows_max": 96413,
+      "lines_in_file": 96414,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 20,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_07_of_10/local-shard_0_of_10/shard_00000188_processed.jsonl.zstd",
+      "docs_in_file": 128255,
+      "docs_selected": 104580,
+      "tokens_selected": 143682667,
+      "rows_min": 0,
+      "rows_max": 128254,
+      "lines_in_file": 128255,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 19,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_06_of_10/local-shard_5_of_10/shard_00000123_processed.jsonl.zstd",
+      "docs_in_file": 104082,
+      "docs_selected": 84799,
+      "tokens_selected": 114291426,
+      "rows_min": 1,
+      "rows_max": 104080,
+      "lines_in_file": 104082,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 32,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_09_of_10/local-shard_9_of_10/shard_00000144_processed.jsonl.zstd",
+      "docs_in_file": 129961,
+      "docs_selected": 105595,
+      "tokens_selected": 144190791,
+      "rows_min": 0,
+      "rows_max": 129958,
+      "lines_in_file": 129961,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 11,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_02_of_10/local-shard_8_of_10/shard_00000173_processed.jsonl.zstd",
+      "docs_in_file": 99291,
+      "docs_selected": 80554,
+      "tokens_selected": 106223906,
+      "rows_min": 0,
+      "rows_max": 99290,
+      "lines_in_file": 99291,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 31,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_09_of_10/local-shard_3_of_10/shard_00000142_processed.jsonl.zstd",
+      "docs_in_file": 94286,
+      "docs_selected": 76673,
+      "tokens_selected": 95312092,
+      "rows_min": 0,
+      "rows_max": 94285,
+      "lines_in_file": 94286,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 29,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_09_of_10/local-shard_2_of_10/shard_00000231_processed.jsonl.zstd",
+      "docs_in_file": 148588,
+      "docs_selected": 120746,
+      "tokens_selected": 172029143,
+      "rows_min": 0,
+      "rows_max": 148587,
+      "lines_in_file": 148588,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 5,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_01_of_10/local-shard_2_of_10/shard_00000188_processed.jsonl.zstd",
+      "docs_in_file": 125414,
+      "docs_selected": 102242,
+      "tokens_selected": 144581846,
+      "rows_min": 0,
+      "rows_max": 125413,
+      "lines_in_file": 125414,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 26,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_08_of_10/local-shard_5_of_10/shard_00000124_processed.jsonl.zstd",
+      "docs_in_file": 107293,
+      "docs_selected": 87308,
+      "tokens_selected": 107363993,
+      "rows_min": 0,
+      "rows_max": 107292,
+      "lines_in_file": 107293,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 18,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_05_of_10/local-shard_7_of_10/shard_00000092_processed.jsonl.zstd",
+      "docs_in_file": 88017,
+      "docs_selected": 71491,
+      "tokens_selected": 88354607,
+      "rows_min": 0,
+      "rows_max": 88016,
+      "lines_in_file": 88017,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 14,
+      "path": "data/dclm/raw/hero-run-fasttext_for_HF/filtered/OH_eli5_vs_rw_v2_bigram_200k_train/fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/processed_data/global-shard_03_of_10/local-shard_5_of_10/shard_00000276_processed.jsonl.zstd",
+      "docs_in_file": 165655,
+      "docs_selected": 134948,
+      "tokens_selected": 195190056,
+      "rows_min": 0,
+      "rows_max": 165653,
+      "lines_in_file": 165655,
+      "lines_not_yielded": 0
+     }
+    ]
+   },
+   "publish_objects": [
+    {
+     "name": "tokens/dclm/train-00000.u32le.bin",
+     "token_start": 0,
+     "token_end": 268435456,
+     "first_doc": 0,
+     "first_doc_token_offset": 0,
+     "last_doc": 199931,
+     "last_doc_tokens_included": 490,
+     "last_doc_tokens_with_eos": 1878
+    },
+    {
+     "name": "tokens/dclm/train-00001.u32le.bin",
+     "token_start": 268435456,
+     "token_end": 536870912,
+     "first_doc": 199931,
+     "first_doc_token_offset": 490,
+     "last_doc": 399849,
+     "last_doc_tokens_included": 3182,
+     "last_doc_tokens_with_eos": 6806
+    },
+    {
+     "name": "tokens/dclm/train-00002.u32le.bin",
+     "token_start": 536870912,
+     "token_end": 805306368,
+     "first_doc": 399849,
+     "first_doc_token_offset": 3182,
+     "last_doc": 600238,
+     "last_doc_tokens_included": 403,
+     "last_doc_tokens_with_eos": 3873
+    },
+    {
+     "name": "tokens/dclm/train-00003.u32le.bin",
+     "token_start": 805306368,
+     "token_end": 1073741824,
+     "first_doc": 600238,
+     "first_doc_token_offset": 403,
+     "last_doc": 801750,
+     "last_doc_tokens_included": 422,
+     "last_doc_tokens_with_eos": 570
+    },
+    {
+     "name": "tokens/dclm/train-00004.u32le.bin",
+     "token_start": 1073741824,
+     "token_end": 1342177280,
+     "first_doc": 801750,
+     "first_doc_token_offset": 422,
+     "last_doc": 1002915,
+     "last_doc_tokens_included": 743,
+     "last_doc_tokens_with_eos": 1779
+    },
+    {
+     "name": "tokens/dclm/train-00005.u32le.bin",
+     "token_start": 1342177280,
+     "token_end": 1610612736,
+     "first_doc": 1002915,
+     "first_doc_token_offset": 743,
+     "last_doc": 1204116,
+     "last_doc_tokens_included": 782,
+     "last_doc_tokens_with_eos": 927
+    },
+    {
+     "name": "tokens/dclm/train-00006.u32le.bin",
+     "token_start": 1610612736,
+     "token_end": 1879048192,
+     "first_doc": 1204116,
+     "first_doc_token_offset": 782,
+     "last_doc": 1403667,
+     "last_doc_tokens_included": 1691,
+     "last_doc_tokens_with_eos": 3844
+    },
+    {
+     "name": "tokens/dclm/train-00007.u32le.bin",
+     "token_start": 1879048192,
+     "token_end": 2147483648,
+     "first_doc": 1403667,
+     "first_doc_token_offset": 1691,
+     "last_doc": 1603186,
+     "last_doc_tokens_included": 673,
+     "last_doc_tokens_with_eos": 820
+    },
+    {
+     "name": "tokens/dclm/train-00008.u32le.bin",
+     "token_start": 2147483648,
+     "token_end": 2415919104,
+     "first_doc": 1603186,
+     "first_doc_token_offset": 673,
+     "last_doc": 1803700,
+     "last_doc_tokens_included": 22666,
+     "last_doc_tokens_with_eos": 44275
+    },
+    {
+     "name": "tokens/dclm/train-00009.u32le.bin",
+     "token_start": 2415919104,
+     "token_end": 2684354560,
+     "first_doc": 1803700,
+     "first_doc_token_offset": 22666,
+     "last_doc": 2004322,
+     "last_doc_tokens_included": 649,
+     "last_doc_tokens_with_eos": 877
+    },
+    {
+     "name": "tokens/dclm/train-00010.u32le.bin",
+     "token_start": 2684354560,
+     "token_end": 2952790016,
+     "first_doc": 2004322,
+     "first_doc_token_offset": 649,
+     "last_doc": 2203936,
+     "last_doc_tokens_included": 900,
+     "last_doc_tokens_with_eos": 5262
+    },
+    {
+     "name": "tokens/dclm/train-00011.u32le.bin",
+     "token_start": 2952790016,
+     "token_end": 3221225472,
+     "first_doc": 2203936,
+     "first_doc_token_offset": 900,
+     "last_doc": 2403742,
+     "last_doc_tokens_included": 1475,
+     "last_doc_tokens_with_eos": 3554
+    },
+    {
+     "name": "tokens/dclm/train-00012.u32le.bin",
+     "token_start": 3221225472,
+     "token_end": 3489660928,
+     "first_doc": 2403742,
+     "first_doc_token_offset": 1475,
+     "last_doc": 2604526,
+     "last_doc_tokens_included": 1711,
+     "last_doc_tokens_with_eos": 1878
+    },
+    {
+     "name": "tokens/dclm/train-00013.u32le.bin",
+     "token_start": 3489660928,
+     "token_end": 3747172639,
+     "first_doc": 2604526,
+     "first_doc_token_offset": 1711,
+     "last_doc": 2796807,
+     "last_doc_tokens_included": 2399,
+     "last_doc_tokens_with_eos": 3914
+    },
+    {
+     "name": "tokens/dclm/val-00000.u32le.bin",
+     "token_start": 3747172639,
+     "token_end": 3752801841,
+     "first_doc": 2796807,
+     "first_doc_token_offset": 2399,
+     "last_doc": 2800639,
+     "last_doc_tokens_included": 2993,
+     "last_doc_tokens_with_eos": 2993
+    }
+   ]
+  },
+  "arxiv": {
+   "documents_file": "documents/arxiv.tsv.gz",
+   "docs": 130087,
+   "tokens_content": 2500032818,
+   "tokens_with_eos": 2500162905,
+   "target_tokens": 2500000000,
+   "selection": {
+    "rule": "materialize the files below in this order (every JSON line whose doc_text() is non-empty, in file order) into one list of docs_before documents; order = list(range(docs_before)); random.Random(42).shuffle(order); keep order[:docs_after] in that order. No document is truncated: the trim stops after the first whole document that brings content tokens to >= target_tokens; the 0.98/1.02 skip rule never fired (docs_scanned == docs_after).",
+    "docs_before": 231422,
+    "docs_scanned": 130087,
+    "docs_after": 130087,
+    "files_in_materialization_order": [
+     {
+      "src": 3,
+      "path": "data/arxiv/train/arxiv-train-0015.json.gz",
+      "docs_in_file": 76849,
+      "docs_selected": 43194,
+      "tokens_selected": 828028502,
+      "rows_min": 0,
+      "rows_max": 76847,
+      "lines_in_file": 76849,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 4,
+      "path": "data/arxiv/train/arxiv-train-0016.json.gz",
+      "docs_in_file": 83161,
+      "docs_selected": 46814,
+      "tokens_selected": 889345544,
+      "rows_min": 0,
+      "rows_max": 83159,
+      "lines_in_file": 83161,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 2,
+      "path": "data/arxiv/train/arxiv-train-0004.json.gz",
+      "docs_in_file": 71412,
+      "docs_selected": 40079,
+      "tokens_selected": 782658772,
+      "rows_min": 1,
+      "rows_max": 71410,
+      "lines_in_file": 71412,
+      "lines_not_yielded": 0
+     }
+    ]
+   },
+   "publish_objects": [
+    {
+     "name": "tokens/arxiv/train-00000.u32le.bin",
+     "token_start": 0,
+     "token_end": 268435456,
+     "first_doc": 0,
+     "first_doc_token_offset": 0,
+     "last_doc": 13874,
+     "last_doc_tokens_included": 451,
+     "last_doc_tokens_with_eos": 11445
+    },
+    {
+     "name": "tokens/arxiv/train-00001.u32le.bin",
+     "token_start": 268435456,
+     "token_end": 536870912,
+     "first_doc": 13874,
+     "first_doc_token_offset": 451,
+     "last_doc": 27661,
+     "last_doc_tokens_included": 3155,
+     "last_doc_tokens_with_eos": 29557
+    },
+    {
+     "name": "tokens/arxiv/train-00002.u32le.bin",
+     "token_start": 536870912,
+     "token_end": 805306368,
+     "first_doc": 27661,
+     "first_doc_token_offset": 3155,
+     "last_doc": 41742,
+     "last_doc_tokens_included": 11634,
+     "last_doc_tokens_with_eos": 49577
+    },
+    {
+     "name": "tokens/arxiv/train-00003.u32le.bin",
+     "token_start": 805306368,
+     "token_end": 1073741824,
+     "first_doc": 41742,
+     "first_doc_token_offset": 11634,
+     "last_doc": 55959,
+     "last_doc_tokens_included": 41720,
+     "last_doc_tokens_with_eos": 80957
+    },
+    {
+     "name": "tokens/arxiv/train-00004.u32le.bin",
+     "token_start": 1073741824,
+     "token_end": 1342177280,
+     "first_doc": 55959,
+     "first_doc_token_offset": 41720,
+     "last_doc": 69990,
+     "last_doc_tokens_included": 53619,
+     "last_doc_tokens_with_eos": 76285
+    },
+    {
+     "name": "tokens/arxiv/train-00005.u32le.bin",
+     "token_start": 1342177280,
+     "token_end": 1610612736,
+     "first_doc": 69990,
+     "first_doc_token_offset": 53619,
+     "last_doc": 84059,
+     "last_doc_tokens_included": 49710,
+     "last_doc_tokens_with_eos": 74059
+    },
+    {
+     "name": "tokens/arxiv/train-00006.u32le.bin",
+     "token_start": 1610612736,
+     "token_end": 1879048192,
+     "first_doc": 84059,
+     "first_doc_token_offset": 49710,
+     "last_doc": 97801,
+     "last_doc_tokens_included": 19899,
+     "last_doc_tokens_with_eos": 27248
+    },
+    {
+     "name": "tokens/arxiv/train-00007.u32le.bin",
+     "token_start": 1879048192,
+     "token_end": 2147483648,
+     "first_doc": 97801,
+     "first_doc_token_offset": 19899,
+     "last_doc": 111735,
+     "last_doc_tokens_included": 6589,
+     "last_doc_tokens_with_eos": 29262
+    },
+    {
+     "name": "tokens/arxiv/train-00008.u32le.bin",
+     "token_start": 2147483648,
+     "token_end": 2415919104,
+     "first_doc": 111735,
+     "first_doc_token_offset": 6589,
+     "last_doc": 125700,
+     "last_doc_tokens_included": 2844,
+     "last_doc_tokens_with_eos": 10568
+    },
+    {
+     "name": "tokens/arxiv/train-00009.u32le.bin",
+     "token_start": 2415919104,
+     "token_end": 2496412661,
+     "first_doc": 125700,
+     "first_doc_token_offset": 2844,
+     "last_doc": 129919,
+     "last_doc_tokens_included": 1740,
+     "last_doc_tokens_with_eos": 23865
+    },
+    {
+     "name": "tokens/arxiv/val-00000.u32le.bin",
+     "token_start": 2496412661,
+     "token_end": 2500162905,
+     "first_doc": 129919,
+     "first_doc_token_offset": 1740,
+     "last_doc": 130086,
+     "last_doc_tokens_included": 37919,
+     "last_doc_tokens_with_eos": 37919
+    }
+   ],
+   "embedded_eos_note": "1 document(s) in this domain contain the tokenizer's own EOS token (100257, '<|endoftext|>') inside their content, not only as the appended document separator: the pinned dolma2-tokenizer has that literal string registered as a special token, and HF fast tokenizers still recognize it inside raw text even with add_special_tokens=False (that flag only controls tokens the tokenizer adds itself). Scanning the archived .npy for EOS occurrences therefore overcounts document boundaries here; ntok/crc32 below come from retokenizing every document in this domain directly (build_manifest.py --stage retok) instead.",
+   "embedded_eos_examples": [
+    {
+     "src": 4,
+     "row": 28490,
+     "pos_in_doc": 7944,
+     "n_occurrences": 1,
+     "context": " maximum length. We use the special token \\textit{\"<|endoftext|>\"} to pad"
+    }
+   ]
+  },
+  "starcoder": {
+   "documents_file": "documents/starcoder.tsv.gz",
+   "docs": 985925,
+   "tokens_content": 1406000460,
+   "tokens_with_eos": 1406986385,
+   "target_tokens": 1406000000,
+   "selection": {
+    "rule": "materialize the files below in this order (every JSON line whose doc_text() is non-empty, in file order) into one list of docs_before documents; order = list(range(docs_before)); random.Random(42).shuffle(order); keep order[:docs_after] in that order. No document is truncated: the trim stops after the first whole document that brings content tokens to >= target_tokens; the 0.98/1.02 skip rule never fired (docs_scanned == docs_after).",
+    "docs_before": 1495231,
+    "docs_scanned": 985925,
+    "docs_after": 985925,
+    "files_in_materialization_order": [
+     {
+      "src": 38,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/c-0002.json.gz",
+      "docs_in_file": 61320,
+      "docs_selected": 40500,
+      "tokens_selected": 79637515,
+      "rows_min": 0,
+      "rows_max": 61318,
+      "lines_in_file": 61320,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 39,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/c-0006.json.gz",
+      "docs_in_file": 61388,
+      "docs_selected": 40582,
+      "tokens_selected": 82481123,
+      "rows_min": 0,
+      "rows_max": 61387,
+      "lines_in_file": 61388,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 40,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/c-0034.json.gz",
+      "docs_in_file": 61599,
+      "docs_selected": 40395,
+      "tokens_selected": 81983212,
+      "rows_min": 3,
+      "rows_max": 61598,
+      "lines_in_file": 61599,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 41,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/git-commits-cleaned-0001.json.gz",
+      "docs_in_file": 134169,
+      "docs_selected": 88268,
+      "tokens_selected": 193039422,
+      "rows_min": 0,
+      "rows_max": 134168,
+      "lines_in_file": 134169,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 42,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/git-commits-cleaned-0034.json.gz",
+      "docs_in_file": 135148,
+      "docs_selected": 89242,
+      "tokens_selected": 200112263,
+      "rows_min": 0,
+      "rows_max": 135147,
+      "lines_in_file": 135148,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 43,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/git-commits-cleaned-0042.json.gz",
+      "docs_in_file": 134530,
+      "docs_selected": 88842,
+      "tokens_selected": 195607029,
+      "rows_min": 0,
+      "rows_max": 134529,
+      "lines_in_file": 134530,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 44,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/github-issues-filtered-structured-0051.json.gz",
+      "docs_in_file": 437945,
+      "docs_selected": 288632,
+      "tokens_selected": 188006194,
+      "rows_min": 0,
+      "rows_max": 437940,
+      "lines_in_file": 437945,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 45,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/go-0000.json.gz",
+      "docs_in_file": 70156,
+      "docs_selected": 46271,
+      "tokens_selected": 72848455,
+      "rows_min": 1,
+      "rows_max": 70153,
+      "lines_in_file": 70156,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 46,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/javascript-0012.json.gz",
+      "docs_in_file": 65244,
+      "docs_selected": 42993,
+      "tokens_selected": 47136921,
+      "rows_min": 0,
+      "rows_max": 65242,
+      "lines_in_file": 65244,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 47,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/javascript-0054.json.gz",
+      "docs_in_file": 66090,
+      "docs_selected": 43716,
+      "tokens_selected": 49211477,
+      "rows_min": 4,
+      "rows_max": 66086,
+      "lines_in_file": 66090,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 48,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/markdown-0019.json.gz",
+      "docs_in_file": 62873,
+      "docs_selected": 41519,
+      "tokens_selected": 59190544,
+      "rows_min": 3,
+      "rows_max": 62872,
+      "lines_in_file": 62873,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 49,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/markdown-0035.json.gz",
+      "docs_in_file": 62766,
+      "docs_selected": 41320,
+      "tokens_selected": 58115210,
+      "rows_min": 0,
+      "rows_max": 62765,
+      "lines_in_file": 62766,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 50,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/php-0049.json.gz",
+      "docs_in_file": 30202,
+      "docs_selected": 19939,
+      "tokens_selected": 22577653,
+      "rows_min": 1,
+      "rows_max": 30200,
+      "lines_in_file": 30202,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 51,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/sql-0001.json.gz",
+      "docs_in_file": 15998,
+      "docs_selected": 10529,
+      "tokens_selected": 18673644,
+      "rows_min": 0,
+      "rows_max": 15995,
+      "lines_in_file": 15998,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 52,
+      "path": "data/starcoder/v1-decon-100_to_20k-2star-top_token_030/documents/typescript-0001.json.gz",
+      "docs_in_file": 95803,
+      "docs_selected": 63177,
+      "tokens_selected": 57379798,
+      "rows_min": 0,
+      "rows_max": 95802,
+      "lines_in_file": 95803,
+      "lines_not_yielded": 0
+     }
+    ]
+   },
+   "publish_objects": [
+    {
+     "name": "tokens/starcoder/train-00000.u32le.bin",
+     "token_start": 0,
+     "token_end": 268435456,
+     "first_doc": 0,
+     "first_doc_token_offset": 0,
+     "last_doc": 188425,
+     "last_doc_tokens_included": 10711,
+     "last_doc_tokens_with_eos": 17094
+    },
+    {
+     "name": "tokens/starcoder/train-00001.u32le.bin",
+     "token_start": 268435456,
+     "token_end": 536870912,
+     "first_doc": 188425,
+     "first_doc_token_offset": 10711,
+     "last_doc": 375640,
+     "last_doc_tokens_included": 755,
+     "last_doc_tokens_with_eos": 972
+    },
+    {
+     "name": "tokens/starcoder/train-00002.u32le.bin",
+     "token_start": 536870912,
+     "token_end": 805306368,
+     "first_doc": 375640,
+     "first_doc_token_offset": 755,
+     "last_doc": 564364,
+     "last_doc_tokens_included": 15060,
+     "last_doc_tokens_with_eos": 15363
+    },
+    {
+     "name": "tokens/starcoder/train-00003.u32le.bin",
+     "token_start": 805306368,
+     "token_end": 1073741824,
+     "first_doc": 564364,
+     "first_doc_token_offset": 15060,
+     "last_doc": 752161,
+     "last_doc_tokens_included": 150,
+     "last_doc_tokens_with_eos": 953
+    },
+    {
+     "name": "tokens/starcoder/train-00004.u32le.bin",
+     "token_start": 1073741824,
+     "token_end": 1342177280,
+     "first_doc": 752161,
+     "first_doc_token_offset": 150,
+     "last_doc": 940850,
+     "last_doc_tokens_included": 5996,
+     "last_doc_tokens_with_eos": 14215
+    },
+    {
+     "name": "tokens/starcoder/train-00005.u32le.bin",
+     "token_start": 1342177280,
+     "token_end": 1404875906,
+     "first_doc": 940850,
+     "first_doc_token_offset": 5996,
+     "last_doc": 984409,
+     "last_doc_tokens_included": 1718,
+     "last_doc_tokens_with_eos": 2076
+    },
+    {
+     "name": "tokens/starcoder/val-00000.u32le.bin",
+     "token_start": 1404875906,
+     "token_end": 1406986385,
+     "first_doc": 984409,
+     "first_doc_token_offset": 1718,
+     "last_doc": 985924,
+     "last_doc_tokens_included": 1738,
+     "last_doc_tokens_with_eos": 1738
+    }
+   ],
+   "embedded_eos_note": "2 document(s) in this domain contain the tokenizer's own EOS token (100257, '<|endoftext|>') inside their content, not only as the appended document separator: the pinned dolma2-tokenizer has that literal string registered as a special token, and HF fast tokenizers still recognize it inside raw text even with add_special_tokens=False (that flag only controls tokens the tokenizer adds itself). Scanning the archived .npy for EOS occurrences therefore overcounts document boundaries here; ntok/crc32 below come from retokenizing every document in this domain directly (build_manifest.py --stage retok) instead.",
+   "embedded_eos_examples": [
+    {
+     "src": 41,
+     "row": 72492,
+     "pos_in_doc": 204,
+     "n_occurrences": 2,
+     "context": "\n                include_prefix=False,\n                truncate=\"<|endoftext|>\",\n               "
+    },
+    {
+     "src": 44,
+     "row": 43614,
+     "pos_in_doc": 1185,
+     "n_occurrences": 1,
+     "context": " [8]: tokenizer.encode(\"Testsatz zu Ende <|endoftext|>\")\r\n"
+    }
+   ]
+  },
+  "pes2o": {
+   "documents_file": "documents/pes2o.tsv.gz",
+   "docs": 150710,
+   "tokens_content": 938006600,
+   "tokens_with_eos": 938157310,
+   "target_tokens": 938000000,
+   "selection": {
+    "rule": "materialize the files below in this order (every JSON line whose doc_text() is non-empty, in file order) into one list of docs_before documents; order = list(range(docs_before)); random.Random(42).shuffle(order); keep order[:docs_after] in that order. No document is truncated: the trim stops after the first whole document that brings content tokens to >= target_tokens; the 0.98/1.02 skip rule never fired (docs_scanned == docs_after).",
+    "docs_before": 468631,
+    "docs_scanned": 150710,
+    "docs_after": 150710,
+    "files_in_materialization_order": [
+     {
+      "src": 37,
+      "path": "data/pes2o/pes2o-0020.json.gz",
+      "docs_in_file": 468631,
+      "docs_selected": 150710,
+      "tokens_selected": 938006600,
+      "rows_min": 0,
+      "rows_max": 468630,
+      "lines_in_file": 468631,
+      "lines_not_yielded": 0
+     }
+    ]
+   },
+   "publish_objects": [
+    {
+     "name": "tokens/pes2o/train-00000.u32le.bin",
+     "token_start": 0,
+     "token_end": 268435456,
+     "first_doc": 0,
+     "first_doc_token_offset": 0,
+     "last_doc": 43290,
+     "last_doc_tokens_included": 2606,
+     "last_doc_tokens_with_eos": 10241
+    },
+    {
+     "name": "tokens/pes2o/train-00001.u32le.bin",
+     "token_start": 268435456,
+     "token_end": 536870912,
+     "first_doc": 43290,
+     "first_doc_token_offset": 2606,
+     "last_doc": 86373,
+     "last_doc_tokens_included": 2109,
+     "last_doc_tokens_with_eos": 3607
+    },
+    {
+     "name": "tokens/pes2o/train-00002.u32le.bin",
+     "token_start": 536870912,
+     "token_end": 805306368,
+     "first_doc": 86373,
+     "first_doc_token_offset": 2109,
+     "last_doc": 129442,
+     "last_doc_tokens_included": 3789,
+     "last_doc_tokens_with_eos": 11262
+    },
+    {
+     "name": "tokens/pes2o/train-00003.u32le.bin",
+     "token_start": 805306368,
+     "token_end": 936750075,
+     "first_doc": 129442,
+     "first_doc_token_offset": 3789,
+     "last_doc": 150466,
+     "last_doc_tokens_included": 3289,
+     "last_doc_tokens_with_eos": 11349
+    },
+    {
+     "name": "tokens/pes2o/val-00000.u32le.bin",
+     "token_start": 936750075,
+     "token_end": 938157310,
+     "first_doc": 150466,
+     "first_doc_token_offset": 3289,
+     "last_doc": 150709,
+     "last_doc_tokens_included": 9137,
+     "last_doc_tokens_with_eos": 9137
+    }
+   ],
+   "embedded_eos_note": "1 document(s) in this domain contain the tokenizer's own EOS token (100257, '<|endoftext|>') inside their content, not only as the appended document separator: the pinned dolma2-tokenizer has that literal string registered as a special token, and HF fast tokenizers still recognize it inside raw text even with add_special_tokens=False (that flag only controls tokens the tokenizer adds itself). Scanning the archived .npy for EOS occurrences therefore overcounts document boundaries here; ntok/crc32 below come from retokenizing every document in this domain directly (build_manifest.py --stage retok) instead.",
+   "embedded_eos_examples": [
+    {
+     "src": 37,
+     "row": 425189,
+     "pos_in_doc": 3268,
+     "n_occurrences": 1,
+     "context": " generates report till the moment when it generates the special token <|endoftext|> token. We"
+    }
+   ]
+  },
+  "open-web-math": {
+   "documents_file": "documents/open-web-math.tsv.gz",
+   "docs": 97937,
+   "tokens_content": 635000841,
+   "tokens_with_eos": 635098778,
+   "target_tokens": 635000000,
+   "selection": {
+    "rule": "materialize the files below in this order (every JSON line whose doc_text() is non-empty, in file order) into one list of docs_before documents; order = list(range(docs_before)); random.Random(42).shuffle(order); keep order[:docs_after] in that order. No document is truncated: the trim stops after the first whole document that brings content tokens to >= target_tokens; the 0.98/1.02 skip rule never fired (docs_scanned == docs_after).",
+    "docs_before": 322953,
+    "docs_scanned": 97937,
+    "docs_after": 97937,
+    "files_in_materialization_order": [
+     {
+      "src": 35,
+      "path": "data/open-web-math/train/open-web-math-train-0004.json.gz",
+      "docs_in_file": 247325,
+      "docs_selected": 75012,
+      "tokens_selected": 195315615,
+      "rows_min": 0,
+      "rows_max": 247318,
+      "lines_in_file": 247325,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 36,
+      "path": "data/open-web-math/train/open-web-math-train-0012.json.gz",
+      "docs_in_file": 75628,
+      "docs_selected": 22925,
+      "tokens_selected": 439685226,
+      "rows_min": 4,
+      "rows_max": 75621,
+      "lines_in_file": 75628,
+      "lines_not_yielded": 0
+     }
+    ]
+   },
+   "publish_objects": [
+    {
+     "name": "tokens/open-web-math/train-00000.u32le.bin",
+     "token_start": 0,
+     "token_end": 268435456,
+     "first_doc": 0,
+     "first_doc_token_offset": 0,
+     "last_doc": 41543,
+     "last_doc_tokens_included": 548,
+     "last_doc_tokens_with_eos": 8107
+    },
+    {
+     "name": "tokens/open-web-math/train-00001.u32le.bin",
+     "token_start": 268435456,
+     "token_end": 536870912,
+     "first_doc": 41543,
+     "first_doc_token_offset": 548,
+     "last_doc": 83082,
+     "last_doc_tokens_included": 5999,
+     "last_doc_tokens_with_eos": 7854
+    },
+    {
+     "name": "tokens/open-web-math/train-00002.u32le.bin",
+     "token_start": 536870912,
+     "token_end": 634146130,
+     "first_doc": 83082,
+     "first_doc_token_offset": 5999,
+     "last_doc": 97792,
+     "last_doc_tokens_included": 4108,
+     "last_doc_tokens_with_eos": 10852
+    },
+    {
+     "name": "tokens/open-web-math/val-00000.u32le.bin",
+     "token_start": 634146130,
+     "token_end": 635098778,
+     "first_doc": 97792,
+     "first_doc_token_offset": 4108,
+     "last_doc": 97936,
+     "last_doc_tokens_included": 4548,
+     "last_doc_tokens_with_eos": 4548
+    }
+   ],
+   "embedded_eos_note": "11 document(s) in this domain contain the tokenizer's own EOS token (100257, '<|endoftext|>') inside their content, not only as the appended document separator: the pinned dolma2-tokenizer has that literal string registered as a special token, and HF fast tokenizers still recognize it inside raw text even with add_special_tokens=False (that flag only controls tokens the tokenizer adds itself). Scanning the archived .npy for EOS occurrences therefore overcounts document boundaries here; ntok/crc32 below come from retokenizing every document in this domain directly (build_manifest.py --stage retok) instead.",
+   "embedded_eos_examples": [
+    {
+     "src": 35,
+     "row": 9959,
+     "pos_in_doc": 1740,
+     "n_occurrences": 4,
+     "context": " vocab.extend(['<|startoftext|>', '<|endoftext|>'])\n       "
+    },
+    {
+     "src": 35,
+     "row": 10457,
+     "pos_in_doc": 162,
+     "n_occurrences": 1,
+     "context": ".eval()\n        self.start_token = '<|endoftext|>'\n       "
+    },
+    {
+     "src": 35,
+     "row": 14411,
+     "pos_in_doc": 7350,
+     "n_occurrences": 2,
+     "context": " next_token_id in self.tokenizer.encode('<|endoftext|>'):\n\t\t\t\t"
+    },
+    {
+     "src": 35,
+     "row": 18216,
+     "pos_in_doc": 11157,
+     "n_occurrences": 4,
+     "context": "\n                                                sep_token=\"---\",eos_token=\"<|endoftext|>\",pad_"
+    },
+    {
+     "src": 35,
+     "row": 40612,
+     "pos_in_doc": 273,
+     "n_occurrences": 1,
+     "context": ">\"] = idx+0\n        self.vocab[\"<|endoftext|>\"] = idx"
+    },
+    {
+     "src": 35,
+     "row": 57060,
+     "pos_in_doc": 361,
+     "n_occurrences": 1,
+     "context": "00,\n                    help='Concatenate input files with <|endoftext|> separator into chunks"
+    },
+    {
+     "src": 35,
+     "row": 69171,
+     "pos_in_doc": 587,
+     "n_occurrences": 1,
+     "context": " \"\"\n        else:\n            raw_text += \"<|endoftext|>\"\n\n       "
+    },
+    {
+     "src": 35,
+     "row": 103559,
+     "pos_in_doc": 1028,
+     "n_occurrences": 2,
+     "context": "token='<|startoftext|>', eos_token='<|endoftext|>', pad_"
+    },
+    {
+     "src": 35,
+     "row": 112767,
+     "pos_in_doc": 248,
+     "n_occurrences": 2,
+     "context": " instances per iteration.\n\n        eos: string, default \"<|endoftext|>\"\n           "
+    },
+    {
+     "src": 35,
+     "row": 196185,
+     "pos_in_doc": 481,
+     "n_occurrences": 1,
+     "context": " text_end_id = tok.get_vocab()[\"<|endoftext|>\"]\n "
+    },
+    {
+     "src": 36,
+     "row": 61322,
+     "pos_in_doc": 4007,
+     "n_occurrences": 1,
+     "context": "output-dataset repository have informed us that they used a `<|endoftext|>' token as"
+    }
+   ]
+  },
+  "algebraic-stack": {
+   "documents_file": "documents/algebraic-stack.tsv.gz",
+   "docs": 223705,
+   "tokens_content": 615015312,
+   "tokens_with_eos": 615239017,
+   "target_tokens": 615000000,
+   "selection": {
+    "rule": "materialize the files below in this order (every JSON line whose doc_text() is non-empty, in file order) into one list of docs_before documents; order = list(range(docs_before)); random.Random(42).shuffle(order); keep order[:docs_after] in that order. No document is truncated: the trim stops after the first whole document that brings content tokens to >= target_tokens; the 0.98/1.02 skip rule never fired (docs_scanned == docs_after).",
+    "docs_before": 601654,
+    "docs_scanned": 223705,
+    "docs_after": 223705,
+    "files_in_materialization_order": [
+     {
+      "src": 1,
+      "path": "data/algebraic-stack/train/algebraic-stack-train-0009.json.gz",
+      "docs_in_file": 351659,
+      "docs_selected": 130809,
+      "tokens_selected": 371348254,
+      "rows_min": 0,
+      "rows_max": 351651,
+      "lines_in_file": 351659,
+      "lines_not_yielded": 0
+     },
+     {
+      "src": 0,
+      "path": "data/algebraic-stack/train/algebraic-stack-train-0005.json.gz",
+      "docs_in_file": 249995,
+      "docs_selected": 92896,
+      "tokens_selected": 243667058,
+      "rows_min": 0,
+      "rows_max": 249987,
+      "lines_in_file": 249995,
+      "lines_not_yielded": 0
+     }
+    ]
+   },
+   "publish_objects": [
+    {
+     "name": "tokens/algebraic-stack/train-00000.u32le.bin",
+     "token_start": 0,
+     "token_end": 268435456,
+     "first_doc": 0,
+     "first_doc_token_offset": 0,
+     "last_doc": 97656,
+     "last_doc_tokens_included": 805,
+     "last_doc_tokens_with_eos": 15219
+    },
+    {
+     "name": "tokens/algebraic-stack/train-00001.u32le.bin",
+     "token_start": 268435456,
+     "token_end": 536870912,
+     "first_doc": 97656,
+     "first_doc_token_offset": 805,
+     "last_doc": 195685,
+     "last_doc_tokens_included": 6139,
+     "last_doc_tokens_with_eos": 13701
+    },
+    {
+     "name": "tokens/algebraic-stack/train-00002.u32le.bin",
+     "token_start": 536870912,
+     "token_end": 614316159,
+     "first_doc": 195685,
+     "first_doc_token_offset": 6139,
+     "last_doc": 223210,
+     "last_doc_tokens_included": 6095,
+     "last_doc_tokens_with_eos": 17119
+    },
+    {
+     "name": "tokens/algebraic-stack/val-00000.u32le.bin",
+     "token_start": 614316159,
+     "token_end": 615239017,
+     "first_doc": 223210,
+     "first_doc_token_offset": 6095,
+     "last_doc": 223704,
+     "last_doc_tokens_included": 22818,
+     "last_doc_tokens_with_eos": 22818
+    }
+   ],
+   "embedded_eos_note": "20 document(s) in this domain contain the tokenizer's own EOS token (100257, '<|endoftext|>') inside their content, not only as the appended document separator: the pinned dolma2-tokenizer has that literal string registered as a special token, and HF fast tokenizers still recognize it inside raw text even with add_special_tokens=False (that flag only controls tokens the tokenizer adds itself). Scanning the archived .npy for EOS occurrences therefore overcounts document boundaries here; ntok/crc32 below come from retokenizing every document in this domain directly (build_manifest.py --stage retok) instead.",
+   "embedded_eos_examples": [
+    {
+     "src": 0,
+     "row": 14034,
+     "pos_in_doc": 884,
+     "n_occurrences": 1,
+     "context": "bert_tokenizer.convert_tokens_to_ids(['<|endoftext|>'])\n       "
+    },
+    {
+     "src": 0,
+     "row": 19957,
+     "pos_in_doc": 3206,
+     "n_occurrences": 1,
+     "context": "token='<|startoftext|>', eos_token='<|endoftext|>',\r\n                                             "
+    },
+    {
+     "src": 0,
+     "row": 31840,
+     "pos_in_doc": 341,
+     "n_occurrences": 8,
+     "context": "al: bool = True,\n        eostoken=\"<|endoftext|>\",\n   "
+    },
+    {
+     "src": 0,
+     "row": 58801,
+     "pos_in_doc": 1619,
+     "n_occurrences": 2,
+     "context": "tokens = decode_tokens[:decode_tokens.find(\"<|endoftext|>\")]\n       "
+    },
+    {
+     "src": 0,
+     "row": 67191,
+     "pos_in_doc": 1467,
+     "n_occurrences": 1,
+     "context": " `tokenizer.add_special_tokens()` adds two '<|endoftext|>' tokens,"
+    },
+    {
+     "src": 0,
+     "row": 71363,
+     "pos_in_doc": 2264,
+     "n_occurrences": 1,
+     "context": "\n    eot_token = _tokenizer.encoder[\"<|endoftext|>\"]\n   "
+    },
+    {
+     "src": 0,
+     "row": 81402,
+     "pos_in_doc": 229,
+     "n_occurrences": 1,
+     "context": "\ufffd\u05d1\u05d5\u05ea \"\r\nstop_token = \"<|endoftext|>\"\r\n"
+    },
+    {
+     "src": 0,
+     "row": 121946,
+     "pos_in_doc": 293,
+     "n_occurrences": 1,
+     "context": "OK = '<sep>'\nEOS_TOK = '<|endoftext|>'\n\n"
+    },
+    {
+     "src": 0,
+     "row": 124551,
+     "pos_in_doc": 350,
+     "n_occurrences": 3,
+     "context": "dataset, model, tokenizer, device, sample_context='<|endoftext|>', batch_"
+    },
+    {
+     "src": 0,
+     "row": 151898,
+     "pos_in_doc": 238,
+     "n_occurrences": 1,
+     "context": "beam\r\nEND_OF_TEXT_TOKEN = '<|endoftext|>'\r\n"
+    },
+    {
+     "src": 0,
+     "row": 157299,
+     "pos_in_doc": 637,
+     "n_occurrences": 4,
+     "context": "(\n        \"--start_token\",\n        default=\"<|endoftext|>\",\n       "
+    },
+    {
+     "src": 0,
+     "row": 177568,
+     "pos_in_doc": 573,
+     "n_occurrences": 1,
+     "context": "coding this value\n  stop_token: str = \"<|endoftext|>\"\n\n "
+    },
+    {
+     "src": 0,
+     "row": 179473,
+     "pos_in_doc": 2079,
+     "n_occurrences": 1,
+     "context": "\n            # e.g. 'open fridge\\n<|endoftext|>' -> '"
+    },
+    {
+     "src": 0,
+     "row": 181760,
+     "pos_in_doc": 1111,
+     "n_occurrences": 2,
+     "context": " [tokenizer.encode(\"This is \" + desc + \"<|endoftext|>\") for desc"
+    },
+    {
+     "src": 0,
+     "row": 186327,
+     "pos_in_doc": 640,
+     "n_occurrences": 1,
+     "context": " x in test_data]\n\n    # pad with '<|endoftext|>' = ["
+    },
+    {
+     "src": 0,
+     "row": 206233,
+     "pos_in_doc": 1379,
+     "n_occurrences": 5,
+     "context": "\n    eos_token_id = proc.encoder['<|endoftext|>']\n\n   "
+    },
+    {
+     "src": 0,
+     "row": 220388,
+     "pos_in_doc": 1098,
+     "n_occurrences": 2,
+     "context": " test, out-of-sample factual knowledge test\n\n    <|endoftext|>\\n -"
+    },
+    {
+     "src": 0,
+     "row": 232641,
+     "pos_in_doc": 344,
+     "n_occurrences": 1,
+     "context": "_sentences:\n            item = item.replace('<|endoftext|>', '')\n"
+    },
+    {
+     "src": 0,
+     "row": 246574,
+     "pos_in_doc": 112,
+     "n_occurrences": 1,
+     "context": "')\n        self.tokenizer.pad_token = \"<|endoftext|>\"\n\n   "
+    },
+    {
+     "src": 0,
+     "row": 249919,
+     "pos_in_doc": 395,
+     "n_occurrences": 1,
+     "context": "=50000, help='Concatenate input files with <|endoftext|> separator into chunks"
+    }
+   ]
+  },
+  "wiki": {
+   "documents_file": "documents/wiki.tsv.gz",
+   "docs": 359986,
+   "tokens_content": 156000819,
+   "tokens_with_eos": 156360805,
+   "target_tokens": 156000000,
+   "selection": {
+    "rule": "materialize the files below in this order (every JSON line whose doc_text() is non-empty, in file order) into one list of docs_before documents; order = list(range(docs_before)); random.Random(42).shuffle(order); keep order[:docs_after] in that order. No document is truncated: the trim stops after the first whole document that brings content tokens to >= target_tokens; the 0.98/1.02 skip rule never fired (docs_scanned == docs_after).",
+    "docs_before": 2951018,
+    "docs_scanned": 359986,
+    "docs_after": 359986,
+    "files_in_materialization_order": [
+     {
+      "src": 53,
+      "path": "data/wiki/wiki-0001.json.gz",
+      "docs_in_file": 2951018,
+      "docs_selected": 359986,
+      "tokens_selected": 156000819,
+      "rows_min": 0,
+      "rows_max": 2951014,
+      "lines_in_file": 2951018,
+      "lines_not_yielded": 0
+     }
+    ]
+   },
+   "publish_objects": [
+    {
+     "name": "tokens/wiki/train-00000.u32le.bin",
+     "token_start": 0,
+     "token_end": 156126264,
+     "first_doc": 0,
+     "first_doc_token_offset": 0,
+     "last_doc": 359391,
+     "last_doc_tokens_included": 437,
+     "last_doc_tokens_with_eos": 482
+    },
+    {
+     "name": "tokens/wiki/val-00000.u32le.bin",
+     "token_start": 156126264,
+     "token_end": 156360805,
+     "first_doc": 359391,
+     "first_doc_token_offset": 437,
+     "last_doc": 359985,
+     "last_doc_tokens_included": 959,
+     "last_doc_tokens_with_eos": 959
+    }
+   ]
+  }
+ }
+}

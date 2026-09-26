@@ -1,0 +1,11 @@
+# rebuild.py -- Python 3.12.3 (FarmShare: /usr/bin/python3.12)
+# Exact versions the original refhq-new-v1 build venv used on FarmShare
+# (/scratch/users/nzhao2/refhq-new-v1/venv), confirmed by `pip freeze` there on
+# 2026-09-25. Install with:
+#   /usr/bin/python3.12 -m venv .venv && . .venv/bin/activate
+#   pip install -r requirements.txt
+huggingface_hub==0.36.1
+transformers==4.44.2
+tokenizers==0.19.1
+numpy==2.5.1
+pyarrow==25.0.0

@@ -1,0 +1,84 @@
+{
+  "corpus_id": "refhq-regmix-5p5b-v1",
+  "tokenizer": {
+    "repo_id": "allenai/dolma2-tokenizer",
+    "revision": "5292e5d6c0f40b67cc765fe41bec991cf4345b5c"
+  },
+  "eos_token_id": 100257,
+  "dtype": "uint32",
+  "byte_order": "little",
+  "layout_rule": {
+    "description": "Each domain's tokenized/<domain>/<domain>.npy (headerless uint32-LE memmap, one EOS token id 100257 appended after every document's content tokens) is split into contiguous 1 GiB (1073741824 byte) shards named tokens/<domain>/train-NNNNN.u32le.bin in byte order, except the LAST shard, from whose tail a validation slice is carved.",
+    "shard_bytes": 1073741824,
+    "val_fraction": 0.0015,
+    "val_selection": "tail (last) VAL_BYTES of the domain's token stream, VAL_BYTES = floor(total_bytes * 0.0015) rounded down to a multiple of 4; written as tokens/<domain>/val-00000.u32le.bin. Implemented in scripts/publish_refhq_edullm_data.py (split_npy_to_shards + carve_val_holdout).",
+    "source_script": "experiments/token-selection/datasets/refhq/scripts/publish_refhq_edullm_data.py"
+  },
+  "totals": {
+    "content_tokens": 5514030574,
+    "tokens_with_eos": 5517296144,
+    "train_tokens_published": 5509020202,
+    "val_tokens_published": 8275942,
+    "train_objects": 24,
+    "val_objects": 7,
+    "docs": 3265570
+  },
+  "verification": {
+    "computed_on": "FarmShare, read-only, from /scratch/users/nzhao2/refhq-regmix-5p5b-v1/tokenized/<domain>/<domain>.npy",
+    "job_ids": [1741746, 1741747],
+    "method": "tools/hash_outputs.sbatch (Slurm array 0-6) -> tools/hash_outputs.py: streams each domain's .npy once, computing sha256 of the whole file and of every 1 GiB train shard / tail val slice implied by the layout rule above. Cross-checked: sum of all object token counts here equals the corpus's stated totals (train 5,509,020,202 + val 8,275,942 = 5,517,296,144 with-EOS, and 24+7=31 objects), which matches independently."
+  },
+  "tokenized_npy": {
+    "dclm": {"path": "tokenized/dclm/dclm.npy", "bytes": 8272009760, "tokens": 2068002440, "docs": 252440, "sha256": "78cb9aac87742db6961b8d502a81e788bbcad2d86ae40678cd459345b89d99fc"},
+    "arxiv": {"path": "tokenized/arxiv/arxiv.npy", "bytes": 5514352328, "tokens": 1378588082, "docs": 72894, "sha256": "c5cd45f28360deadf1e69a0a500102a81ee9f2473338928ff0cab3f65936d1c1"},
+    "starcoder": {"path": "tokenized/starcoder/starcoder.npy", "bytes": 3104123708, "tokens": 776030927, "docs": 762037, "sha256": "39a4403df32d23ba5c56228aacc3db99858db0907804a0a3c1124438eec56c90"},
+    "pes2o": {"path": "tokenized/pes2o/pes2o.npy", "bytes": 2076370888, "tokens": 519092722, "docs": 1879376, "sha256": "ee10089a97e1976c4d2f361ea5c6f93fc4cdbf428dc7dd7ff7d228473dd7b2f3"},
+    "open-web-math": {"path": "tokenized/open-web-math/open-web-math.npy", "bytes": 1401061428, "tokens": 350265357, "docs": 125554, "sha256": "d314dd4d6fefc9918a50ba6e9e7dffa00f9a753e8a70a43780e0b202e4103f26"},
+    "algebraic-stack": {"path": "tokenized/algebraic-stack/algebraic-stack.npy", "bytes": 1356880428, "tokens": 339220107, "docs": 99445, "sha256": "7051378d79b728198d7b13b8f196a96bf157f0b64b7c7419c4db39c74fd1c975"},
+    "wiki": {"path": "tokenized/wiki/wiki.npy", "bytes": 344386036, "tokens": 86096509, "docs": 73824, "sha256": "59bc4646a03aeedffd4f4284d3ad33da115c84b1dea0563eea043de9b4b3b576"}
+  },
+  "publish_objects": [
+    {"name": "tokens/algebraic-stack/train-00000.u32le.bin", "domain": "algebraic-stack", "bytes": 1073741824, "tokens": 268435456, "sha256": "45f1603ad126f0fc64f68c39a3d6dced4147b5bda3248bcb39ad4c7c25a81721"},
+    {"name": "tokens/algebraic-stack/train-00001.u32le.bin", "domain": "algebraic-stack", "bytes": 281103284, "tokens": 70275821, "sha256": "9970ddb809b7bbed49ae1fb54cc927f09896d973a183bee01056504ab14143e2"},
+    {"name": "tokens/algebraic-stack/val-00000.u32le.bin", "domain": "algebraic-stack", "bytes": 2035320, "tokens": 508830, "sha256": "c0af7c8ae87baf45c610ed04ed7cf12bd849ec048e18423a1052eb6224008d1e"},
+
+    {"name": "tokens/arxiv/train-00000.u32le.bin", "domain": "arxiv", "bytes": 1073741824, "tokens": 268435456, "sha256": "639c2a51b3c4480faf0e491df8ebf16acde12f7a7da8583746eec4da8dc886d3"},
+    {"name": "tokens/arxiv/train-00001.u32le.bin", "domain": "arxiv", "bytes": 1073741824, "tokens": 268435456, "sha256": "aa2544c3394943b80c664c671cf4d2b2b2f2eb2a52d88c339e62e0432ff82070"},
+    {"name": "tokens/arxiv/train-00002.u32le.bin", "domain": "arxiv", "bytes": 1073741824, "tokens": 268435456, "sha256": "257a03fd6f7fdb61a4eda169278ea7964546e65f5597bdbfb5a26f8bf419df94"},
+    {"name": "tokens/arxiv/train-00003.u32le.bin", "domain": "arxiv", "bytes": 1073741824, "tokens": 268435456, "sha256": "9b208ec602c563a05c3b4b3604f1a4fff7e0a9c07e5f765b0f92e557649e9d3a"},
+    {"name": "tokens/arxiv/train-00004.u32le.bin", "domain": "arxiv", "bytes": 1073741824, "tokens": 268435456, "sha256": "db58f5fd6f38fdca839392cb9f360b359e84b2bc3d0f8b7fc0a1d9a7a3e62db1"},
+    {"name": "tokens/arxiv/train-00005.u32le.bin", "domain": "arxiv", "bytes": 137371680, "tokens": 34342920, "sha256": "08533c64f7ca24cb48cc573c382c7e8ecadeb97cb903f89889250cfe6d61fcdc"},
+    {"name": "tokens/arxiv/val-00000.u32le.bin", "domain": "arxiv", "bytes": 8271528, "tokens": 2067882, "sha256": "4848e69a9a00c3d3eefe6cbdedee519d94a58b158bcb35d4c2afc03dc56e69f7"},
+
+    {"name": "tokens/dclm/train-00000.u32le.bin", "domain": "dclm", "bytes": 1073741824, "tokens": 268435456, "sha256": "0fdb71fa39924bb5f345cfdd744bb00f2c42509808fe19699d9524b0ce749b5d"},
+    {"name": "tokens/dclm/train-00001.u32le.bin", "domain": "dclm", "bytes": 1073741824, "tokens": 268435456, "sha256": "d1f601a3f11c56be425c4b4a23cf08d756410be34019fcc9e32192aa044d79fd"},
+    {"name": "tokens/dclm/train-00002.u32le.bin", "domain": "dclm", "bytes": 1073741824, "tokens": 268435456, "sha256": "0cceb952914be18ad56788caef4c22be95aacc8c58931eafd5d1a77c6499bd2e"},
+    {"name": "tokens/dclm/train-00003.u32le.bin", "domain": "dclm", "bytes": 1073741824, "tokens": 268435456, "sha256": "9fb058e9e8417d98646dd378a268dd56a8729fc4bc983e3d01113b174cbf2e21"},
+    {"name": "tokens/dclm/train-00004.u32le.bin", "domain": "dclm", "bytes": 1073741824, "tokens": 268435456, "sha256": "8ff86ff2e0586407b8cd4a147ae08e00257b2b9744ecb572e3f4b0fd23bed3b1"},
+    {"name": "tokens/dclm/train-00005.u32le.bin", "domain": "dclm", "bytes": 1073741824, "tokens": 268435456, "sha256": "03cb63fb30cd8514ba8426f31f1ca85c05ccec0fa1ef8e6da810b2f923582e11"},
+    {"name": "tokens/dclm/train-00006.u32le.bin", "domain": "dclm", "bytes": 1073741824, "tokens": 268435456, "sha256": "aa20c841f3b72c5056b6df651428e1c292cca6bf90fd7065c2cff0d541c57511"},
+    {"name": "tokens/dclm/train-00007.u32le.bin", "domain": "dclm", "bytes": 743408980, "tokens": 185852245, "sha256": "acd278098596eba955140f86d23b916f7546b967d7f77e9c4415da91e218b856"},
+    {"name": "tokens/dclm/val-00000.u32le.bin", "domain": "dclm", "bytes": 12408012, "tokens": 3102003, "sha256": "7761c9d1dfc9d2608191aa8c62984395e62ea649aecb863d064736be003c39a6"},
+
+    {"name": "tokens/open-web-math/train-00000.u32le.bin", "domain": "open-web-math", "bytes": 1073741824, "tokens": 268435456, "sha256": "a908d6c96978634606928086b100ce63f77aff2d89a5398432c76f5e31df3a77"},
+    {"name": "tokens/open-web-math/train-00001.u32le.bin", "domain": "open-web-math", "bytes": 325218012, "tokens": 81304503, "sha256": "648dfa22e5012077703116c30d0e75686452ca302cff25bbc3748d8399883a0d"},
+    {"name": "tokens/open-web-math/val-00000.u32le.bin", "domain": "open-web-math", "bytes": 2101592, "tokens": 525398, "sha256": "3008f4c0cbd2b9c9dbcfb03ae7c24ebb94f11cfecaa3aab3e47a89338faa4512"},
+
+    {"name": "tokens/pes2o/train-00000.u32le.bin", "domain": "pes2o", "bytes": 1073741824, "tokens": 268435456, "sha256": "7fcde8cf0dcef9dc3817ac243be738f84bbeb4a3fd52aad1480f06399c164c0a"},
+    {"name": "tokens/pes2o/train-00001.u32le.bin", "domain": "pes2o", "bytes": 999514508, "tokens": 249878627, "sha256": "6d03b78b793f83bda2a4dac002555ac21273449297d2581b84b4fa0166cd4259"},
+    {"name": "tokens/pes2o/val-00000.u32le.bin", "domain": "pes2o", "bytes": 3114556, "tokens": 778639, "sha256": "c1ec4733fff14d4c11c0b349c975438408c061d60e5e7c89d3226857c854b2f5"},
+
+    {"name": "tokens/starcoder/train-00000.u32le.bin", "domain": "starcoder", "bytes": 1073741824, "tokens": 268435456, "sha256": "608c3a73f0662f517d527348b41964934b79d31804661f9abe6651fbe7e27680"},
+    {"name": "tokens/starcoder/train-00001.u32le.bin", "domain": "starcoder", "bytes": 1073741824, "tokens": 268435456, "sha256": "0005db4230a9446bbb188b9f8086449f5ae0ef069133691503dc26daaebbd7ce"},
+    {"name": "tokens/starcoder/train-00002.u32le.bin", "domain": "starcoder", "bytes": 951983876, "tokens": 237995969, "sha256": "1e10a8bfef823aab16a0f6a3e55adb33c55ee19a1f1fc506d6c83cdecf8db255"},
+    {"name": "tokens/starcoder/val-00000.u32le.bin", "domain": "starcoder", "bytes": 4656184, "tokens": 1164046, "sha256": "9f712483618d2df6dc7c496a4064ecd527798cad9c812f449c7ea0a24da1989b"},
+
+    {"name": "tokens/wiki/train-00000.u32le.bin", "domain": "wiki", "bytes": 343869460, "tokens": 85967365, "sha256": "83e375064be88adebe336a9580417be1b177d3422b9bf0b0990d3b8e766d6b3f"},
+    {"name": "tokens/wiki/val-00000.u32le.bin", "domain": "wiki", "bytes": 516576, "tokens": 129144, "sha256": "e24dba13353f3695103540afc7471f76563354db7a585984a5b45a7fbbec2e2e"}
+  ],
+  "notes": [
+    "The publish_objects sha256 values were computed directly from the surviving tokenized/<domain>/<domain>.npy files by streaming (never materializing the split), so they are exact regardless of whether the original S3-published copy under s3://edullm-landing/pretrain/refhq-regmix-5p5b/... still exists.",
+    "The original publish-stage log (hq-tok-up-*.out under the build dir) records only the S3 upload, not per-object hashes; no publish-stage hash manifest was found to survive on scratch. These hashes are therefore the first recorded sha256 for the published objects.",
+    "docs count per domain here is content-document count (writer.finalize() docs), matching tokenized/<domain>/<domain>.json's 'docs' field; it is NOT the number of publish_objects (which are byte shards, not documents)."
+  ]
+}

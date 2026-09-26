@@ -1,2 +1,5 @@
 # Force Unix line endings for SLURM scripts (sbatch rejects CRLF).
 *.sh text eol=lf
+
+# Keep LF in the dataset manifests so the script and file hashes recorded in their READMEs hold on every platform.
+datasets/manifests/** text=auto eol=lf

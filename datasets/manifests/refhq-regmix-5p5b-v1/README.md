@@ -176,6 +176,11 @@ default. See the Verification table for the sampled byte-equality check.
 
 ## Rebuilding
 
+StarCoder comes from `bigcode/starcoderdata`, which is gated. Before rebuilding it, accept the
+dataset's terms on its Hugging Face page, then make a read token available to the script:
+set `HF_TOKEN`, run `huggingface-cli login`, or pass `--hf-token`. The other six domains
+download anonymously.
+
 ```
 python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt

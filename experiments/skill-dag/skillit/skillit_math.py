@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Skill-It weight update and adjacency construction helpers.
 
-Offline A (probe arm): Chinchilla-extrapolated one-hot probes vs RegMix reference
-``L_j(r_RegMix)`` from ``mixlaw_fit_chinchilla.json``; loaded from ``artifacts/A_offline.npy``.
+Offline A (probe arm): Chinchilla-extrapolated one-hot probes vs the MixLaw fit's
+prediction ``L_j(r_RegMix)`` from ``mixlaw_fit_chinchilla.json``, where ``regmix``
+in this module's names denotes the Data Mixing Laws paper mixture; loaded from
+``artifacts/probes_full/A_offline.npy``.
 Online A (derivative arm): from the parametric mixing law
 
     L_j(r) = c_j + k_j * exp( sum_i t_ij * r_i )

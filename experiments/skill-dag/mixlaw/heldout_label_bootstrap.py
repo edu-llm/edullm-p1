@@ -7,7 +7,7 @@ fit y = a + b/step**alpha on steps >= 1000, alpha-free residual bootstrap,
 n_boot = 200000, seed = 0, one independent stream per arm, control = the
 element-by-element average of the two control seeds' draws.
 
-Input is heldout_curves.json, the per-step means of the two label subsets
+Input is heldout_label_curves.json, the per-step means of the two label subsets
 pulled from W&B (12 targeted = val+test of the six optimized skills; 8
 never-targeted = boolq, csqa, hellaswag, openbookqa val+test, piqa, socialiqa,
 winogrande).

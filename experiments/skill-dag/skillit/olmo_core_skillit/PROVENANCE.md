@@ -1,8 +1,8 @@
 # Provenance of this directory
 
 This is the code that actually produced the two Skill-It 370M runs reported in
-the paper. It is a **copy**, vendored here so that the paper's "all code is
-available" claim is true from this repository alone.
+the paper. It is a **copy**, vendored here so that the code behind the paper's
+dynamic-reweighting results is available from this repository alone.
 
 ## Where it came from
 
@@ -98,7 +98,7 @@ The evaluator here is not the same version as the one vendored for token
 selection (`experiments/token-selection/olmo_core_token_selection/`); each copy
 is the one its own runs used.
 
-SHA-256 of each file here (LF):
+SHA-256 of each vendored file here (LF):
 
 ```
 ba2de34db6a4cf6156c514a9f5bcf463fbd5343c1f34223d5ac459a5a74cb394  runpod/entrypoint.py
@@ -137,6 +137,20 @@ f387223dbf3eb6282b5295bfa1da8a7319a9784af574d961e0bee055dc6f42a3  farmshare/conf
   Skill-It path.
 - `tests/` and `rehearsal.md`: they produced no reported number.
 - The OLMo-core library (`src/`): identical to `f2ded0b6`, as noted above.
+
+## Added after vendoring
+
+Three files in `farmshare/` were added after this directory was vendored, so
+they are not in the SHA-256 list above: `patch_legacy_static_lgbm_arm.py`,
+`farmshare_static_lgbm_l40s.sbatch` and
+`farmshare_preflight_submit_static_lgbm.sh`. They produced the 4×L40S rerun of
+the static LightGBM mixture (Slurm job 1744338, W&B `eduLLM/skillit/zgmte13g`).
+The patch script added a static arm (arm index 2, `a_mode` `static`, no
+Skill-It updates) to a separate copy of this bundle; every source string it
+replaces, including `RECIPE_SHA256 = "28506e7c…"` in `skillit_math.py`, occurs
+exactly once in the files here. The two shell scripts preflighted, submitted
+and ran that patched copy. The vendored files themselves were left unmodified,
+and their hashes above still hold.
 
 ## Caveat
 

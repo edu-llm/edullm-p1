@@ -347,6 +347,55 @@
     1.6254812836647035,
     1.6215846300125123
    ]
+  },
+  "lightgbm-l40s": {
+   "label": "LightGBM fit (ours), 4\u00d7L40S rerun",
+   "wandb_run": "eduLLM/skillit/zgmte13g",
+   "steps": [
+    0,
+    125,
+    250,
+    375,
+    500,
+    625,
+    750,
+    875,
+    1000,
+    1125,
+    1250,
+    1375,
+    1500,
+    1625,
+    1750,
+    1875,
+    2000,
+    2125,
+    2250,
+    2384
+   ],
+   "macro_bpb": [
+    4.47281289100647,
+    2.608544635772705,
+    2.280844008922577,
+    2.034141057729721,
+    1.9141574412584306,
+    1.847699037194252,
+    1.7912550300359726,
+    1.758649578690529,
+    1.7280881881713868,
+    1.6991565883159638,
+    1.693314602971077,
+    1.6633358120918273,
+    1.6538105934858323,
+    1.6557191997766494,
+    1.6409108877182006,
+    1.6405665069818496,
+    1.634474241733551,
+    1.6253210186958313,
+    1.6283560752868653,
+    1.6247784465551376
+   ],
+   "provenance": "FarmShare Slurm job 1744338 on four L40S GPUs (W&B name static-lgbm-min1pct-farmshare-1744338): the LightGBM 1%-floor mixture retrained with dynamic reweighting disabled. It ran the Skill-It trainer at arm index 2 (a_mode static) with data seed 42, from a copy of the vendored experiments/skill-dag/skillit/olmo_core_skillit/ bundle patched by farmshare/patch_legacy_static_lgbm_arm.py, so the domain weights stayed fixed at the LGB-min1pct optimum and W&B logs only the step-0 Skill-It snapshot. Hardware, data seed and training code therefore match the probe and derivative arms, and its step-0 macro_bpb, 4.47281289100647, is identical to theirs (and to the seed-12345 control's), so it also shares their initialization. W&B marks the run failed, but training finished all 2384 steps and logged the step-2384 eval; only afterwards did OLMo-core's W&B callback call wandb.finish(exit_code=..., quiet=True), which the installed wandb rejects with TypeError: finish() got an unexpected keyword argument 'quiet'. The step-2384 value (1.6247784465551376) is exactly the unweighted mean of all 20 labels, and every point in this series comes from the run's metrics history."
   }
  }
 }

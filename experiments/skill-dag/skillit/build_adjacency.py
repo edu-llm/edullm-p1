@@ -8,7 +8,8 @@ Pipeline:
   2. Chinchilla-extrapolate each curve family to step 5806 (tpp=20) via
      ``mixlaw/extrapolate_chinchilla.py`` logic.
   3. ``A_ij = max(0, L_j(r_RegMix) - L_i_j)`` for domains i and families j,
-     with ``L_j(r_RegMix)`` from ``mixlaw_fit_chinchilla.json``.
+     with ``L_j(r_RegMix)`` the MixLaw fit's prediction (``mixlaw_fit_chinchilla.json``)
+     at the Data Mixing Laws paper mixture, which this code calls ``regmix``.
   4. Write ``artifacts/A_offline.npy`` plus named JSON on runtime scratch and
      upload the directory to W&B.
 """

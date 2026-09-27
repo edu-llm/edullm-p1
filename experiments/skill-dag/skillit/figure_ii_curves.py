@@ -24,6 +24,16 @@ here. It is the probe arm's observed final task loss (1.6124) in the paper.
 ``OLMO_AVERAGE`` is unaffected: it is built from the intersection of the two
 seeds' steps, and seed 12345 never had a 2375 eval, so the average never
 included it.
+
+``lgbm_static_l40s`` is the 4xL40S rerun of the LightGBM 1%-floor static
+mixture (FarmShare job 1744338, W&B ``eduLLM/skillit/zgmte13g``): the Skill-It
+trainer at arm index 2 with dynamic reweighting disabled. It shares the probe
+and derivative arms' hardware, initialization, data seed (42) and training
+code, which ``lgbm_control`` (the 8xA100 run) does not. W&B marks it failed
+only because OLMo-core's W&B callback called ``wandb.finish(..., quiet=True)``
+after all 2384 steps had trained and the step-2384 eval had been logged. The
+series is copied from ``lightgbm-l40s`` in
+``../mixlaw/skill_dag_370m_wandb_curves.json``, which records its provenance.
 """
 
 OLMO_SEED12536 = {
@@ -49,6 +59,11 @@ CURVES = {
         "wandb_path": "eduLLM/skillit/2m00hdwr",
         "steps": [0,125,250,375,500,625,750,875,1000,1125,1250,1375,1500,1625,1750,1875,2000,2125,2250,2384],
         "curve": [4.4261352777481076,2.666497975587845,2.3803920209407807,2.101907157897949,1.9341304361820222,1.8494510263204575,1.8062498718500137,1.787355864048004,1.738598108291626,1.7119211167097093,1.687327927350998,1.6799303203821183,1.6631824493408203,1.652594181895256,1.640337383747101,1.628769725561142,1.6267277270555496,1.6203553318977355,1.6132047593593597,1.6077178746461869],
+    },
+    "lgbm_static_l40s": {
+        "wandb_path": "eduLLM/skillit/zgmte13g",
+        "steps": [0,125,250,375,500,625,750,875,1000,1125,1250,1375,1500,1625,1750,1875,2000,2125,2250,2384],
+        "curve": [4.47281289100647,2.608544635772705,2.280844008922577,2.034141057729721,1.9141574412584306,1.847699037194252,1.7912550300359726,1.758649578690529,1.7280881881713868,1.6991565883159638,1.693314602971077,1.6633358120918273,1.6538105934858323,1.6557191997766494,1.6409108877182006,1.6405665069818496,1.634474241733551,1.6253210186958313,1.6283560752868653,1.6247784465551376],
     },
     "regmix_control": {
         "wandb_path": "eduLLM/skillit/ugzjxsda",

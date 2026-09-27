@@ -8,8 +8,12 @@ cd /mnt/c/alpha_ai/OLMo-core-token-selection-370m
 ARM=attention bash .edullm/farmshare/submit_from_laptop.sh
 ```
 
-BLADE requires RefHQ stream staging (`REFHQ_VERSION=v1` by default). Reference
+BLADE requires RefHQ stream staging (`REFHQ_VERSION=v1` by default; the reported BLADE
+run used `pretrain/refhq-instruct/v3` and ran on RunPod, see `../runpod/`). Reference
 checkpoints are downloaded only for arms that need them.
+
+The reported FarmShare runs (full-loss control, both random-control seeds, REL-EMA)
+all ran on 4 × L40S (`TRAIN_GPUS=4`, below); none used the 8-GPU default.
 
 Restage before switching arms. Use `SKIP_TRAIN=1` to stage without launching
 training.

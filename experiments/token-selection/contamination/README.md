@@ -5,7 +5,7 @@ audit of the three corpora used in the token-selection experiment. It
 **replaces** an earlier verbatim-13-gram audit that lived at this path: that
 audit's own denominator (40,087 items) and per-corpus match counts (358 /
 438 / 1,472) did not match the numbers this paper's text now reports (40,582
-items; 957 / 1,010 / 2,432, with the HQ count since rescanned on the trained build as 1,180), and neither the scanner nor the eval-item index
+items; 957 / 1,180 / 2,432 for the training, HQ and Instruct corpora), and neither the scanner nor the eval-item index
 that produced them had ever been committed here, so the discrepancy was not
 reproducible from this repo. This directory now vendors the code that
 produced the *current* numbers, so the join can be checked directly rather

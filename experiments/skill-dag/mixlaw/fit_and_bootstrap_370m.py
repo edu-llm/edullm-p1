@@ -4,6 +4,14 @@
 Reproduces Tables II and III of the paper from the committed curve file
 ``skill_dag_370m_wandb_curves.json``. No network or W&B access required.
 
+Table III compares the two dynamic-reweighting (Skill-It) arms with two runs of
+the static 1%-floor LightGBM mixture they start from: the original 8xA100 run
+(``lightgbm``) and a 4xL40S rerun with dynamic reweighting disabled
+(``lightgbm-l40s``). The rerun shares the dynamic arms' hardware,
+initialization, data seed and training code; the 8xA100 run does not. Both
+dynamic arms are tested against both static runs, and the two static runs
+against each other, which measures run-to-run variation at a fixed mixture.
+
 Method
 ------
 For each arm we fit
@@ -30,11 +38,17 @@ be independent. Drawing every arm's resample indices from one seeded generator
 silently couples them and distorts every between-arm interval -- here it made
 the derivative arm's bootstrap draws correlate +0.91 with the control's and the
 probe arm's -0.43, shrinking one difference interval and inflating the other.
+``SeedSequence.spawn`` children are indexed by position, so a run appended at
+the end of the curve file's ``runs`` (as ``lightgbm-l40s`` was) leaves every
+earlier arm's stream, and every earlier number, unchanged.
 
 The Olmo-mix-1124 control is the *average of the two dataloader seeds*: its
 bootstrap distribution is the element-by-element mean of the two seeds' own
 alpha-free bootstrap distributions, and its CI is the 2.5/97.5 percentiles of
-that averaged distribution.
+that averaged distribution. The two control runs differ in dataloader seed,
+hardware (8xA100 vs 4xL40S, which also changed the realized initialization)
+and training code, so their difference (``seed_variance_estimate``) is not a
+pure data-order contrast.
 
 p-values are two-sided bootstrap tests on the difference of two independent
 distributions, ``p = 2 * min(P(diff <= 0), P(diff >= 0))``, floored at the
@@ -67,6 +81,17 @@ VS_CONTROL = [
     "lightgbm",
     "skillit-probe",
     "skillit-derivative",
+    "lightgbm-l40s",
+]
+
+# (arm, reference) pairs reported as arm - reference: both dynamic arms against
+# both static LightGBM runs, then the two static runs against each other.
+VS_STATIC = [
+    ("skillit-probe", "lightgbm"),
+    ("skillit-derivative", "lightgbm"),
+    ("skillit-probe", "lightgbm-l40s"),
+    ("skillit-derivative", "lightgbm-l40s"),
+    ("lightgbm-l40s", "lightgbm"),
 ]
 
 
@@ -216,27 +241,29 @@ def main() -> None:
         }
         print(f"{key:28s} vs olmo avg: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
-    # Dynamic arms against the best static mixture (LightGBM), which is the
-    # comparison the dynamic-reweighting conclusion actually rests on.
+    # Dynamic arms against the static LightGBM mixture they start from, both the
+    # 8xA100 run and the matched 4xL40S rerun, and the two static runs against
+    # each other (run-to-run variation at a fixed mixture).
     print()
-    for key in ("skillit-probe", "skillit-derivative"):
-        d = finals[key] - finals["lightgbm"]
-        p = diff_p(finals[key], finals["lightgbm"])
+    for key, ref in VS_STATIC:
+        d = finals[key] - finals[ref]
+        p = diff_p(finals[key], finals[ref])
         lo, hi = ci(d)
-        out["comparisons"][f"{key}_vs_lightgbm"] = {
+        out["comparisons"][f"{key}_vs_{ref}"] = {
             "mean_diff_bpb": round(float(d.mean()), 6),
             "ci95": [round(lo, 6), round(hi, 6)],
             "p_value": p,
             "p_display": fmt_p(p, args.n_boot),
         }
-        print(f"{key:28s} vs LightGBM: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
+        print(f"{key:20s} vs {ref:14s}: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
     # Seed-variance estimate quoted in the paper.
     d = finals[s1] - finals[s2]
     p = diff_p(finals[s1], finals[s2])
     lo, hi = ci(d)
     out["seed_variance_estimate"] = {
-        "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (dataloader seed only)",
+        "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (the two controls "
+                       "differ in dataloader seed, hardware and training code)",
         "mean_diff_bpb": round(float(d.mean()), 6),
         "ci95": [round(lo, 6), round(hi, 6)],
         "p_value": p,

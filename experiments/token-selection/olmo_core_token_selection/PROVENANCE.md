@@ -15,7 +15,11 @@ from this repository alone.
 | Copied on | 2026-09-19 |
 
 This directory is byte-identical to `.edullm/` at that commit, for every file
-listed below.
+listed below, except three documentation files edited here afterwards to match the
+paper: `README-token-selection.md`, `runpod/README.md` and `farmshare/README.md` (they
+dropped an unreported `rel-ema-refhq` arm that `arms.py` does not define, name RHO-1's
+Instruct-v3 step-940 reference, and record the hardware the reported runs used). No
+code file was changed.
 
 At the time the study ran, this code existed only as an uncommitted working tree
 on one laptop. It was committed upstream as `bf087c8f` ("Commit the

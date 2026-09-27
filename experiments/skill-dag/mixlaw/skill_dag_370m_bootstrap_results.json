@@ -72,6 +72,15 @@
         1.623463
       ]
     },
+    "lightgbm-l40s": {
+      "label": "LightGBM fit (ours), 4\u00d7L40S rerun",
+      "fitted_final": 1.623822,
+      "observed_final": 1.624778,
+      "ci95": [
+        1.619003,
+        1.629077
+      ]
+    },
     "olmo-mix-1124-average": {
       "label": "Olmo-mix-1124 average",
       "fitted_final": 1.629114,
@@ -128,6 +137,15 @@
       "p_value": 0.00356,
       "p_display": "p = 0.0036"
     },
+    "lightgbm-l40s_vs_olmo_average": {
+      "mean_diff_bpb": -0.005271,
+      "ci95": [
+        -0.011846,
+        0.001616
+      ],
+      "p_value": 0.13237,
+      "p_display": "p = 0.1324"
+    },
     "skillit-probe_vs_lightgbm": {
       "mean_diff_bpb": 0.003245,
       "ci95": [
@@ -145,10 +163,37 @@
       ],
       "p_value": 0.00199,
       "p_display": "p = 0.0020"
+    },
+    "skillit-probe_vs_lightgbm-l40s": {
+      "mean_diff_bpb": -0.012563,
+      "ci95": [
+        -0.018795,
+        -0.006842
+      ],
+      "p_value": 5e-06,
+      "p_display": "p < 5e-06"
+    },
+    "skillit-derivative_vs_lightgbm-l40s": {
+      "mean_diff_bpb": -0.007194,
+      "ci95": [
+        -0.014803,
+        0.001159
+      ],
+      "p_value": 0.08715,
+      "p_display": "p = 0.0872"
+    },
+    "lightgbm-l40s_vs_lightgbm": {
+      "mean_diff_bpb": 0.015809,
+      "ci95": [
+        0.010243,
+        0.021847
+      ],
+      "p_value": 5e-06,
+      "p_display": "p < 5e-06"
     }
   },
   "seed_variance_estimate": {
-    "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (dataloader seed only)",
+    "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (the two controls differ in dataloader seed, hardware and training code)",
     "mean_diff_bpb": 0.004445,
     "ci95": [
       -0.004611,

@@ -1,15 +1,23 @@
 """Figure II: Task loss curves for the dynamic-reweighting arms (Probe, Derivative)
-compared to the static control (Data Mixing Laws paper mix / regmix-control).
+compared with the Olmo-mix-1124 control (the average of its two seeds) and with
+the static LightGBM 1%-floor mixture both arms start from. The static mixture
+is drawn twice: the original 8xA100 run and the 4xL40S rerun with dynamic
+reweighting disabled (FarmShare job 1744338), which shares the dynamic arms'
+hardware, initialization, data seed and training code. The two static runs
+finish 0.0158 bpb apart, more than either dynamic arm's advantage over the
+matched rerun, so the figure shows the run-to-run variation the dynamic arms
+have to be read against.
 
-Regenerated using the completed FarmShare probe rerun (job 1730368) and the
-existing derivative/control runs. The stale third arm ("Probe with optimized
-start", from the superseded RunPod-era run set) has been dropped.
+Regenerated using the completed FarmShare probe rerun (job 1730368), the
+existing derivative/control runs and the 4xL40S static rerun. The stale third
+arm ("Probe with optimized start", from the superseded RunPod-era run set) has
+been dropped.
 
 The curve data lives alongside this script in `figure_ii_curves.py` so the
 figure is reproducible from the repository rather than from a scratch
 directory.
 
-Two revisions to the originally published panel:
+Three revisions to the originally published panel:
 
 * The palette no longer pairs red against green. Red-green is the most
   common form of color vision deficiency, and the two arms that the figure
@@ -22,6 +30,10 @@ Two revisions to the originally published panel:
   12345), while every reweighting arm was run once. The band therefore sets
   the scale against which the single-seed arms should be read, and no band
   is drawn for those arms because none was measured.
+* The two LightGBM static runs share the purple hue so they read as one
+  mixture trained twice: the 8xA100 run keeps its dotted line and filled
+  diamonds, and the 4xL40S rerun is a lighter violet dashed line with hollow
+  diamonds, so the two still separate in grayscale.
 """
 from __future__ import annotations
 import sys
@@ -45,14 +57,19 @@ plt.rcParams.update({
     "axes.linewidth": 0.9,
 })
 
-# Colorblind-safe: grey control, then blue / orange / purple. No red-green pair.
+# Colorblind-safe: grey control, then blue / orange / purple (two shades for the
+# two LightGBM static runs). No red-green pair.
 # Distinct dash patterns and markers so the series also separate in grayscale.
 SERIES = [
     ("olmo_average", "Olmo-mix-1124 average (control)", "#6B7280", (0, (5, 2)), "s"),
-    ("lgbm_control", "LightGBM static", "#7C3AED", (0, (1, 1.6)), "D"),
+    ("lgbm_control", "LightGBM static (8\u00d7A100)", "#7C3AED", (0, (1, 1.6)), "D"),
+    ("lgbm_static_l40s", "LightGBM static (4\u00d7L40S)", "#A78BFA", (0, (3, 1.4)), "D"),
     ("probe", "Probe", "#2563EB", "-", "o"),
     ("derivative", "Derivative", "#D97706", (0, (6, 1.6, 1.4, 1.6)), "^"),
 ]
+# Hollow markers for the 4xL40S static rerun, so the two LightGBM static runs
+# differ in marker fill as well as in shade and dash.
+MARKER_FACE = {"lgbm_static_l40s": "white"}
 
 CONTROL_BAND_COLOR = "#9CA3AF"
 X_LEFT = 700
@@ -122,6 +139,7 @@ for key, label, color, ls, marker in SERIES:
     steps = [s for s in d["steps"] if s >= MIN_STEP]
     vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= MIN_STEP]
     ax.plot(steps, vals, color=color, linestyle=ls, marker=marker,
+            markerfacecolor=MARKER_FACE.get(key, color),
             markersize=3.5, linewidth=1.8, label=label, zorder=3)
 
 # This panel leaves its y-limits to autoscale, so freeze them before adding the
@@ -149,8 +167,11 @@ ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, \u2193 lower is better)")
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
+# Spacing tightened slightly for the sixth entry so the box stays below the
+# curves passing over its top-right corner near step 1350.
 ax.legend(loc="lower left", fontsize=10, frameon=True, framealpha=0.92,
-          edgecolor="none", facecolor="white", borderpad=0.5, labelspacing=0.35)
+          edgecolor="none", facecolor="white", borderpad=0.4, labelspacing=0.3,
+          borderaxespad=0.3)
 ax.set_xlim(MIN_STEP, 2450)
 # Same axes rectangle as Figures I and III, so the 12pt type occupies the
 # same fraction of the canvas in all three.
@@ -170,6 +191,7 @@ for key, label, color, ls, marker in SERIES:
     steps = [s for s in d["steps"] if s >= 1900]
     vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= 1900]
     axins.plot(steps, vals, color=color, linestyle=ls, marker=marker, markersize=3,
+               markerfacecolor=MARKER_FACE.get(key, color),
                linewidth=1.5, zorder=3)
 # Same lead-in treatment in the inset. Both of its axes are autoscaled, so
 # capture the limits first and restore them after, then extend each curve to

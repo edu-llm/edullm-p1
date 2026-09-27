@@ -64,12 +64,13 @@ assert torch.version.cuda, "CPU-only torch wheel installed"
 assert torch.cuda.device_count() == 8, torch.cuda.device_count()
 assert "arc_easy_val_rc_5shot_bpb" in label_to_task_map
 assert tuple(ARM_SPECS) == (
+    "full-loss-control",
     "rho-1",
     "rel-ema-exp",
-    "rel-ema-refhq",
     "middle-ppl-token",
     "attention",
     "blade",
+    "random-control",
 )
 print("RunPod bootstrap ready:", torch.__version__, torch.version.cuda)
 print(TransformerConfig.olmo2_370M(vocab_size=100352).__class__.__name__)

@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "description": "Skill-It OLMo2-370M dual-arm training (10B tokens). Streams from published edullm-data domain shards at RegMix initial weights; mid-run Skill-It updates via DomainMixtureStream.set_weights.",
+  "description": "Skill-It OLMo2-370M dual-arm training (10B tokens). Streams from published edullm-data domain shards starting at the 1%-floor LightGBM optimum (LGB-min1pct); mid-run Skill-It updates via DomainMixtureStream.set_weights.",
   "budget_tokens": 10000000000,
   "domain_order": [
     "dclm",

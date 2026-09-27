@@ -1,0 +1,21 @@
+# Python 3.12.3 (FarmShare login/compute nodes ship /usr/bin/python3.12 at this version).
+# Exact versions verified against the original regmix-10b-20260725-124810 build venv,
+# restricted to what rebuild.py actually imports (directly or transitively):
+#   numpy            - token array handling / memmap / sha256 buffering
+#   huggingface_hub   - hf_hub_download() for the pinned olmo-mix-1124 + dolma2-tokenizer files
+#   hf-xet            - Xet-backend download support huggingface_hub uses for this repo
+#   transformers      - AutoTokenizer.from_pretrained(..., use_fast=True)
+#   tokenizers        - the fast (Rust) tokenizer backend transformers dispatches to
+#   zstandard         - decompresses the .jsonl.zstd source shards
+#
+# `pip install -r requirements.txt` will also pull each package's own declared
+# dependencies (httpx/httpcore/h11/anyio/certifi/idna for huggingface_hub's HTTP client,
+# filelock/fsspec/packaging/PyYAML/regex/safetensors/tqdm/typing_extensions for
+# transformers, etc.); none of those affect tokenization determinism, only network and
+# packaging plumbing, so they are left unpinned and resolved by pip.
+numpy==2.5.1
+huggingface_hub==1.24.0
+hf-xet==1.5.2
+transformers==5.14.1
+tokenizers==0.22.2
+zstandard==0.25.0

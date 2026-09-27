@@ -1,0 +1,43 @@
+{
+ "domains": {
+  "dclm": {
+   "docs": 2800640,
+   "gz_bytes": 32615013
+  },
+  "arxiv": {
+   "docs": 130087,
+   "gz_bytes": 1524187
+  },
+  "starcoder": {
+   "docs": 985925,
+   "gz_bytes": 11405651
+  },
+  "pes2o": {
+   "docs": 150710,
+   "gz_bytes": 1781600
+  },
+  "open-web-math": {
+   "docs": 97937,
+   "gz_bytes": 1136634
+  },
+  "algebraic-stack": {
+   "docs": 223705,
+   "gz_bytes": 2540016
+  },
+  "wiki": {
+   "docs": 359986,
+   "gz_bytes": 4164190
+  }
+ },
+ "totals": {
+  "docs": 4748990,
+  "tokens_content": 10000058051,
+  "tokens_with_eos": 10004807041,
+  "tokens_val": 15007207,
+  "tokens_train": 9989799834,
+  "objects": 55
+ },
+ "zstd_frames": [],
+ "files_with_unyielded_lines": [],
+ "docs_text_from_fallback_field": 0
+}

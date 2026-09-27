@@ -6,6 +6,13 @@ Instruct reference. It is a **copy**, vendored here so a reader following this
 repo's "Code and data availability" link can find the pipelines that produced
 the data, not just the prose description of them in the appendix tables.
 
+We do not redistribute these datasets or our derived subsets; the S3 locations the
+scripts read and write are the project's private stores. To rebuild a corpus byte for
+byte from its public Hugging Face sources, use the document manifests in
+[`../../../datasets/manifests/`](../../../datasets/manifests/): `regmix-10b-v1` (training
+corpus), `refhq-regmix-5p5b-v1` (HQ reference) and `refhq-new-v1` (Instruct reference).
+The pipelines here record how each corpus was selected; the manifests replay the result.
+
 ## Where it came from
 
 All of it is copied unchanged from the top level of this same repo, under
@@ -14,9 +21,9 @@ All of it is copied unchanged from the top level of this same repo, under
 | Here | Source | Produces |
 | --- | --- | --- |
 | `olmo/` | `datasets/olmo/` | `olmo-mix-1124-30b` — a ~30B-token stratified sample of `allenai/olmo-mix-1124` (Hugging Face) |
-| `olmohq/` | `datasets/olmohq/` | `olmo100b/olmo-mix-1124-30b` — an upsampled ~100B+ pool built on top of the 30B sample, sized to cover RegMix's per-domain targets |
-| `regmix/` | `datasets/regmix/` | `pretrain/regmix-10b` **v1** — the paper's 10B-token training corpus, domain-weighted from the pool above |
-| `refhq/` | `datasets/refhq/` | `refhq/refhq-regmix-5p5b-v1` — the paper's 5.5B-token HQ reference corpus (DCLM, StarCoder, peS2o, arXiv, OpenWebMath, Algebraic Stack, Wikipedia) |
+| `olmohq/` | `datasets/olmohq/` | `olmo100b/olmo-mix-1124-30b` — an upsampled ~100B+ pool built on top of the 30B sample, sized to cover `pretrain/regmix-10b`'s per-domain targets |
+| `regmix/` | `datasets/regmix/` | `pretrain/regmix-10b` **v1** — the paper's 10B-token training corpus, domain-weighted from the pool above with Data Mixing Laws weights (paper Table 4; the `regmix` name is historical) |
+| `refhq/` | `datasets/refhq/` | `refhq/refhq-regmix-5p5b-v1` — the paper's 5.5B-token HQ reference corpus, the same seven domains (DCLM, StarCoder, peS2o, arXiv, OpenWebMath, Algebraic Stack, Wikipedia); only arXiv comes from `allenai/olmo-mix-1124`, the other six from their original public releases |
 | `refhq_new/` | `datasets/refhq_new/` | `pretrain/refhq-instruct` — the paper's ~3.9B-token Instruct reference corpus (Tulu-v2, OpenHermes-2.5, Tulu-3, Hermes-3, SmolTalk, Dolci) |
 | top-level `*.py`/`*.sbatch` here | `datasets/*.py`/`*.sbatch` | Shared utilities the four pipelines above import or invoke |
 
@@ -25,8 +32,9 @@ along with the calls to them; S3 reads and writes use the standard AWS credentia
 
 `olmo/` and `olmohq/` are here because `regmix/` depends on them: the 10B
 training corpus is a domain-weighted subsample of the `olmohq` pool, which is
-itself built on top of the `olmo` 30B sample. Reproducing `pretrain/regmix-10b`
-from Hugging Face means walking this whole chain.
+itself built on top of the `olmo` 30B sample. Re-running the selection for
+`pretrain/regmix-10b` from Hugging Face means walking this whole chain; rebuilding the
+exact corpus only needs `datasets/manifests/regmix-10b-v1/`.
 
 ## What is included, and why
 

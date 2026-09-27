@@ -1,10 +1,10 @@
 # Skill-It (Mixing Laws Dataset / OLMoHQ × OLMo-2 370M)
 
-**Question.** Can Skill-It domain reweighting — driven by an offline probe adjacency or by online mixing-law derivatives — improve macro task-loss over a fixed Data Mixing Laws paper mixture under a matched one-epoch budget?
+**Question.** Can Skill-It domain reweighting — driven by an offline probe adjacency or by online mixing-law derivatives — improve macro task-loss over the best static mixture (the 1%-floor LightGBM optimum both arms start from) under a matched one-epoch budget?
 
 **Answer.** Both Skill-It arms beat the Olmo-mix-1124 control decisively
 ($p < 10^{-4}$), but **neither beat the best static mixture** (the LightGBM
-optimum they start from). The offline probe arm ends 0.0033 bpb above it — a
+optimum they start from). The offline probe arm ends 0.0032 bpb above it — a
 gap smaller than the 0.0044 bpb difference we measure between two dataloader
 seeds of the same mixture, so the two are not meaningfully separable. The
 online derivative arm ends 0.0086 bpb above it, about twice the seed noise
@@ -19,14 +19,16 @@ floor. Mid-run reweighting therefore bought nothing here.
 | Architecture | OLMo-2 370M (full attention), shared 370M contract |
 | Train stream | Domain-stratified sampling over 7 OLMoHQ domains with **time-varying** mixture weights |
 | Domains | dclm, arxiv, starcoder, pes2o, open-web-math, algebraic-stack, wiki |
+| Data | The ~127B-token reservoir `pretrain/olmo-127b` v1, shared with MixLaw; rebuild it byte for byte from the public Olmo-mix-1124 files with [`datasets/manifests/olmo-127b-v1/`](../../../datasets/manifests/olmo-127b-v1/README.md) (`rebuild.py`) |
 | Global batch / seq / LR | 4,194,304 / 2048 / \(4\times10^{-4}\) cosine (warmup 24, \(\alpha_f=0.1\)) |
 | Full-run budget | ~2384 steps ≈ one epoch |
-| FLOPs / full arm | \(2.63\times10^{19}\) (measured from W&B) |
+| Data seed | 42 (both arms) |
+| FLOPs / full arm | \(2.63\times10^{19}\) (\(6ND\) plus the PaLM attention term, as for the probes below; measured from W&B) |
 | Skill-It update | \(\eta=0.2\), \(w=1\); five mid-run updates |
 | Update schedule | steps 500, 875, 1250, 1625, 2000 |
-| Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels |
+| Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels, every 125 steps (step 2375 excluded) |
 
-Unlike MixLaw (fixed weights for the whole run), Skill-It **reweights domains mid-training**. Between updates the sampler holds the current mixture fixed; at each update step it rebuilds domain probabilities from an adjacency \(A\) and the current per-family losses \(L\).
+Unlike MixLaw (fixed weights for the whole run), Skill-It **reweights domains mid-training**. Between updates the sampler holds the current mixture fixed; at each update step it updates the domain probabilities from an adjacency \(A\) and the current per-family losses \(L\).
 
 ### Skill-It update (shared by all arms)
 
@@ -45,20 +47,18 @@ and (for one arm) **where \(p\) starts**.
 
 ### Offline probe matrix
 
-1. Train **7 one-hot** DataDecide-60M probes (100% of each domain in turn; 5 tokens/param → 1451 steps / ~285M tokens; \(N=57.1\mathrm{M}\) non-embedding).
-2. Fit Chinchilla step-laws on in-run curves; extrapolate to tpp=20 (step 5806).
+1. Train **7 one-hot** DataDecide-60M probes (100% of each domain in turn; 5 tokens/param → 1451 steps / ~285M tokens, sized against DataDecide's original \(N=57.1\mathrm{M}\) non-embedding count; data seed 6198, as for the 24 pilots).
+2. Fit Chinchilla step-laws on in-run curves (evals every 120 of the 1451 steps on a fixed four-batch subsample of each family's validation split); extrapolate to tpp=20 (step 5806).
 3. Build
    \[
    A_{ij} = \max\!\big(0,\; L_j(r_{\mathrm{DML}}) - L_j(i)\big)
    \]
-   where \(L_j(i)\) is family \(j\)’s extrapolated loss after training on 100% domain \(i\), and \(r_{\mathrm{DML}}\) is the Data Mixing Laws paper mixture. Positive \(A_{ij}\) means domain \(i\) beat that paper mix on family \(j\).
+   where \(L_j(i)\) is family \(j\)’s extrapolated loss after training on 100% domain \(i\), and \(L_j(r_{\mathrm{DML}})\) is the MixLaw fit's prediction for family \(j\) at the Data Mixing Laws paper mixture \(r_{\mathrm{DML}}\), also at the Chinchilla-style budget. Positive \(A_{ij}\) means domain \(i\) alone beat that prediction on family \(j\).
 
-**Probe FLOPs.** Kaplan et al. (2020) estimate including the attention term,
+**Probe FLOPs.** The 6ND estimate of Kaplan et al. (2020) plus the attention term of Chowdhery et al. (2023, PaLM),
 \(C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D\),
 at the trained model's \(N_{\text{non-emb}} = 76{,}296{,}576\):
 \(\approx 1.74\times10^{17}\) per probe → **\(\approx 1.22\times10^{18}\)** for all 7.
-(Plain \(6ND\) at the DataDecide budget-setting \(N=57.1\)M gives \(9.8\times10^{16}\)
-per probe; that older figure understates the cost by ~1.8x and is superseded.)
 
 **Offline \(A\) used by the Offline probe arm** (rows = domains, columns = task families; Chinchilla step 5806):
 
@@ -72,7 +72,7 @@ per probe; that older figure understates the cost by ~1.8x and is superseded.)
 | algebraic-stack | 0.017 | 0.000 | 0.000 | 0.000 | 0.000 | 0.242 |
 | wiki | 0.227 | 0.000 | 0.470 | 0.013 | 0.000 | 0.352 |
 
-Starcoder’s row is all zeros (never beats the Data Mixing Laws paper mix on these families at Chinchilla scale). DCLM and wiki dominate many columns.
+Starcoder’s row is all zeros (never beats the fit's prediction for the Data Mixing Laws paper mix on these families at Chinchilla scale). DCLM and wiki dominate many columns. Density: 17 of 42 cells (40%) are nonzero.
 
 ### Online mixing-law derivative
 
@@ -89,6 +89,17 @@ A_{ij} = \max\!\big(0,\; -(dL_j/dr_i)\big) = \max\!\big(0,\; -t_{ij}(L_j(r)-c_j)
 \]
 
 So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \(t_{ij}\) / \(c_j\) / \(k_j\) are those from the MixLaw parametric fit.
+
+**This adjacency depends on the fit's gauge.** On the simplex \(\sum_i r_i = 1\), so
+replacing \(t_{ij} \to t_{ij} + q_j\) for every domain \(i\) and \(k_j \to k_j e^{-q_j}\)
+leaves \(L_j(r)\) unchanged for every mixture but moves every \(A_{ij}\), including
+which ones are zero. The fitted \(t\) values are pinned only by the fit's
+regularization, so the derivative arm's edges inherit that choice. The gauge-invariant
+alternative is the benefit of moving mass from \(r\) toward domain \(i\),
+\(\max\!\big(0,\;(\sum_q r_q t_{qj} - t_{ij})(L_j(r)-c_j)\big)\), available as
+`online_A_from_fit(..., gauge_invariant=True)` in [`skillit_math.py`](skillit_math.py).
+The reported run used the default (historical) form, `derivative_a` in the vendored
+[`olmo_core_skillit/skillit_math.py`](olmo_core_skillit/skillit_math.py).
 
 #### Which \(r\) a published derivative matrix is evaluated at
 
@@ -115,18 +126,26 @@ panel is evaluated at **`LGB-min1pct`**, which is the point the paper's body
 describes and the point its \(r = 0.07\) is computed at; the committed output is
 [`figures/adjacency_comparison.png`](figures/adjacency_comparison.png).
 
-An earlier version of that figure was evaluated at \(r_{\mathrm{DML}}\) instead.
-It put entries roughly twice as large in the derivative panel (dclm →
-arc_challenge 0.154 rather than 0.065), so a reader who recomputed the
-correlation from it got 0.17 rather than the 0.07 in the text. That version
-survives in PDF exports of the paper taken before 2026-09-17, and three
-independent reviewers working from one of those exports each flagged it; the
-live document has carried the `LGB-min1pct` panel since then. Every qualitative
-claim in the paper's Appendix E holds at either point —
-StarCoder and Algebraic Stack all-zero, arXiv all-zero, OpenWebMath helping only
+The derivative matrix's qualitative pattern is the same at either point:
+StarCoder, Algebraic Stack and arXiv all-zero, OpenWebMath helping only
 ARC Easy, pes2o trivial on both ARC skills, Wikipedia and DCLM broadly helpful,
-31% density, 10 of 42 edge-presence disagreements — so only the printed
-magnitudes and the correlation were ever affected.
+31% density, 10 of 42 edge-presence disagreements with the probe matrix.
+
+#### Robustness checks (Appendix E)
+
+[`appendix_e_robustness.py`](appendix_e_robustness.py) reproduces the paper's two
+robustness checks on these constructions and writes
+[`artifacts/appendix_e_robustness.json`](artifacts/appendix_e_robustness.json):
+
+- **Probe reference.** Rebuilding the probe matrix against the extrapolated losses
+  of the trained Data Mixing Laws pilot (`mix01`), instead of the MixLaw fit's
+  prediction for that mixture, gives Pearson \(r = 0.987\) to the matrix used, with
+  2 of 42 cells differing in edge presence (`probe_reference.mix01_vs_committed`).
+- **Derivative along the simplex.** The gauge-invariant form above, the derivative
+  along \(r(\varepsilon) = (1-\varepsilon)r + \varepsilon e_i\)
+  (`online_A_from_fit(..., gauge_invariant=True)`), has \(r = 0.981\)–\(0.985\) to
+  the form the arm used at the domain weights of each of its five updates, i.e.
+  \(r \ge 0.98\) at every update (`simplex_derivative.per_update`).
 
 ### Arms actually run
 
@@ -140,16 +159,16 @@ Two arms were trained, both starting from the **LightGBM-optimized mixture**
 `skillit-370m-deriv-20260916-124719`), which match that published weight vector
 to full float precision.
 
-| Arm | Manipulation | A100-h | FLOPs |
-|-----|--------------|-------:|------:|
-| Offline probe | Start at the LightGBM-optimized mixture; at each update apply Skill-It with the **fixed** offline \(A\) above and current task losses | 47.26 | \(2.63\times10^{19}\) |
-| Online derivative | Start at the LightGBM-optimized mixture; at each update **recompute** \(A(r)\) from MixLaw derivatives, then Skill-It-update | 53.8 | \(2.63\times10^{19}\) |
-| **Total** | | **101.06** | **\(5.26\times10^{19}\)** |
+| Arm | Manipulation | FLOPs |
+|-----|--------------|------:|
+| Offline probe | Start at the LightGBM-optimized mixture; at each update apply Skill-It with the **fixed** offline \(A\) above and current task losses | \(2.63\times10^{19}\) |
+| Online derivative | Start at the LightGBM-optimized mixture; at each update **recompute** \(A(r)\) from MixLaw derivatives, then Skill-It-update | \(2.63\times10^{19}\) |
+| **Total** | | **\(5.26\times10^{19}\)** |
 
 Comparisons use the **Olmo-mix-1124 seed average** as the control (the corpus's
 natural weighting), and additionally report each arm against the **LightGBM
 static** mixture it starts from. Both are fixed-weight full runs, not extra
-Skill-It trains. A100-hours are the no-waste totals measured for these runs. Online derivative’s A100-hours are throughput-repriced to steady-state (W&B wall was 70.51 A100-h; defective-pod I/O on a mid-run stretch is excluded).
+Skill-It trains. Both Skill-It arms ran on FarmShare 4×L40S.
 
 ### Domain weights after each update
 
@@ -182,8 +201,8 @@ LightGBM-optimized mixture (see Arms actually run above).
 
 Offline probe's fixed adjacency drives weight toward `dclm` monotonically at
 every update; online derivative's recomputed adjacency instead redistributes
-weight from `dclm`/`arxiv` onto `wiki` while leaving `dclm` close to its
-starting share. See
+weight from `arxiv`/`starcoder` onto `wiki` (about 4×), `open-web-math` and
+`pes2o` while leaving `dclm` close to its starting share. See
 [`contamination/README.md`](contamination/README.md#reading-these-together)
 for how this drives each arm's contaminated exposure.
 
@@ -211,8 +230,8 @@ controls they are compared against are the MixLaw runs; see
 
 ## Evaluation and uncertainty
 
-Same as MixLaw: power law \(y = a + b/\mathrm{step}^{\alpha}\) on steps ≥ 1000;
-fitted final as center; **alpha-free** residual bootstrap (10k draws, \(\alpha\)
+Same as MixLaw: evals every 125 of the 2384 steps, with step 2375 excluded; power law \(y = a + b/\mathrm{step}^{\alpha}\) on steps ≥ 1000;
+fitted final as center; **alpha-free** residual bootstrap (200,000 draws, \(\alpha\)
 re-selected on every draw) for the 95% CI. Reproduce with
 [`../mixlaw/fit_and_bootstrap_370m.py`](../mixlaw/fit_and_bootstrap_370m.py) from
 the committed curves in
@@ -244,12 +263,13 @@ mixture they start from:
 
 | Comparison | Δ bpb | 95% CI | \(p\) |
 |------------|------:|--------|------:|
-| Offline probe − LightGBM static | +0.0033 | [-0.0011, +0.0075] | 0.14 |
+| Offline probe − LightGBM static | +0.0032 | [-0.0011, +0.0075] | 0.14 |
 | Online derivative − LightGBM static | +0.0086 | [+0.0026, +0.0161] | 0.0020 |
 
-**Seed noise floor.** Two Olmo-mix-1124 runs differing only in dataloader seed
-land 0.0044 bpb apart (95% CI [-0.0046, 0.0132], \(p = 0.34\)). The probe arm's
-0.0033 bpb deficit is *below* that floor; the derivative arm's 0.0086 bpb deficit
+**Seed noise floor.** Two Olmo-mix-1124 runs differing in dataloader seed (12536 vs
+12345), hardware (8×A100 vs 4×L40S, which also changed the realized initialization)
+and training code (the second control ran a separate trainer) land 0.0044 bpb apart (95% CI [-0.0046, 0.0132], \(p = 0.34\)). The probe arm's
+0.0032 bpb deficit is *below* that floor; the derivative arm's 0.0086 bpb deficit
 is about twice it.
 
 ### Takeaways

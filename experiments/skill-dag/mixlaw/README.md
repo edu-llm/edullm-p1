@@ -13,13 +13,14 @@
 | Architecture | OLMo-2 370M (full attention) |
 | Train stream | Domain-stratified sampling over 7 OLMoHQ domains at fixed recipe weights |
 | Domains | dclm, arxiv, starcoder, pes2o, open-web-math, algebraic-stack, wiki |
+| Data | The ~127B-token reservoir `pretrain/olmo-127b` v1, a subset of Olmo-mix-1124; rebuild it byte for byte from the public Olmo-mix-1124 files with [`datasets/manifests/olmo-127b-v1/`](../../../datasets/manifests/olmo-127b-v1/README.md) (`rebuild.py`). No source documents are redistributed here. |
 | Global batch / seq / LR | 4,194,304 tokens / 2048 / $4\times10^{-4}$ cosine ($T_{\max}=2360$ after 24 warmup steps; 2384 steps total, $\alpha_f=0.1$) |
 | Full-run budget | 2384 steps ≈ one epoch (~10B tokens); cosine horizon $T_{\max}=2360$ after 24 warmup steps |
-| FLOPs / full arm | $2.63\times10^{19}$ (measured from W&B) |
+| FLOPs / full arm | $2.63\times10^{19}$ ($6ND$ plus the PaLM attention term at $N_{\text{non-emb}} = 371{,}262{,}464$, as for the pilots below; measured from W&B) |
 | Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels (task-loss) |
-| Seeds (as launched) | `--seed 12536` for all four static arms — data-stream, mixture-sampling *and* model-initialization seed, the last of those via `seed_all(stream_seed + rank)`. The `model.init_seed = 0` visible in the W&B config is an **unset default, not a choice**: the trainer never assigns `init_seed`, so it never reaches `TransformerConfig` (the same defect is recorded in `experiments/token-selection/ARMS.md`). |
+| Seeds (as launched) | `--seed 12536` for all four static arms — data-stream and mixture-sampling seed; `seed_all(stream_seed + rank)` also seeds the process RNGs. Model weights are initialized from `TransformerConfig`'s own `init_seed`, and the `model.init_seed = 0` visible in the W&B config is an **unset default, not a choice**: the trainer never assigns `init_seed` (the same defect is recorded in `experiments/token-selection/ARMS.md`). The realized initialization therefore follows the parallel layout, not the stream seed: every 8×A100 arm starts at step-0 task loss 4.4261 bpb, and every 4×L40S run (the seed-12345 control and both Skill-It arms, at stream seeds 12345 and 42) at 4.4728 bpb. |
 
-**Shared recipe across arms:** same architecture, tokenizer, batch, LR schedule, and one-epoch step budget. Arms differ only in **domain mixture weights**.
+**Shared recipe across arms:** same architecture, tokenizer, batch, LR schedule, and one-epoch step budget. The four arms below differ only in **domain mixture weights**; the second Olmo-mix-1124 control additionally differs in seed, hardware and trainer (see the note below).
 
 > **Read the seed row, not the code default.** `train_mixlaw_validation_370m.py`
 > falls back to `stream_seed = recipe_seed + mix_id` when `--seed` is not passed,
@@ -30,7 +31,12 @@
 > configs are the record (`eduLLM/mixlaw-1`:
 > `dataset.source_mixture_config.seed = 12536`, `data_loader.seed = 12536`,
 > `model.init_seed = 0` on all four). The second control (`olmo-mix-seed12345`)
-> is the same recipe re-run with the data-stream seed changed to 12345; despite
+> trains the same Olmo-mix-1124 mixture but differs from the first in three ways:
+> dataloader seed 12345 instead of 12536; hardware, FarmShare 4×L40S (`oat-04`)
+> rather than 8×A100, which also changed the realized model initialization
+> (step-0 task loss 4.4728 vs 4.4261 bpb); and training code, since it ran this
+> directory's `train_mixlaw_validation_370m.py` rather than the OLMo-core branch
+> entrypoint the four arms used (see Training-code provenance). Despite
 > its name, the first control's stream seed is 12536, not 6198 — 6198 is the
 > recipe seed used to build the pools and to train the 60M pilots.
 
@@ -40,8 +46,8 @@
 |-----|------|-------:|------:|
 | OLMo Mix 1124 | Control — natural OLMo Mix 1124 domain proportions (~95% DCLM) | 47.46 | $2.63\times10^{19}$ |
 | Data Mixing Laws paper | Fixed proportions from the Data Mixing Laws paper (Pilot 01) | 44.11 | $2.63\times10^{19}$ |
-| LightGBM | LightGBM mixing-law optimum | 48.39 | $2.63\times10^{19}$ |
-| MixLaw | Parametric mixing-law optimum | 48.78 | $2.63\times10^{19}$ |
+| LightGBM | 1%-floor LightGBM optimum | 48.39 | $2.63\times10^{19}$ |
+| MixLaw | Unconstrained MixLaw optimum | 48.78 | $2.63\times10^{19}$ |
 | **Total** | | **188.74** | **$1.05\times10^{20}$** |
 
 A100-hours are the no-waste totals measured for these runs.
@@ -79,18 +85,17 @@ metrics.
 - Hidden size 384, 16 layers, 12 heads, MLP ratio 8, sequence length 2048
 - Global batch 96 sequences; learning rate $5.8\times10^{-3}$
 - Tokenizer: dolma2 (100,352 embedding rows); untied LM head
-- Body params 37.8M; **non-embedding params 57.1M** (tokens/param denominator); total ~114.8M with dolma2 vocab
-- **Budget:** tokens/param = 5 → **285M tokens / 1451 steps** per mixture
-- **Pilot FLOPs.** We use the Kaplan et al. (2020) forward-pass estimate including the
-  attention term, $C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D$,
+- Body params 37.8M; **non-embedding params 76.3M** (76,296,576, including the untied LM head); total ~114.8M with dolma2 vocab
+- **Budget:** tokens/param = 5 → **285M tokens / 1451 steps** per mixture, sized against DataDecide's original non-embedding count, 57.1M (57,078,144), as is the tpp = 20 Chinchilla target
+- **Pilot FLOPs.** We use the 6ND training estimate of Kaplan et al. (2020) plus the
+  attention term of Chowdhery et al. (2023, PaLM), $C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D$,
   evaluated at the **trained** model's $N_{\text{non-emb}} = 76{,}296{,}576$ (dolma2 vocab):
-  $\approx 1.74\times10^{17}$ per mix → **$\approx 4.17\times10^{18}$** for 24.
-  (Plain $6ND$ at the DataDecide budget-setting count $N=57.1$M gives $9.8\times10^{16}$,
-  which understates the real cost by ~1.8x; that older figure is superseded.)
+  $\approx 1.74\times10^{17}$ per mix → **$\approx 4.17\times10^{18}$** for 24, about 16% of
+  one $2.63\times10^{19}$ validation run.
 
 ### Evaluation and Chinchilla targets
 
-In-run curves use six **ARC + MMLU** val families (subset batches). Step-laws fit **in-run curve points only** (steps 120–1440); a post-hoc full eval at step 1451 is kept for reporting but **not** used in the step law. Curves are extrapolated to Chinchilla step **5806** (tpp = 20). Mixing-law / LightGBM targets are those six extrapolated family losses.
+In-run curves use six **ARC + MMLU** val families, evaluated every 120 of the 1451 steps on a fixed four-batch subsample of each family's validation split. Step-laws fit **in-run curve points only** (steps 120–1440); a post-hoc full eval at step 1451 is kept for reporting but **not** used in the step law. Curves are extrapolated to Chinchilla step **5806** (tpp = 20). Mixing-law / LightGBM targets are those six extrapolated family losses.
 
 Observed Chinchilla-target range across the 24 pilots:
 
@@ -110,7 +115,7 @@ Observed Chinchilla-target range across the 24 pilots:
 Mixtures follow **Algorithm 2** (double-diminishing grid) from [Ye et al., Data Mixing Laws](https://arxiv.org/abs/2403.16952):
 
 1. Start from the **Data Mixing Laws paper** mixture (Pilot 01).
-2. Compute per-domain **$r_{\max}$** from OLMoHQ pool availability at a 30B target corpus.
+2. Compute per-domain **$r_{\max}$** from the planned per-domain token counts at a 30B target corpus.
 3. Sample a double-diminishing grid with step **$\delta = 0.05$** and **seed 42**.
 4. Apply Algorithm 2 feasibility constraints from Ye et al. (availability-aware simplex sampling; wiki-ablation tags may zero wiki).
 5. Inject three mid–high DCLM points at 50% / 55% / 60% DCLM that the coarse grid cannot reach with all domains positive.
@@ -136,6 +141,11 @@ Result: **24 designed probe points** (not uniform random simplex samples).
 | open-web-math | 0.4067 |
 | algebraic-stack | 0.3933 |
 | wiki | 0.1220 |
+
+Wikipedia is the binding domain: all of Wikipedia is only ~3.75B tokens, so its
+pilot weight is capped at 12.2%, the share of a 30B-token corpus that the planned
+3.66B Wikipedia tokens can supply. The optimized mixtures use a separate 30%
+Wikipedia cap (see the constraint settings below).
 
 ### Pilot mixture domain weights
 
@@ -220,6 +230,12 @@ More negative $t_{ij}$ means increasing domain $j$ lowers family $i$ loss. Among
 | mmlu_social_sciences | -2.77 | 1.69 | 1.34 | 0.17 | 1.50 | 1.82 | -1.64 |
 | mmlu_stem | -0.07 | 1.88 | 1.43 | -1.66 | 1.18 | 1.59 | -0.49 |
 
+Only within-row comparisons of $t_{ij}$ are meaningful: on the simplex, adding the
+same constant to a family's whole row while rescaling its $k_i$ leaves the fitted
+law unchanged, so each row is pinned only by the fit's regularization. $c_i$ is
+constrained at or below the lowest extrapolated loss across the 24 pilots; that
+bound is active for ARC Challenge and ARC Easy.
+
 ### LightGBM
 
 Features = 7 mixture weights; target = per-family Chinchilla loss; predicted macro = mean over families. Hyperparameters chosen by a **144-config LOO grid** minimizing macro LOO RMSE. Optima: **50k random simplex samples + SLSQP polish**.
@@ -274,27 +290,41 @@ LOO grid: hand-picked default macro LOO RMSE 0.0439 → selected 0.0366
 
 Surrogate optima plus nearby mixtures (within +0.04 bpb of that model’s optimum and ≥ 8 pp ($L_\infty$) from the optimum). None exactly match a pilot point.
 
-#### The two arms were optimized under different constraint sets
+#### Table I: optima under the two constraint settings
 
-`MIXTURE_OPT_CONSTRAINTS` (`mixlaw_common.py`) defines three settings, and the
-two arms that were trained do not come from the same one. The row labelled
-"optimum" in each table below is **the mixture that was trained**, not
-necessarily that surrogate's unconstrained argmin.
+Each surrogate was minimized under two settings, both keeping the 30% Wikipedia
+cap: unconstrained, and with a 1% per-domain floor. **Bold** rows were trained at
+370M. The predicted macro is each surrogate's own Chinchilla-extrapolated 60M
+prediction, so it compares settings within a surrogate, not across the two.
 
-| Setting | Caps | Floors | MixLaw argmin (pred. macro) | LightGBM argmin (pred. macro) |
-|---|---|---|---|---|
-| `uncapped` | wiki ≤ 0.30 | none | dclm .568 / pes2o .097 / owm .035 / wiki .300 (**1.7965**) | dclm .354 / arxiv .083 / scode .061 / pes2o .441 / owm .030 / alg .022 / wiki .009 (**1.8316**) |
-| `pilot_caps` | dclm ≤ 0.6, others ≤ 0.7, wiki ≤ 0.30 | wiki ≥ 0.005 | same as `uncapped` (**1.7965**) | same as `uncapped` (**1.8316**) |
-| `min1pct` | wiki ≤ 0.30 | every domain ≥ 0.01 | dclm .556 / arxiv .010 / scode .010 / pes2o .092 / owm .023 / alg .010 / wiki .300 (**1.7984**) | dclm .553 / arxiv .212 / scode .087 / pes2o .082 / owm .042 / alg .014 / wiki .011 (**1.8335**) |
+| Mixture | pred. macro | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Olmo-mix-1124** (`olmo-mix-1124`) | — | 0.951 | 0.005 | 0.021 | 0.015 | 0.003 | 0.003 | 0.001 |
+| **Data Mixing Laws paper** (`mix01`) | — | 0.375 | 0.250 | 0.141 | 0.094 | 0.064 | 0.061 | 0.016 |
+| **MixLaw unconstrained** (`ML-pilot_caps`) | 1.7965 | 0.568 | 0.000 | 0.000 | 0.097 | 0.035 | 0.000 | 0.300 |
+| MixLaw 1%-floor | 1.7984 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
+| LightGBM unconstrained | 1.8316 | 0.354 | 0.083 | 0.061 | 0.441 | 0.030 | 0.022 | 0.009 |
+| **LightGBM 1%-floor** (`LGB-min1pct`) | 1.8335 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
 
-- **MixLaw arm = `ML-pilot_caps`**, i.e. the `pilot_caps` optimum, which is also
-  the unconstrained argmin. Three domains sit at zero.
-- **LightGBM arm = `LGB-min1pct`**, i.e. the `min1pct` optimum. It is **not** the
-  LightGBM argmin: the unconstrained optimum is a very different mixture
-  (35% dclm, 44% pes2o) with a *lower* predicted macro (1.8316 vs 1.8335). The
-  LightGBM arm has no zero weights **because a 1% floor was imposed**, not
-  because the fit preferred a balanced mixture — and a `min1pct` MixLaw variant
-  with the same property exists (1.7984, only 0.0019 worse than its own argmin).
+**Which optimum was trained.** The 1% floor was the default, to keep every
+domain in the mixture, but the unconstrained optimum was trained instead
+wherever the floor did little more than lift zero weights. For MixLaw the floor
+only lifts its three zero weights (arXiv, StarCoder, Algebraic Stack) to 1% and
+shifts the others minimally, so the unconstrained MixLaw optimum was trained.
+For LightGBM the floor moves the optimum to a different location on the
+simplex, raising DCLM from 35% to 55% and lowering pes2o from 44% to 8%, so the
+1%-floor LightGBM optimum was trained. Both choices were made after the pilots,
+before any validation runs. In both surrogates the floor raises the predicted
+macro loss by 0.0019 bpb. The unconstrained MixLaw optimum pushes Wikipedia to
+the 30% cap, beyond the 12.2% maximum across the 24 pilots, so on that domain it
+extrapolates beyond the pilot grid.
+
+In code, `MIXTURE_OPT_CONSTRAINTS` (`mixlaw_common.py`) implements the two
+settings as `uncapped` and `min1pct`. A third setting, `pilot_caps` (dclm ≤ 0.6,
+other domains ≤ 0.7, 0.005 ≤ wiki ≤ 0.30), returns the same optimum as
+`uncapped` for both surrogates, which is why the trained MixLaw arm is named
+`ML-pilot_caps`. The row labelled "optimum" in each table below is the mixture
+that was trained.
 
 That a 1% floor moves the LightGBM argmin by ~40 pp of mass while changing the
 predicted macro by 0.0019 bpb — against a macro LOO RMSE of 0.0366 — says the
@@ -331,7 +361,7 @@ weakly identified. Treat the specific LightGBM weight vector accordingly.
 
 ### Random-simplex plausibility
 
-1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Pilot observed macro range: **2.0444 – 2.2888 bpb**.
+1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Both surrogates predict the Chinchilla-extrapolated loss, so they are compared against the pilots' Chinchilla-extrapolated macro range, **1.8369 – 2.0561 bpb** (the raw observed pilot range, 2.0444 – 2.2888 bpb, is on a different basis).
 
 | Metric | Mixing law | LightGBM |
 |--------|-----------:|---------:|
@@ -341,7 +371,7 @@ weakly identified. Treat the specific LightGBM weight vector accordingly.
 | Macro p99 | 2.0460 | 2.0217 |
 | Macro max | 2.1064 | 2.0339 |
 | Macro mean ± std | 1.8968 ± 0.0542 | 1.9393 ± 0.0441 |
-| % inside pilot macro range | 1.1% | 0.0% |
+| % inside pilots' extrapolated macro range | 87.6% (117 below, 7 above) | 100.0% |
 | Mixtures with macro > 3 bpb | 0 | 0 |
 | Mixtures with macro > 5 bpb | 0 | 0 |
 
@@ -380,20 +410,20 @@ Recipe domain weights for the four 370M arms that were trained:
 **What each validated arm manipulates**
 
 - **OLMo Mix 1124 (control)** — hold mix fixed at the natural OLMo Mix 1124 corpus proportions (very DCLM-heavy).
-- **Data Mixing Laws paper** — hold domain mix fixed at the Data Mixing Laws paper proportions (Pilot 01).
-- **MixLaw** — train the parametric mixing-law optimum. Method from [Ye et al., Data Mixing Laws](https://arxiv.org/abs/2403.16952).
-- **LightGBM** — train the LightGBM mixing-law optimum. Method from [Liu et al., RegMix](https://arxiv.org/abs/2407.01492) (regression / tree surrogate over mixture probes).
+- **Data Mixing Laws paper** — hold domain mix fixed at the Data Mixing Laws paper proportions (Pilot 01). That paper's published optimal split (CommonCrawl 0.1250, C4 0.2500, GitHub 0.1406, arXiv 0.2500, Books 0.0938, StackExchange 0.1250, Wikipedia 0.0156) is mapped onto our domains by semantic category: CommonCrawl + C4 → DCLM, GitHub → StarCoder, Books → pes2o, StackExchange → OpenWebMath (0.0635) + Algebraic Stack (0.0615), arXiv and Wikipedia directly.
+- **MixLaw** — train the unconstrained MixLaw optimum. Method from [Ye et al., Data Mixing Laws](https://arxiv.org/abs/2403.16952).
+- **LightGBM** — train the 1%-floor LightGBM optimum. Method from [Liu et al., RegMix](https://arxiv.org/abs/2407.01492) (regression / tree surrogate over mixture probes).
 
 ---
 
 ## 370M evaluation and uncertainty
 
-Task-loss is evaluated periodically on the shared 20-label suite. Final performance uses a **power-law residual bootstrap**:
+Task-loss is evaluated on the shared 20-label suite every 125 of the 2384 steps; the step-2375 eval is excluded for its proximity to the final step. Final performance uses a **power-law residual bootstrap**:
 
 1. Fit $y = a + b / \mathrm{step}^{\alpha}$ on all eval points with step ≥ 1000 ($\alpha$ on a grid in $[0.05, 3]$).
 2. Take the fitted value at the final step as the point estimate.
-3. Residual bootstrap (10k draws) for a 95% CI on that fitted final.
-4. Pairwise $\Delta = \mathrm{arm} - \mathrm{control}$ from independent bootstraps (control = OLMo Mix 1124); two-sided $p$ reported only when the arm beats control.
+3. Alpha-free residual bootstrap (200,000 draws, $\alpha$ re-selected on every draw) for a 95% CI on that fitted final.
+4. Pairwise $\Delta = \mathrm{arm} - \mathrm{control}$ from independent bootstraps (control = the two-seed Olmo-mix-1124 average); two-sided $p$ reported only when the arm beats control.
 
 ---
 
@@ -417,14 +447,41 @@ shared generator.
 | Olmo-mix-1124 seed 12536 | 1.6313 | 1.6370 | [1.6261, 1.6357] | — |
 | Olmo-mix-1124 seed 12345 | 1.6269 | 1.6285 | [1.6195, 1.6343] | — |
 | Olmo-mix-1124 average (control) | 1.6291 | 1.6327 | [1.6246, 1.6335] | — |
-| Data Mixing Laws paper | 1.6515 | 1.6518 | [1.6473, 1.6556] | worse, $p < 10^{-4}$ |
+| Data Mixing Laws paper | 1.6515 | 1.6518 | [1.6473, 1.6556] | worse by 0.0224 [0.0163, 0.0285] |
 
 Lower is better. Both fitted mixtures beat the Olmo-mix-1124 control. The Data Mixing
-Laws paper mixture is significantly **worse** than the control.
+Laws paper mixture finishes **worse** than the control, by 0.0224 bpb (95% CI
+[0.0163, 0.0285]).
 
 **Seed-variance reference.** The two control seeds differ by 0.0044 bpb
-(95% CI [-0.0046, 0.0132], $p = 0.34$) — dataloader seed only, model init held fixed.
-Any effect smaller than ~0.004 bpb is inside that noise floor.
+(95% CI [-0.0046, 0.0132], $p = 0.34$). The two runs differ in dataloader seed
+(12536 vs 12345), in hardware (8×A100 vs 4×L40S), which also changed the realized
+model initialization (step-0 task loss 4.4261 vs 4.4728 bpb), and in training code
+(the second control ran a separate trainer; see Training-code provenance), so this
+is not a pure data-order contrast. Any effect smaller than ~0.004 bpb is inside
+that noise floor.
+
+### Targeted vs never-targeted labels
+
+The six fitted skills supply 12 of the 20 labels (validation and test splits of
+ARC Easy, ARC Challenge and the four MMLU groups); the other 8 (BoolQ, CSQA,
+HellaSwag, OpenBookQA validation and test, PIQA, SocialIQA, WinoGrande) were never
+optimized. Same fit and bootstrap as above, on each subset's per-step mean
+([`heldout_label_bootstrap.py`](heldout_label_bootstrap.py) from
+[`heldout_label_curves.json`](heldout_label_curves.json)); improvement over the
+control, positive = better:
+
+| Labels | MixLaw | LightGBM |
+|---|---|---|
+| 12 targeted | 0.0351 [0.0275, 0.0425], $p < 10^{-4}$ | 0.0397 [0.0331, 0.0461], $p < 10^{-4}$ |
+| 8 never-targeted | 0.0055 [-0.0009, 0.0126], $p = 0.10$ | -0.0067 [-0.0128, -0.0003], $p = 0.039$ |
+
+The gain is concentrated on the targeted labels. Per label
+([`heldout_perlabel_bootstrap.py`](heldout_perlabel_bootstrap.py)), HellaSwag and
+PIQA are worse under both mixtures (MixLaw +0.0315 and +0.0303 bpb, LightGBM
++0.0227 and +0.0219, all $p < 10^{-4}$) against seed spreads of 0.0024 and 0.0034
+bpb. BoolQ moves in opposite directions, 0.0931 bpb better under MixLaw and 0.0990
+worse under LightGBM, against a 0.0472 bpb seed spread.
 
 ### Takeaways
 
@@ -432,12 +489,22 @@ Any effect smaller than ~0.004 bpb is inside that noise floor.
 2. **MixLaw ≈ LightGBM**, with a small edge to the MixLaw optimum (0.0023 bpb, inside the 0.0044 bpb seed noise floor).
 3. **Data Mixing Laws paper proportions underperform the control.** That fixed paper mix finishes worse than OLMo Mix 1124.
 4. **Cost.** Four full arms 188.74 A100-hours and $\approx 1.05\times10^{20}$ FLOPs, plus $\approx 4.17\times10^{18}$ FLOPs for the 60M pilot grid.
+5. **Compute savings.** The MixLaw mixture reaches the two-seed control's fitted
+   final in 21.7% fewer steps (95% CI [18.4%, 24.8%]); the control would take
+   1.53× as long (95% CI [1.27×, 2.66×]) to reach the MixLaw mixture's final,
+   assuming its fitted power law holds past the end of its LR schedule. The 24
+   pilots cost about 16% of one validation run, so the net compute saving is
+   5.9% (95% CI [2.6%, 9.0%]); equivalently, the control would consume 32% more
+   FLOPs (95% CI [10%, 129%]) than the optimized mixture plus its pilots. The point
+   estimates are reproduced by
+   [`plot_figure_iii_compute_savings.py`](plot_figure_iii_compute_savings.py)
+   (Figure III).
 
 ---
 
 ## Conclusions
 
-Under the P1 one-epoch 370M contract, **data mixture is a high-leverage lever**: mixing-law optimization yields ~0.025 bpb absolute macro task-loss improvement over the OLMo Mix 1124 control, with tight CIs and decisive bootstrap significance. Among levers in this campaign, MixLaw is the clearest positive result.
+Under the P1 one-epoch 370M contract, **data mixture is a high-leverage lever**: mixing-law optimization yields 0.021–0.023 bpb absolute macro task-loss improvement over the OLMo Mix 1124 control, with tight CIs and decisive bootstrap significance. Among levers in this campaign, MixLaw is the clearest positive result.
 
 Benchmark contamination between the shared 127B-token reservoir and the
 evaluation suite, and its projection onto each arm's mixture, is audited in

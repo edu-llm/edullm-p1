@@ -6,21 +6,22 @@ Top-60% token selection by RHO-1 excess loss `L_curr − L_ref` on RegMix 10B.
 
 | Knob | Value |
 |------|-------|
-| Method | `rho_excess` (shared `token_selection` package) |
+| Method | `rho_excess` (`../olmo_core_token_selection/token_selection_370m/selection.py`) |
 | Keep rate `k` / γ | 0.6 (top 60%) |
 | Selection warmup | `t0_steps=0` / `t0_frac=0` (active from step 0) |
 | Arch | `TransformerConfig.olmo2_370M` (RefHQ-matched) |
 | GBS / microbatch | `4_194_304` / `65_536` (tune microbatch for GPU memory) |
 | LR / warmup / `alpha_f` | `4e-4` / 24 / 0.1 |
 | Compile | `compile_model=true` (YAML + FarmShare default) |
-| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens; one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
+| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens, 98.94% of one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
 | Permanent ckpts | `{0, 125, …, 2125, 2360}` (omit 2250); `max_checkpoints=None`; no ephemeral |
 | Frozen reference | Instruct-v3 (`refhq-instruct`) 370M **step940** |
 | `run_id` | `rho-1-regmix10b-v1` |
 | Train corpus | `pretrain/regmix-10b` via `s3://edullm-data/` (stage each job) |
 | Artifact durability | Runtime scratch + W&B |
 
-**Discarded:** `rho-excess-10b-scratch-v1` (~step200). Do not resume it. GPU retrain of the new `run_id` is still required.
+**The reported arm is W&B `eduLLM/token-selection/ebf1fa33048b3459f768cd471c2a8917`**
+(`rho-1-regmix10b-v1`), which ran on 8xA100 (RunPod). **Discarded:** `rho-excess-10b-scratch-v1` (~step200). Do not resume it.
 
 **Ephemeral scratch:** start empty; stage tokens from edullm-data; keep run
 artifacts on scratch and upload them to W&B. Do not rely on FarmShare/laptop

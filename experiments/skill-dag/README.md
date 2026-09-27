@@ -11,12 +11,23 @@ Shared evaluation: macro task-loss CE bits-per-byte over 20 OLMES-style labels;
 power-law **alpha-free** residual-bootstrap CIs on fitted finals (steps ≥ 1000),
 one independent resampling stream per arm, reproducible offline via
 [`mixlaw/fit_and_bootstrap_370m.py`](mixlaw/fit_and_bootstrap_370m.py).
-A100-hours: MixLaw 188.74, Skill-It 101.06 (two arms; the earlier 148.2 counted a
-third arm that was never run). FLOPs: \(2.63\times10^{19}\) per 370M
+A100-hours: MixLaw 188.74 (its four 8×A100 arms; both Skill-It arms ran on
+4×L40S). FLOPs: \(2.63\times10^{19}\) per 370M
 arm (W&B); MixLaw 60M pilot grid \(\approx 4.17\times10^{18}\); Skill-It 60M
 probes \(\approx 1.22\times10^{18}\).
 
-**Seed noise floor.** Two Olmo-mix-1124 runs differing only in dataloader seed
+**Data.** Every arm draws from the ~127B-token reservoir `pretrain/olmo-127b` v1,
+a subset of Olmo-mix-1124 (DCLM 29.691B, arXiv 22.148B, pes2o 26.379B, StarCoder
+18.541B, OpenWebMath 13.238B, Algebraic Stack 12.902B, Wikipedia 3.752B tokens).
+Olmo-mix-1124 is licensed ODC-By v1.0, and its DCLM component is also subject to
+the Common Crawl terms of use. No source documents are redistributed here; rebuild
+the reservoir byte for byte from the public Olmo-mix-1124 files with
+[`datasets/manifests/olmo-127b-v1/`](../../datasets/manifests/olmo-127b-v1/README.md)
+(`rebuild.py`).
+
+**Seed noise floor.** Two Olmo-mix-1124 runs differing in dataloader seed (12536 vs
+12345), hardware (8×A100 vs 4×L40S, which also changed the realized initialization)
+and training code (the second control ran a separate trainer)
 land 0.0044 bpb apart (\(p = 0.34\)); treat differences below ~0.004 bpb as
 indistinguishable.
 

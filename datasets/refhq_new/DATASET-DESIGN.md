@@ -43,11 +43,27 @@ Metadata drops run **before** Dolma English. Rules live in [`exclusion_rules.yam
 | Source | Keep | Drop |
 |---|---|---|
 | **Tulu-v2** | all | — |
-| **OpenHermes-2.5** | all | optional: drop rows with `language` set and not en/eng |
+| **OpenHermes-2.5** | all, including rows with null/missing `language` | rows with `language` set and not en/eng/english |
 | **Tulu-3** | FLAN, WildChat, personas math/GSM/code/algebra, Numina-TIR, Evol CodeAlpaca, SciRIFF, TableGPT, No Robots, OASST, hardcoded | `wildguardmix`, `wildjailbreak`, `coconot`, `tulu-3-sft-personas-instruction-following`, `aya` / Aya |
 | **Hermes-3** | all (~959K; no category column) | — |
 | **SmolTalk** | all configs except listed | `apigen-80k`, `smol-constraints` |
 | **Dolci** | everything else | `domain == Safety`; Precise IF; CoCoNot; Aya; WildGuard/WildJailbreak; Tool Use `source_dataset`; any row with non-null `function_calls`/`functions` |
+
+**As built (`refhq-new-v1`, published internally as `pretrain/refhq-instruct` v3), two rows differ from this design:**
+
+- **SmolTalk.** The download kept `all` together with the 11 configs other than
+  `apigen-80k` and `smol-constraints` (`logs/refhqn-download-1674284_4.out`), and
+  normalization streamed `config=all` first. The aggregate config contains every
+  subset, so `apigen-80k` and `smol-constraints` are included once and the other 11
+  configs twice (1,043,917 + 926,349 = 1,970,266 kept rows; 1.607B tokens).
+- **Tulu-3.** The `tulu-3-sft-personas-instruction-following` needle matched nothing:
+  the Persona IF rows come from `ai2-adapt-dev/personahub_ifdata_manual_seed_v3_29980`
+  with `personahub_…` ids, so that subset (29,980 rows) is retained. The 211,103 dropped
+  rows are CoCoNot, WildJailbreak, WildGuardMix and Aya, plus 120 rows whose random ids
+  contain `aya`.
+
+The realized corpus is about 3.9B tokens (paper Table 6). We do not redistribute it; rebuild
+it byte for byte with [`../manifests/refhq-new-v1/`](../manifests/refhq-new-v1/).
 
 ### Dolma English filter (all kept docs)
 
@@ -114,3 +130,11 @@ publish(
     limitations=[{"kind": "license", "detail": "Tulu ODC-BY with some NC subsets; research use"}],
 )
 ```
+
+**Licensing, as stated in the token selection paper (Appendix A).** The single
+`ODC-By-1.0` declaration above does not cover every source. Tulu-v2, Tulu-3 and
+Dolci-Instruct-SFT are ODC-By v1.0; Hermes-3 is Apache-2.0; SmolTalk has no dataset-level
+license (its author-created subsets are Apache-2.0); OpenHermes-2.5 declares no license,
+so treat it as research use only. Non-commercial subsets: GPT4-Alpaca and Code-Alpaca
+(CC-BY-NC-4.0) and LIMA (CC-BY-NC-SA) within Tulu-v2, and No Robots (CC-BY-NC-4.0) within
+Tulu-3.

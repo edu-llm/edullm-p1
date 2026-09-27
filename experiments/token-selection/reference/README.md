@@ -1,14 +1,22 @@
 # Reference arm — RefHQ RegMix 5.5B CE
 
-Plain CE on published RefHQ (`pretrain/refhq-regmix-5p5b`) with the
-RefHQ-matched OLMo-2 370M stack. Produces the reference ladder consumed by
-downstream token-selection arms (via DistCP → `export_refhq_reference.py`).
+Plain CE on the 5.5B-token HQ reference corpus (`pretrain/refhq-regmix-5p5b`, in the
+project's private `s3://edullm-data/` store) with the RefHQ-matched OLMo-2 370M stack.
+Produces the reference ladder consumed by downstream token-selection arms (via DistCP →
+`export_refhq_reference.py`); the Perplexity arm scores against the weight average of its
+steps 1000, 1125 and 1315 checkpoints.
+
+The corpus has the training corpus's seven domains, but only arXiv comes from
+OLMo-mix-1124; the other six come from their original public releases, each under its own
+terms (StarCoderData is gated under The Stack's terms of use; Wikipedia is CC-BY-SA 3.0 and
+GFDL). It is not redistributed; rebuild it byte for byte with
+[`../../../datasets/manifests/refhq-regmix-5p5b-v1/`](../../../datasets/manifests/refhq-regmix-5p5b-v1/).
 
 | Knob | Value |
 |------|-------|
 | Architecture | `TransformerConfig.olmo2_370M` (full attn) |
 | GBS / seq / LR | `4_194_304` / 2048 / `4e-4` (warmup 24, `alpha_f=0.1`) |
-| Token budget | published train rows (~5.509B → ≈1313 steps) |
+| Token budget | the reported run's final step is **1315** (the last checkpoint the Perplexity arm averages). This script's default budget, the 5,509,020,202 published train tokens, gives 1313 steps (`5_509_020_202 // 4_194_304`), so it does not by itself reproduce that step count |
 | Dataset | `pretrain/refhq-regmix-5p5b` (`s3://edullm-data/`, latest validated) |
 | Artifact durability | Runtime scratch + W&B (production online fail-closed) |
 

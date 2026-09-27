@@ -4,22 +4,18 @@
 
 Online token selection: keep top **60%** by `REL = L_curr − L_hist`.
 
-**Polarity corrected 2026-09-05.** This arm was originally documented and run with
-`REL = L_hist − L_curr`, which is inverted relative to the `rho_excess` / BLADE convention
-(current minus reference/history) and therefore selected the tokens the live model had already
-*mastered* relative to its own history. The scorer computes `current − history`, and the arm was
-re-run on 2026-09-05 with the fixed polarity. **The reported arm is W&B
-`eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e`**, which ran on 4xL40S; cite only
-that run.
+**The reported arm is W&B `eduLLM/token-selection/cc52d5537a03ad8e57cc87a025668b2e`**,
+which ran on 4xL40S.
 
 | Knob | Value |
 |------|--------|
-| EMA | Bias-corrected from **zero** (no RefHQ / θ₀ seed) |
+| EMA | Reference starts from the randomly initialized model; its weights are an EMA of the student's, bias-corrected from **zero** (`shadow_0 = correction_0 = 0`, reference = `shadow_t / correction_t`; no RefHQ / θ₀ seed) |
 | α schedule | `α(t) = 1 − exp(−t/300)` (`tau=300`) |
+| Reference lag | ~25 steps behind the student at step 1000, ~570 steps at the end of training |
 | `t0` | **0** (selection from step 0) |
 | `k` / γ | 0.6 |
 | Arch | `olmo2_370M` (RefHQ-matched) |
-| Data | `pretrain/regmix-10b` v1 on `s3://edullm-data/` — realized **10,004,807,041** tokens — one epoch → **2360** steps = 9,898,557,440 tokens, no wrap |
+| Data | `pretrain/regmix-10b` v1 on `s3://edullm-data/` — realized **10,004,807,041** tokens — **2360** steps = 9,898,557,440 tokens, 98.94% of one epoch, no wrap |
 | Checkpoints | `{0, 125, …, 2125, 2360}` (skip 2250) |
 | Eval | Full 20-label `task_loss_bpb` on every permanent save |
 | `run_id` | `rel-ema-exp-10b-scratch-v1` (**not** `rel-ema-10b-scratch-v1`) |
@@ -28,8 +24,7 @@ that run.
 **Ephemeral scratch:** set `RUN_DIR` empty; stage edullm-data each job; durable
 export via the shared spine.
 
-Only the EMA seed mode and α schedule
-should differ. Shared package: [`../token_selection/`](../token_selection/).
+Shared package: [`../token_selection/`](../token_selection/).
 Config: [`configs/run_rel_ema_exp_10b.yaml`](configs/run_rel_ema_exp_10b.yaml).
 
 ## α schedule API

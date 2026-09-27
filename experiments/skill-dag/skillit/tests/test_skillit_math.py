@@ -204,11 +204,55 @@ def test_online_A_matches_hand_derivative():
     assert pytest.approx(A[0, 0], rel=1e-9) == expected
 
 
+def _gauge_shifted(target, q):
+    """Same fitted law on the simplex: t -> t + q, k -> k * exp(-q)."""
+    return {
+        "c": target["c"],
+        "k": target["k"] * np.exp(-q),
+        "t": {d: v + q for d, v in target["t"].items()},
+    }
+
+
+def test_online_A_default_depends_on_simplex_gauge():
+    domains = ("a", "b", "c")
+    r = np.array([0.2, 0.3, 0.5])
+    target = {"c": 1.0, "k": 0.7, "t": {"a": -0.4, "b": 0.2, "c": 0.8}}
+    shifted = _gauge_shifted(target, 5.25)
+    assert pytest.approx(predict_family_loss(shifted, r, domains=domains), rel=1e-12) == (
+        predict_family_loss(target, r, domains=domains)
+    )
+    A = online_A_from_fit({"targets": {"task": target}}, r, domains=domains, families=("task",))
+    A_shift = online_A_from_fit(
+        {"targets": {"task": shifted}}, r, domains=domains, families=("task",)
+    )
+    # The reported arm's adjacency changes although the fitted law does not.
+    assert A[0, 0] > 0.0
+    assert np.all(A_shift == 0.0)
+
+
+def test_online_A_gauge_invariant_option():
+    domains = ("a", "b", "c")
+    r = np.array([0.2, 0.3, 0.5])
+    target = {"c": 1.0, "k": 0.7, "t": {"a": -0.4, "b": 0.2, "c": 0.8}}
+    kw = dict(domains=domains, families=("task",), gauge_invariant=True)
+    A = online_A_from_fit({"targets": {"task": target}}, r, **kw)
+    for q in (-3.0, 5.25):
+        A_shift = online_A_from_fit({"targets": {"task": _gauge_shifted(target, q)}}, r, **kw)
+        assert np.allclose(A, A_shift, rtol=1e-12, atol=1e-12)
+    # t.r = 0.38, so only moving toward "a" (-0.4) or "b" (0.2) lowers the loss.
+    delta = predict_family_loss(target, r, domains=domains) - 1.0
+    assert pytest.approx(A[0, 0], rel=1e-12) == (0.38 + 0.4) * delta
+    assert pytest.approx(A[1, 0], rel=1e-12) == (0.38 - 0.2) * delta
+    assert A[2, 0] == 0.0
+
+
 if __name__ == "__main__":
     # Allow ``python tests/test_skillit_math.py`` without pytest installed.
     test_softmax_sums_to_one()
     test_skillit_update_toy()
-    test_skillit_update_eta_zero_is_uniform_when_scores_zero()
+    test_skillit_update_carries_previous_weights()
     test_online_A_sign_and_shape()
     test_online_A_matches_hand_derivative()
+    test_online_A_default_depends_on_simplex_gauge()
+    test_online_A_gauge_invariant_option()
     print("ok")

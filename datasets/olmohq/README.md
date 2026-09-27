@@ -24,3 +24,11 @@ As of 2026-07-29 all seven domains satisfy the 10% gate
 (`plan/availability_after_topup.json`). Active measured totals: starcoder **18.541B**,
 pes2o **26.379B**. Excess topup objects may remain on S3 but are
 excluded from `plan/tokenized_manifest.json`.
+
+## Published reservoir
+
+`publish_olmohq_edullm_data.py` published this pool as the ~127B-token reservoir
+`pretrain/olmo-127b` v1 that the domain-weighting paper trains on. Its source
+documents are not redistributed; rebuild it byte for byte from the public
+`allenai/olmo-mix-1124` files with
+[`../manifests/olmo-127b-v1/`](../manifests/olmo-127b-v1/README.md) (`rebuild.py`).

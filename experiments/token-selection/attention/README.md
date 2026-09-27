@@ -17,8 +17,10 @@ Keep the top **60%** of valid target tokens per sequence (`k=0.6`). Selection is
 active from **step 0** (`t0_steps=0` / `t0_frac=0`). No frozen reference / EMA.
 
 FlashAttention path: during the train forward, a pre-hook captures the last
-block’s attention input; Q/K are recomputed for that layer only to form causal
-weights (no full-matrix materialization during FlashAttention).
+block’s attention input; Q/K are recomputed for that layer only (with QK-norm and
+RoPE applied) to form causal weights (no full-matrix materialization during
+FlashAttention). The column mass is unnormalized, so it is structurally larger for
+earlier positions.
 
 ## Contract
 
@@ -26,12 +28,12 @@ weights (no full-matrix materialization during FlashAttention).
 |------|--------|
 | Arch | `olmo2_370M` (RefHQ-matched) |
 | Data | `pretrain/regmix-10b` via `data.dataset_id` → `s3://edullm-data/` (staged per job) |
-| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens; one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
+| Steps | **2360** (`9900000000 // 4_194_304`) = 9,898,557,440 tokens, 98.94% of one epoch of `pretrain/regmix-10b` v1 (realized **10,004,807,041** tokens), no second-epoch wrap |
 | Keep rate `k` | 0.6 |
 | Masking warmup | `t0_steps=0` (selection from step 0) |
 | Permanent ckpts | `{0, 125, …, 2125, 2360}` (omit 2250) |
-| Eval | full 20-label `task_loss_bpb` on each permanent save |
-| `run_id` | `attention-topk-10b-scratch-v1` |
+| Eval | full 20-label `task_loss_bpb` on each permanent save; the reported run is missing its step-250 evaluation (outside the step >= 1000 fit window, so it affects no reported number) |
+| `run_id` | `attention-topk-10b-scratch-v1` (reported run: W&B `eduLLM/token-selection/01e18e7141fdbf9b988f17c32bb0c084`, 8xA100) |
 | Artifact durability | Runtime scratch + W&B |
 
 ## Launch

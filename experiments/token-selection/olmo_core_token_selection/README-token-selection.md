@@ -1,7 +1,7 @@
 # Token-selection 370M branch
 
-This branch contains the six approved RegMix token-selection arms outside
-`src/olmo_core`. Every arm uses the same `TransformerConfig.olmo2_370M` recipe:
+This branch contains the five RegMix token-selection arms the paper reports, plus
+its random and full-loss controls, outside `src/olmo_core`. Every arm uses the same `TransformerConfig.olmo2_370M` recipe:
 `d_model=1024`, 16 layers/heads, reordered norm, gated-SiLU 4096 MLP, full
 attention, QK-RMSNorm, RoPE theta 500,000, Dolma2 vocabulary 100,352, sequence
 2048, global batch 4,194,304 tokens, and 32,768 rank microbatch tokens.
@@ -14,8 +14,10 @@ Production launches use `.edullm/platform/entrypoint.sh`, which runs the selecte
 arm under one-node `torch.distributed.run --nproc_per_node=8`. The Python
 entrypoint independently refuses a production topology other than eight local
 CUDA ranks before constructing the model. The accepted arms are `rho-1`,
-`rel-ema-exp`, `rel-ema-refhq`, `middle-ppl-token`, `attention`, `blade`, and
-`random-control`.
+`rel-ema-exp`, `middle-ppl-token`, `attention`, `blade`, `random-control`, and
+`full-loss-control` (`token_selection_370m/arms.py`). The reported runs did not go
+through this platform path; they were launched from `runpod/` (8 × A100) and
+`farmshare/` (4 × L40S), see `PROVENANCE.md`.
 
 `random-control` is a non-scientific baseline: it masks a uniformly random 60%
 of tokens per row from the loss (`selection_weights(method="random", ...)` in
@@ -32,19 +34,9 @@ The immutable handoff/submission order is:
 |---:|---|---|---|
 | 0 | `rho-1` | top 60% `L_curr-L_ref` | `pretrain/regmix-10b` |
 | 1 | `rel-ema-exp` | top 60% `L_curr-L_hist`; zero-seeded bias-corrected EMA, alpha `1-exp(-t/300)` | `pretrain/regmix-10b` |
-| 2 | `rel-ema-refhq` | top 60% `L_curr-L_hist`; EMA seeded from Instruct-v3 step 940, constant alpha `0.9985` | `pretrain/regmix-10b` |
-| 3 | `middle-ppl-token` | middle 60% tokens by late RefHQ loss | `pretrain/regmix-10b` |
-| 4 | `attention` | top 60% causal attention-received tokens | `pretrain/regmix-10b` |
-| 5 | `blade` | top 60% `L_proxy-L_ref` after proxy warmup | `pretrain/regmix-10b` plus pinned `pretrain/refhq-instruct/v3` stream |
-
-The two REL arms use the same model/data seeds, corpus order, batching, native
-per-token CE/Z-loss path, HSDP policy, optimizer, checkpoint/eval callbacks, and
-selection implementation. Their only scientific differences are EMA initialization
-and alpha: `rel-ema-exp` starts bias-corrected from zero with
-`alpha(t)=1-exp(-t/300)`, while `rel-ema-refhq` initializes history from
-`s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/`
-and uses constant `alpha=0.9985`. Distinct arm/run IDs and reference hashes are
-provenance fields only.
+| 2 | `middle-ppl-token` | middle 60% tokens by late RefHQ loss | `pretrain/regmix-10b` |
+| 3 | `attention` | top 60% causal attention-received tokens | `pretrain/regmix-10b` |
+| 4 | `blade` | top 60% `L_proxy-L_ref` after proxy warmup | `pretrain/regmix-10b` plus pinned `pretrain/refhq-instruct/v3` stream |
 
 These indices are the matrix and sequential-submission mapping; the production
 CLI takes the exact string with `--arm`, not a numeric index. Every arm routes
@@ -59,7 +51,7 @@ evaluate it on eight ranks in project `token-selection`.
 
 Bootstrap files are local, immutable exports:
 
-- `EDULLM_REFERENCE_PATH`: RefHQ step1315 for RHO-1.
+- `EDULLM_REFERENCE_PATH`: Instruct-v3 (`refhq-instruct`) step940 for RHO-1.
 - `EDULLM_LATE_REFERENCE_PATH`: average of RefHQ steps 1000/1125/1315 for
   middle-PPL token.
 - `EDULLM_PASSIVE_REFERENCE_PATH`: optional passive excess-loss metric only; it
@@ -69,8 +61,8 @@ The methodology source is
 `edu-llm/edullm-p1@b435cbe9c352399fc4ab54b310f36d28f6c9746f`,
 `experiments/token-selection/README.md`. Main RegMix production uses platform
 release `regmix-10b-v1` and requires the resolved `EDULLM_DATASET_VERSION`, not
-`latest`. RefHQ contracts are immutable: step1315 for RHO-1 and the
-materialized average of steps1000/1125/1315 for middle-PPL token. Each
+`latest`. Reference contracts are immutable: Instruct-v3 step940 for RHO-1 and the
+materialized RefHQ average of steps1000/1125/1315 for middle-PPL token. Each
 materialized reference file is SHA-256
 hashed into the run identity. BLADE's reference-update corpus is the sealed,
 pinned `pretrain/refhq-instruct/v3`. Resume rejects a changed
@@ -95,7 +87,7 @@ or publish data/models.
 ## Checkpoints, evaluator, resume, and artifacts
 
 The permanent ladder is step 0, every 125 steps, and true final, omitting the
-last grid point when it is less than 125 steps before final. All six arms use
+last grid point when it is less than 125 steps before final. All arms use
 9.9B RegMix tokens / 2,360 steps.
 Every save is permanent. The branch-local evaluator is self-contained:
 `.edullm/eval_task_loss_olmo_core.py` carries the exact 20

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Skill-It weight update and adjacency construction helpers.
 
-Offline A (probe arm): Chinchilla-extrapolated one-hot probes vs RegMix reference
-``L_j(r_RegMix)`` from ``mixlaw_fit_chinchilla.json``; loaded from ``artifacts/A_offline.npy``.
+Offline A (probe arm): Chinchilla-extrapolated one-hot probes vs the MixLaw fit's
+prediction ``L_j(r_RegMix)`` from ``mixlaw_fit_chinchilla.json``, where ``regmix``
+in this module's names denotes the Data Mixing Laws paper mixture; loaded from
+``artifacts/probes_full/A_offline.npy``.
 Online A (derivative arm): from the parametric mixing law
 
     L_j(r) = c_j + k_j * exp( sum_i t_ij * r_i )
@@ -12,7 +14,14 @@ with Skill-It-compatible adjacency
     A_ij = max( 0, -t_ij * (L_j(r) - c_j) )
          = max( 0, -(dL_j / dr_i) )
 
-so that A_ij > 0 means domain i helps task family j.
+so that A_ij > 0 means domain i helps task family j. This is the adjacency the
+reported derivative arm used. On the simplex it is not identified by the fit:
+``t_j -> t_j + q``, ``k_j -> k_j * exp(-q)`` leaves every prediction unchanged
+but moves every A_ij, so which edges are nonzero depends on how the fit's
+regularization pins q. ``online_A_from_fit(..., gauge_invariant=True)`` gives
+the invariant alternative, the benefit of moving mass from r toward domain i:
+
+    A_ij = max( 0, (sum_q r_q t_qj - t_ij) * (L_j(r) - c_j) )
 """
 from __future__ import annotations
 
@@ -126,10 +135,13 @@ def online_A_from_fit(
     *,
     domains: Sequence[str] = DEFAULT_DOMAINS,
     families: Sequence[str] = DEFAULT_FAMILIES,
+    gauge_invariant: bool = False,
 ) -> np.ndarray:
     """Build A(r) from ``mixlaw_fit_chinchilla.json`` at mixture weights ``r``.
 
-    ``A_ij = max(0, -t_ij * (L_j(r) - c_j))``.
+    ``A_ij = max(0, -t_ij * (L_j(r) - c_j))`` by default, as in the reported run.
+    With ``gauge_invariant=True``, ``t_ij`` is measured from ``sum_q r_q t_qj``,
+    which makes A invariant to the fit's unidentified shift of ``t_j``.
     """
     targets = fit["targets"]
     assert isinstance(targets, Mapping)
@@ -152,9 +164,10 @@ def online_A_from_fit(
         delta = L_j - c_j
         t_map = tgt["t"]
         assert isinstance(t_map, Mapping)
+        t_ref = sum(float(t_map[d]) * r_map[d] for d in domains) if gauge_invariant else 0.0
         for i, dom in enumerate(domains):
             t_ij = float(t_map[dom])
-            A[i, j] = max(0.0, -t_ij * delta)
+            A[i, j] = max(0.0, (t_ref - t_ij) * delta)
     return A
 
 

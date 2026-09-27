@@ -509,7 +509,6 @@ def main() -> None:
         if len(near_optimal_balanced_samples) >= 8:
             break
 
-    obs_macro = [macro_curve(r["task_loss_families"]) for r in runs]
     rng_simplex = np.random.default_rng(42)
     R_rand = rng_simplex.dirichlet(np.ones(7), 1000)
     fams = sorted(families)
@@ -519,7 +518,11 @@ def main() -> None:
         "n_samples": 1000,
         "sampling": "dirichlet_alpha=1",
         "seed": 42,
-        "observed_pilot_macro_range": [min(obs_macro), max(obs_macro)],
+        "range_basis": "Chinchilla-extrapolated six-family pilot targets",
+        "chinchilla_target_macro_range": [
+            float(true_macro.min()),
+            float(true_macro.max()),
+        ],
         "macro": {
             "min": float(macro_rand.min()),
             "p5": float(np.percentile(macro_rand, 5)),
@@ -529,8 +532,18 @@ def main() -> None:
             "max": float(macro_rand.max()),
             "mean": float(macro_rand.mean()),
             "std": float(macro_rand.std()),
-            "pct_in_pilot_range": float(
-                np.mean((macro_rand >= min(obs_macro)) & (macro_rand <= max(obs_macro))) * 100
+            "pct_in_chinchilla_target_range": float(
+                np.mean(
+                    (macro_rand >= float(true_macro.min()))
+                    & (macro_rand <= float(true_macro.max()))
+                )
+                * 100
+            ),
+            "n_below_chinchilla_target_range": int(
+                np.sum(macro_rand < float(true_macro.min()))
+            ),
+            "n_above_chinchilla_target_range": int(
+                np.sum(macro_rand > float(true_macro.max()))
             ),
             "n_gt_3": int(np.sum(macro_rand > 3)),
             "n_gt_5": int(np.sum(macro_rand > 5)),

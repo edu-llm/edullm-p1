@@ -144,21 +144,14 @@ DOMAIN_BASE_WEIGHTS: dict[str, float] = {
 WIKI_MAX_WEIGHT = 0.3
 
 
-def mixture_optimization_caps(*, pilot_grid: bool = False) -> list[float]:
-    """Per-domain upper bounds in ``DOMAINS`` order."""
-    wiki = WIKI_MAX_WEIGHT
-    if pilot_grid:
-        return [0.6, 0.7, 0.7, 0.7, 0.7, 0.7, wiki]
-    return [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, wiki]
+def mixture_optimization_caps() -> list[float]:
+    """Per-domain upper bounds in ``DOMAINS`` order (only Wikipedia is capped)."""
+    return [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, WIKI_MAX_WEIGHT]
 
 
+# The single selection rule for every surrogate: minimize predicted macro task
+# loss with a 1% per-domain floor and the Wikipedia cap above.
 MIXTURE_OPT_CONSTRAINTS: list[tuple[str, list[float], list[float]]] = [
-    ("uncapped", mixture_optimization_caps(), [0.0] * len(DOMAINS)),
-    (
-        "pilot_caps",
-        mixture_optimization_caps(pilot_grid=True),
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.005],
-    ),
     ("min1pct", mixture_optimization_caps(), [0.01] * len(DOMAINS)),
 ]
 NEAR_OPT_DOMAIN_CAPS = mixture_optimization_caps()

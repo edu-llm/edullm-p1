@@ -95,7 +95,8 @@ training code; it is reported with them in
   attention term of Chowdhery et al. (2023, PaLM), $C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D$,
   evaluated at the **trained** model's $N_{\text{non-emb}} = 76{,}296{,}576$ (dolma2 vocab):
   $\approx 1.74\times10^{17}$ per mix → **$\approx 4.17\times10^{18}$** for 24, about 16% of
-  one $2.63\times10^{19}$ validation run.
+  one $2.63\times10^{19}$ validation run. `flops.py` computes all three from the
+  two architectures and the trained token counts.
 
 ### Evaluation and Chinchilla targets
 
@@ -294,52 +295,37 @@ LOO grid: hand-picked default macro LOO RMSE 0.0439 → selected 0.0366
 
 Surrogate optima plus nearby mixtures (within +0.04 bpb of that model’s optimum and ≥ 8 pp ($L_\infty$) from the optimum). None exactly match a pilot point.
 
-#### Table I: optima under the two constraint settings
+#### Table I: the four 370M mixtures
 
-Each surrogate was minimized under two settings, both keeping the 30% Wikipedia
-cap: unconstrained, and with a 1% per-domain floor. **Bold** rows were trained at
-370M. The predicted macro is each surrogate's own Chinchilla-extrapolated 60M
-prediction, so it compares settings within a surrogate, not across the two.
+The predicted macro is each surrogate's own Chinchilla-extrapolated 60M
+prediction, so it is not comparable across the two surrogates.
 
 | Mixture | pred. macro | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **Olmo-mix-1124** (`olmo-mix-1124`) | — | 0.951 | 0.005 | 0.021 | 0.015 | 0.003 | 0.003 | 0.001 |
-| **Data Mixing Laws paper** (`mix01`) | — | 0.375 | 0.250 | 0.141 | 0.094 | 0.064 | 0.061 | 0.016 |
-| **MixLaw unconstrained** (`ML-pilot_caps`) | 1.7965 | 0.568 | 0.000 | 0.000 | 0.097 | 0.035 | 0.000 | 0.300 |
-| MixLaw 1%-floor | 1.7984 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
-| LightGBM unconstrained | 1.8316 | 0.354 | 0.083 | 0.061 | 0.441 | 0.030 | 0.022 | 0.009 |
-| **LightGBM 1%-floor** (`LGB-min1pct`) | 1.8335 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
+| Olmo-mix-1124 (`olmo-mix-1124`) | — | 0.951 | 0.005 | 0.021 | 0.015 | 0.003 | 0.003 | 0.001 |
+| Data Mixing Laws paper (`mix01`) | — | 0.375 | 0.250 | 0.141 | 0.094 | 0.064 | 0.061 | 0.016 |
+| MixLaw (`ML-min1pct`) | 1.7984 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
+| LightGBM (`LGB-min1pct`) | 1.8335 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
 
-**Which optimum was trained.** The 1% floor was the default, to keep every
-domain in the mixture, but the unconstrained optimum was trained instead
-wherever the floor did little more than lift zero weights. For MixLaw the floor
-only lifts its three zero weights (arXiv, StarCoder, Algebraic Stack) to 1% and
-shifts the others minimally, so the unconstrained MixLaw optimum was trained.
-For LightGBM the floor moves the optimum to a different location on the
-simplex, raising DCLM from 35% to 55% and lowering pes2o from 44% to 8%, so the
-1%-floor LightGBM optimum was trained. Both choices were made after the pilots,
-before any validation runs. In both surrogates the floor raises the predicted
-macro loss by 0.0019 bpb. The unconstrained MixLaw optimum pushes Wikipedia to
-the 30% cap, beyond the 12.2% maximum across the 24 pilots, so on that domain it
-extrapolates beyond the pilot grid.
+**Selection rule.** Both surrogates are minimized with a 1% per-domain floor,
+so every domain stays in the mixture, and the 30% Wikipedia cap
+(`MIXTURE_OPT_CONSTRAINTS` in `mixlaw_common.py`). The row labelled "optimum"
+in each table below is that minimizer, the mixture trained at 370M. The MixLaw
+optimum holds arXiv, StarCoder and Algebraic Stack at the 1% floor and puts
+Wikipedia at the 30% cap, beyond the 12.2% maximum across the 24 pilots, so on
+that domain it extrapolates beyond the pilot grid.
 
-In code, `MIXTURE_OPT_CONSTRAINTS` (`mixlaw_common.py`) implements the two
-settings as `uncapped` and `min1pct`. A third setting, `pilot_caps` (dclm ≤ 0.6,
-other domains ≤ 0.7, 0.005 ≤ wiki ≤ 0.30), returns the same optimum as
-`uncapped` for both surrogates, which is why the trained MixLaw arm is named
-`ML-pilot_caps`. The row labelled "optimum" in each table below is the mixture
-that was trained.
-
-That a 1% floor moves the LightGBM argmin by ~40 pp of mass while changing the
-predicted macro by 0.0019 bpb — against a macro LOO RMSE of 0.0366 — says the
-tree surrogate's objective is a broad plateau over the simplex and its argmin is
-weakly identified. Treat the specific LightGBM weight vector accordingly.
+The LightGBM surrogate is piecewise constant, so its minimum is a region, not a
+point: near-opt 1 below predicts exactly the optimum's macro while moving up to
+2.9 pp of weight per domain, and all eight near-optimal mixtures lie within
+0.0075 bpb of it, against a macro LOO RMSE of 0.0366. Its argmin is weakly
+identified. Treat the specific LightGBM weight vector accordingly.
 
 **Mixing law**
 
 | candidate | pred macro | max_w | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |-----------|------------:|-------:|---:|---:|---:|---:|---:|---:|---:|
-| optimum | 1.7965 | 0.568 | 0.568 | — | — | 0.097 | 0.035 | — | 0.300 |
+| optimum | 1.7984 | 0.556 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
 | near-opt 1 | 1.7995 | 0.440 | 0.440 | 0.011 | 0.011 | 0.207 | 0.013 | 0.018 | 0.300 |
 | near-opt 2 | 1.8016 | 0.435 | 0.435 | 0.018 | 0.011 | 0.134 | 0.069 | 0.032 | 0.300 |
 | near-opt 3 | 1.8022 | 0.354 | 0.354 | 0.020 | 0.012 | 0.258 | 0.027 | 0.029 | 0.300 |

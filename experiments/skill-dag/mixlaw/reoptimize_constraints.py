@@ -72,7 +72,7 @@ def far_from_reference(
 
 def sample_near_optimal(
     objective,
-    uncapped_pred: float,
+    anchor_pred: float,
     rng: np.random.Generator,
     floors: list[float],
     caps: list[float],
@@ -89,7 +89,7 @@ def sample_near_optimal(
         ):
             continue
         val = float(objective(r))
-        if val <= uncapped_pred + NEAR_OPT_BAND:
+        if val <= anchor_pred + NEAR_OPT_BAND:
             samples.append((val, r))
     samples.sort(key=lambda x: x[0])
 
@@ -136,7 +136,7 @@ def mixing_law_objective(fit: dict):
 def resample_near_optimal_mixing_law(fit: dict) -> list[dict]:
     return sample_near_optimal(
         mixing_law_objective(fit),
-        fit["optimization"]["uncapped"]["predicted_macro"],
+        fit["optimization"]["min1pct"]["predicted_macro"],
         np.random.default_rng(SEED + 99),
         [MIN_DOMAIN_WEIGHT] * 7,
         NEAR_OPT_DOMAIN_CAPS,
@@ -160,7 +160,7 @@ def resample_near_optimal_lightgbm(
 
     return sample_near_optimal(
         objective,
-        fit["optimization"]["uncapped"]["predicted_macro"],
+        fit["optimization"]["min1pct"]["predicted_macro"],
         np.random.default_rng(SEED + 199),
         [MIN_DOMAIN_WEIGHT] * 7,
         NEAR_OPT_DOMAIN_CAPS,
@@ -197,7 +197,7 @@ def optimize_mixing_law(fit: dict, runs: list[dict]) -> tuple[dict, list[dict], 
 
     near = sample_near_optimal(
         objective,
-        optima["uncapped"]["predicted_macro"],
+        optima["min1pct"]["predicted_macro"],
         np.random.default_rng(SEED + 99),
         [MIN_DOMAIN_WEIGHT] * 7,
         NEAR_OPT_DOMAIN_CAPS,
@@ -225,17 +225,7 @@ def optimize_lightgbm(
 
     optima: dict = {}
     optimization_meta: dict = {}
-    constraint_order = [c[0] for c in OPT_CONSTRAINTS if c[0] != "uncapped"] + ["uncapped"]
-    constraint_by_name = {name: (caps, floors) for name, caps, floors in OPT_CONSTRAINTS}
-
-    for name in constraint_order:
-        caps, floors = constraint_by_name[name]
-        extra_starts: list[np.ndarray] = []
-        if name == "uncapped":
-            for other in optima.values():
-                extra_starts.append(
-                    np.array([other["weights"][d] for d in DOMAINS], dtype=float)
-                )
+    for name, caps, floors in OPT_CONSTRAINTS:
         r_star, val, meta = optimize_simplex_global(
             objective,
             objective_batch,
@@ -243,7 +233,6 @@ def optimize_lightgbm(
             caps,
             floors,
             seed=SEED + OPT_SEED_OFFSET[name],
-            extra_starts=extra_starts,
         )
         optima[name] = {
             "weights": {d: float(v) for d, v in zip(DOMAINS, r_star)},
@@ -269,7 +258,7 @@ def optimize_lightgbm(
 
     near = sample_near_optimal(
         objective,
-        optima["uncapped"]["predicted_macro"],
+        optima["min1pct"]["predicted_macro"],
         np.random.default_rng(SEED + 199),
         [MIN_DOMAIN_WEIGHT] * 7,
         NEAR_OPT_DOMAIN_CAPS,

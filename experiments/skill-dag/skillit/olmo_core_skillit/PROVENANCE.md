@@ -105,7 +105,7 @@ e112c2e42c57be4cc027d3552015b0071da84a69c86359a4e57c9d1617d1bb92  train_skillit_
 eb5c41b0dd41ecabaa18e3743240eb30d6440babd5c30f1abf9ca7bfde421590  skillit_controller.py
 34c2c58c84217830e43ac2b3d2b628e970840778d5079bae0a1d6518c2a9a9c2  skillit_loader.py
 f8d4c1b8792fa56bbbe0733d1f78942179fbd903dbfdd74cb34ba9e6ce94a186  skillit_math.py
-feab875f9706860d0f61835f9e7d7326c079e56dac7e8d792ed5b6dc3ad0c8de  skillit_recipe.json
+b06871ef3f19fca1f982c6d66bc12f5942348504d03740eeb59a6fb165772f05  skillit_recipe.json
 c6d6a9d8292c5f48485e7ae170d913cf368cceccc4a8b6285c86ddbc4eaa7f18  production_contract/__init__.py
 67d8a787a45e5a1c9f0f2f7463363b994916e4469cadf12ddfc8e930cd5632af  production_contract/checkpoint.py
 f633179af942067f859b561056863ca54b2b32479d8bd082db3f0e1331f25283  production_contract/task_loss.py
@@ -141,8 +141,24 @@ probe and derivative runs and neither touching training math:
   `RECIPE_SHA256`. The recipe's original hash was
   `28506e7c3e15814c1dd0082c1c3c52dd228083fec83556616019504583b48f91`, checked
   in `skillit_math.py` and above, before this change; the byte-identical
-  original is recoverable the same way. Every other field in the recipe,
-  including `derivative_fit_source_sha256`, is untouched.
+  original is recoverable the same way.
+- **`skillit_recipe.json`'s `derivative_fit_source_sha256` was updated a second
+  time**, to track `mixlaw_fit_chinchilla.json` after the unconstrained-fit
+  removal (see that file's own history): the `uncapped` and `pilot_caps`
+  optimization blocks were dropped and one diagnostic field was renamed
+  (`best_unconstrained_rmse_proxy` → `best_rmse_before_c_bound`), verified
+  bit-identical everywhere it matters -- `optimization.min1pct` (the weights
+  and predicted macro both Skill-It arms and the LGB-min1pct rerun actually
+  used) and every fitted `c`/`k`/`t` value are unchanged; only
+  `near_optimal_balanced_samples` legitimately differs, since it's now
+  measured against a single reference point instead of three. The recipe's
+  hash before this second change was
+  `feab875f9706860d0f61835f9e7d7326c079e56dac7e8d792ed5b6dc3ad0c8de` (itself
+  already past the original `28506e7c…`, from the edit above), and
+  `derivative_fit_source_sha256` was
+  `acb4754b46cd6a588dffce7e7ad0d9bd70b0188db010669a7cfccf8622da2bcc`; both are
+  recoverable from git history before this change. Every other field in the
+  recipe is untouched.
 
 ## What is deliberately excluded
 

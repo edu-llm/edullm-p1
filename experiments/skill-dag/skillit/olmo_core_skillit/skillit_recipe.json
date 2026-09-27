@@ -8,7 +8,7 @@
     "offline_a_source": "experiments/skill-dag/skillit/artifacts/probes_full/A_offline.json",
     "offline_a_source_sha256": "e542e3e66f70c752110b51f60d1ee84f5f7860931dce5684e7a621f35dd74a21",
     "derivative_fit_source": "experiments/skill-dag/mixlaw/mixlaw_fit_chinchilla.json",
-    "derivative_fit_source_sha256": "acb4754b46cd6a588dffce7e7ad0d9bd70b0188db010669a7cfccf8622da2bcc"
+    "derivative_fit_source_sha256": "2a2fd6b812fb2b7275d4b8b5b89c7a6df999d31fba25f559a3c1d4c96c07ee48"
   },
   "data_source": {
     "dataset_id": "pretrain/olmo-127b",

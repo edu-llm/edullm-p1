@@ -1,4 +1,12 @@
-"""Immutable scientific identities for the approved 370M arms."""
+"""Immutable scientific identities for the approved 370M arms.
+
+Every arm below runs through the same entrypoint, the same
+``TokenWeightedTrainModule``, and the same FarmShare 4xL40S hardware contract
+(``PRODUCTION_WORLD_SIZE`` in ``recipe.py``). There is no RunPod path and no
+AWS/S3 code anywhere in this tree: corpora are read from local FarmShare
+paths staged by ``farmshare/stage_local.py``, bound by the per-file sha256
+recorded in this repository's ``datasets/manifests/<corpus>/outputs.json``.
+"""
 
 from __future__ import annotations
 
@@ -16,13 +24,17 @@ Method = Literal[
 ]
 
 REGMIX = "pretrain/regmix-10b"
-# BLADE's HQ/reference-update stream. Pin the immutable version at launch.
-REFHQ = "pretrain/refhq-instruct"
-RHO_REFERENCE_CHECKPOINT = (
-    "s3://edullm-checkpoints/olmo-370m/"
-    "edullm-370M-refhq-instruct-v3/checkpoints/step940/"
-)
-REFHQ_LATE_STEPS = (1000, 1125, 1315)
+# BLADE's L_val stream, and the Instruct reference arm's own training corpus.
+REFHQ_INSTRUCT = "pretrain/refhq-instruct"
+# The HQ reference arm's own training corpus.
+REFHQ_5P5B = "pretrain/refhq-regmix-5p5b"
+
+# Symbolic reference contracts, resolved to a local, materialized .pt file by
+# farmshare/stage_local.py once the reference arm below has produced the
+# checkpoint. Nothing here is an S3 URI.
+INSTRUCT_REFERENCE_CONTRACT = "instruct-reference-370m/checkpoints/step940"
+HQ_REFERENCE_CONTRACT = "hq-reference-370m/checkpoints/average-1000-1125-1315"
+HQ_REFERENCE_AVERAGED_STEPS = (1000, 1125, 1315)
 
 
 @dataclass(frozen=True)
@@ -35,44 +47,53 @@ class ArmSpec:
     max_tokens: Optional[int] = 9_900_000_000
     wandb_project_override: Optional[str] = None
     reference_contract: Optional[str] = None
-    early_reference_contract: Optional[str] = None
-    late_reference_contract: Optional[str] = None
-    ema_seed: Optional[Literal["zero", "refhq"]] = None
-    ema_alpha: Optional[float] = None
+    ema_seed: Optional[Literal["zero"]] = None
     ema_tau: Optional[float] = None
     requires_refhq_stream: bool = False
+    init_seed: int = 6198
+    data_seed: int = 42
+    rank_microbatch_tokens: int = 16_384
 
     @property
     def wandb_project(self) -> str:
-        return self.wandb_project_override or f"token-selection-{self.name}"
-
-    @property
-    def is_online_selection(self) -> bool:
-        return True
+        return self.wandb_project_override or "token-selection"
 
 
 ARM_SPECS: dict[str, ArmSpec] = {
-    # Full cross-entropy baseline on the identical corpus, step budget, seeds,
-    # and 125-step task-loss ladder as every selection arm. method="full" keeps
-    # every valid token in the loss, so recipe.py routes this to the stock
-    # TransformerTrainModule (no selection callback, no scoring forward pass).
-    # Replaces the hpo-ladder clone that the first draft used as its control.
+    # ---- References (trained in this study; no other trainer produces them) ----
+    # Same "full" method / stock-equivalent loss as the full-loss control, just
+    # on a different corpus and for a different step count.
+    "hq-reference": ArmSpec(
+        "hq-reference",
+        "full",
+        REFHQ_5P5B,
+        "hq-reference-370m",
+        keep_fraction=1.0,
+        max_tokens=None,  # one whole-stream epoch of refhq-regmix-5p5b; see recipe.py
+    ),
+    "instruct-reference": ArmSpec(
+        "instruct-reference",
+        "full",
+        REFHQ_INSTRUCT,
+        "instruct-reference-370m",
+        keep_fraction=1.0,
+        max_tokens=None,  # one whole-stream epoch of refhq-instruct's train split
+    ),
+    # ---- Reported arms: full-loss control, five selection arms, two random-control seeds ----
     "full-loss-control": ArmSpec(
         "full-loss-control",
         "full",
         REGMIX,
-        "full-loss-control-regmix10b-v3",
+        "full-loss-control-regmix10b",
         keep_fraction=1.0,
-        wandb_project_override="token-selection",
     ),
     "rho-1": ArmSpec(
         "rho-1",
         "rho_excess",
         REGMIX,
-        "rho-1-regmix10b-v1",
+        "rho-1-regmix10b",
         keep_fraction=0.6,
-        wandb_project_override="token-selection",
-        reference_contract=RHO_REFERENCE_CHECKPOINT,
+        reference_contract=INSTRUCT_REFERENCE_CONTRACT,
     ),
     "rel-ema-exp": ArmSpec(
         "rel-ema-exp",
@@ -80,34 +101,30 @@ ARM_SPECS: dict[str, ArmSpec] = {
         REGMIX,
         "rel-ema-exp-10b-scratch-v1",
         keep_fraction=0.6,
-        wandb_project_override="token-selection",
         ema_seed="zero",
         ema_tau=300.0,
     ),
-    "middle-ppl-token": ArmSpec(
-        "middle-ppl-token",
+    "perplexity": ArmSpec(
+        "perplexity",
         "middle_ppl",
         REGMIX,
-        "middle-ppl-token-10b-v2",
+        "perplexity-regmix10b",
         keep_fraction=0.6,
-        wandb_project_override="token-selection",
-        late_reference_contract=f"average RefHQ steps {REFHQ_LATE_STEPS}",
+        reference_contract=HQ_REFERENCE_CONTRACT,
     ),
     "attention": ArmSpec(
         "attention",
         "attention_topk",
         REGMIX,
-        "attention-topk-10b-scratch-v1",
+        "attention-regmix10b",
         keep_fraction=0.6,
-        wandb_project_override="token-selection",
     ),
     "blade": ArmSpec(
         "blade",
         "blade",
         REGMIX,
-        "blade-regmix10b-refhq-instruct-v3-v1",
+        "blade-regmix10b",
         keep_fraction=0.6,
-        wandb_project_override="token-selection",
         requires_refhq_stream=True,
     ),
     "random-control": ArmSpec(
@@ -116,7 +133,17 @@ ARM_SPECS: dict[str, ArmSpec] = {
         REGMIX,
         "random-control-regmix10b-v1",
         keep_fraction=0.6,
-        wandb_project_override="token-selection",
+        init_seed=6198,
+        data_seed=42,
+    ),
+    "random-control-seed69": ArmSpec(
+        "random-control-seed69",
+        "random",
+        REGMIX,
+        "random-control-regmix10b-seed69-v1",
+        keep_fraction=0.6,
+        init_seed=12345,
+        data_seed=69,
     ),
 }
 

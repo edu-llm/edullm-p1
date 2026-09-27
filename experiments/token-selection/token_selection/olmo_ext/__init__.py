@@ -1,23 +1,18 @@
 """Partial vendor of the token-selection OLMo-core extensions.
 
-Five modules are vendored here: the checkpoint ladder, the task-loss eval
-hook, the durability marker, the W&B task-loss logging, and the RefHQ
-reference materializer. The upstream package also carries the token-scoring
-machinery (``attention_score``, ``ema``, ``frozen_ref``, ``scorers``,
-``metrics``, ``train_module``), which the token-selection experiment itself
-needs but nothing here does.
-
-``refhq_materialize`` was vendored in df0b7b8 and then removed by 489049f
-("Vendor the code that actually ran; delete the superseded stack"), which left
-``reference/export_refhq_reference.py`` importing a module that was no longer
-present -- the importer survived the sweep but its dependency did not. It has
-been restored from df0b7b8, and its four tests pass.
-
-The copy of this file that came across with the vendor was the full upstream
-one, so it re-exported all eight modules and raised ImportError on the six
-that were never vendored -- which is what broke
-``experiments/skill-dag/mixlaw/tests/test_mixlaw_hardening.py`` on a clean
-checkout. It now re-exports only what is present.
+Four modules are vendored here: the checkpoint ladder, the task-loss eval
+hook, the durability marker, and the W&B task-loss logging. All four are
+imported directly by ``experiments/skill-dag/mixlaw/*.py``, so they stay even
+though the token-selection experiment's own code path
+(``olmo_core_token_selection/production_contract/``) no longer imports this
+package. The upstream package also carries the token-scoring machinery
+(``attention_score``, ``ema``, ``frozen_ref``, ``scorers``, ``metrics``,
+``train_module``) and a RefHQ DistCP->``.pt`` materializer
+(``refhq_materialize``), none of which anything in this repository imports
+anymore -- the materializer's only caller was
+``experiments/token-selection/reference/export_refhq_reference.py``, which is
+gone now that both references are trained in this study (see
+``../arms/README.md``).
 
 Every import site in this repository uses the submodule form
 (``from token_selection.olmo_ext.wandb_logging import ...``), so these

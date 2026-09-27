@@ -311,7 +311,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-name", required=True)
     parser.add_argument("--format", choices=("auto", "distcp", "state_pt"), default="auto")
     # BLADE keeps both proxy and dynamic-reference state resident while the
-    # synchronous evaluator runs. A batch of four can exhaust an 80 GiB A100
+    # synchronous evaluator runs. A batch of four can exhaust a 44 GiB L40S
     # after a sync boundary, so production defaults to the memory-safe size.
     parser.add_argument("--device-eval-batch-size", type=int, default=1)
     return parser.parse_args()

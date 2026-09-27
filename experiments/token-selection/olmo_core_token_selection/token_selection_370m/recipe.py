@@ -18,25 +18,14 @@ from .arms import ArmSpec
 
 SEQUENCE_LENGTH = 2048
 GLOBAL_BATCH_TOKENS = 4_194_304
-# 32,768 (16 sequences/microbatch) was sized for flash-attention on A100/H100.
-# FarmShare has no working flash-attn build, so training runs on the much
-# heavier `torch` SDPA backend (materializes full attention score matrices),
-# which OOMs an L40S (44GB) at this microbatch size. The override only
-# changes how many gradient-accumulation chunks make up the same global
-# batch -- not batch size, LR, seeds, or anything else scientific -- so it's
-# safe to shrink per-hardware without touching the AWS/flash-attention path.
-RANK_MICROBATCH_TOKENS = int(os.environ.get("EDULLM_RANK_MICROBATCH_TOKENS", 32_768))
 PEAK_LR = 4e-4
 WARMUP_STEPS = 24
 ALPHA_F = 0.1
 Z_LOSS = 1e-5
 MAX_GRAD_NORM = 1.0
-INIT_SEED = 6198
-DATA_SEED = 42
-PRODUCTION_WORLD_SIZE = 8
-CUSTOM_LOSS_METHODS = frozenset(
-    {"random", "rho_excess", "rel_ema", "middle_ppl", "learnability", "attention_topk"}
-)
+# Every reported arm runs on one FarmShare 4xL40S node; there is no other
+# hardware contract and no RunPod path in this tree.
+PRODUCTION_WORLD_SIZE = 4
 
 
 def total_steps(max_tokens: int) -> int:
@@ -82,18 +71,13 @@ def scientific_identity(
     refhq_binding: Optional[Mapping[str, Any]],
     max_tokens: int,
     reference_path: Optional[str],
-    early_reference_path: Optional[str],
-    late_reference_path: Optional[str],
-    passive_reference_path: Optional[str] = None,
-    precomputed_selection_binding: Optional[Mapping[str, Any]] = None,
+    git_commit: Optional[str] = None,
 ) -> dict[str, Any]:
     main_binding = dict(dataset_binding)
     if main_binding.get("dataset_id") != arm.dataset_id:
         raise ValueError("resolved main corpus does not match the selected arm")
     if arm.requires_refhq_stream != (refhq_binding is not None):
         raise ValueError("BLADE RefHQ binding is missing or attached to a non-BLADE arm")
-    if precomputed_selection_binding is not None and arm.method != "middle_ppl":
-        raise ValueError("precomputed token masks are only supported for middle-PPL")
     return {
         "arm": arm.name,
         "run_id": arm.run_id,
@@ -104,11 +88,11 @@ def scientific_identity(
         "refhq_binding": dict(refhq_binding) if refhq_binding is not None else None,
         "tokenizer": "tokenizer/dolma2-bpe",
         "model": "TransformerConfig.olmo2_370M",
-        "init_seed": INIT_SEED,
-        "data_seed": DATA_SEED,
+        "init_seed": arm.init_seed,
+        "data_seed": arm.data_seed,
         "sequence_length": SEQUENCE_LENGTH,
         "global_batch_tokens": GLOBAL_BATCH_TOKENS,
-        "rank_microbatch_tokens": RANK_MICROBATCH_TOKENS,
+        "rank_microbatch_tokens": arm.rank_microbatch_tokens,
         "max_tokens": int(max_tokens),
         "total_steps": total_steps(max_tokens),
         "peak_lr": PEAK_LR,
@@ -117,22 +101,12 @@ def scientific_identity(
         "z_loss_multiplier": Z_LOSS,
         "keep_fraction": arm.keep_fraction,
         "ema_seed": arm.ema_seed,
-        "ema_alpha": arm.ema_alpha,
         "ema_tau": arm.ema_tau,
         "reference_contract": arm.reference_contract,
-        "early_reference_contract": arm.early_reference_contract,
-        "late_reference_contract": arm.late_reference_contract,
         "reference_sha256": _reference_digest(reference_path),
-        "early_reference_sha256": _reference_digest(early_reference_path),
-        "late_reference_sha256": _reference_digest(late_reference_path),
-        "passive_reference_sha256": _reference_digest(passive_reference_path),
-        "precomputed_selection_binding": (
-            dict(precomputed_selection_binding)
-            if precomputed_selection_binding is not None
-            else None
-        ),
         "wandb_project": arm.wandb_project,
-        "checkpoint_contract": "schema-v2-ladder125-task-loss20-wandb",
+        "checkpoint_contract": "schema-v3-unified-farmshare-4xl40s",
+        "git_commit": git_commit,
     }
 
 
@@ -142,13 +116,11 @@ def _loader(
     work_dir: Path,
     seed: int,
     process_group=None,
-    label_mask_paths: Optional[Sequence[str]] = None,
 ):
     from olmo_core.data import NumpyDataLoaderConfig, NumpyFSLDatasetConfig
 
     dataset = NumpyFSLDatasetConfig(
         paths=list(corpus.paths),
-        label_mask_paths=list(label_mask_paths) if label_mask_paths is not None else None,
         sequence_length=SEQUENCE_LENGTH,
         tokenizer=corpus.tokenizer,
         dtype=corpus.dtype,
@@ -163,7 +135,7 @@ def _loader(
     ).build(dataset, dp_process_group=process_group)
 
 
-def _train_module_config():
+def _train_module_config(rank_microbatch_tokens: int):
     from olmo_core.config import DType
     from olmo_core.distributed.parallel import DataParallelType
     from olmo_core.distributed.utils import is_distributed
@@ -183,7 +155,7 @@ def _train_module_config():
         else None
     )
     return TransformerTrainModuleConfig(
-        rank_microbatch_size=RANK_MICROBATCH_TOKENS,
+        rank_microbatch_size=rank_microbatch_tokens,
         max_sequence_length=SEQUENCE_LENGTH,
         optim=SkipStepAdamWConfig(
             lr=PEAK_LR,
@@ -244,13 +216,9 @@ def build_trainer(
     progress_dir: Path,
     task_loss_script: Path,
     reference_path: Optional[str] = None,
-    early_reference_path: Optional[str] = None,
-    late_reference_path: Optional[str] = None,
-    passive_reference_path: Optional[str] = None,
-    precomputed_label_mask_paths: Optional[Sequence[str]] = None,
-    precomputed_selection_binding: Optional[Mapping[str, Any]] = None,
     resume: bool = False,
     production: bool = True,
+    git_commit: Optional[str] = None,
 ):
     from olmo_core.nn.transformer import TransformerConfig
     from olmo_core.train import Duration, LoadStrategy, TrainerConfig
@@ -264,50 +232,35 @@ def build_trainer(
     from production_contract.task_loss import TaskLossEvalCallback
 
     from .blade import BladeCallback, ResumableBatchStream
-    from .train_module import (
-        TokenSelectionConfig,
-        TokenSelectionStateCallback,
-        TokenWeightedTrainModule,
-    )
+    from .train_module import TokenSelectionConfig, TokenSelectionStateCallback
 
     steps = total_steps(max_tokens)
     model_config = TransformerConfig.olmo2_370M(
         vocab_size=corpus.tokenizer.padded_vocab_size(),
-        init_seed=INIT_SEED,
+        init_seed=arm.init_seed,
     )
     model = model_config.build(init_device="meta")
-    module_config = _train_module_config()
+    module_config = _train_module_config(arm.rank_microbatch_tokens)
     selection_config = TokenSelectionConfig(
-        method="full" if arm.method == "blade" else arm.method,
+        method=arm.method,
         keep_fraction=arm.keep_fraction,
         total_steps=steps,
-        seed=DATA_SEED,
-        reference_path=late_reference_path if arm.method == "middle_ppl" else reference_path,
-        early_reference_path=early_reference_path,
-        late_reference_path=None if arm.method == "middle_ppl" else late_reference_path,
-        passive_reference_path=passive_reference_path,
+        seed=arm.data_seed,
+        reference_path=reference_path,
         ema_seed=arm.ema_seed,
-        ema_alpha=arm.ema_alpha,
         ema_tau=arm.ema_tau,
     )
-    precomputed_middle_ppl = precomputed_label_mask_paths is not None
-    if precomputed_middle_ppl and arm.method != "middle_ppl":
-        raise ValueError("precomputed label masks are only supported for middle-PPL")
-    if precomputed_middle_ppl != (precomputed_selection_binding is not None):
-        raise ValueError("precomputed label masks and their binding must be supplied together")
-    if precomputed_middle_ppl and passive_reference_path:
-        raise ValueError("passive online scoring is incompatible with precomputed middle-PPL")
-    if (arm.method in CUSTOM_LOSS_METHODS and not precomputed_middle_ppl) or passive_reference_path:
-        train_module = _custom_module(model, module_config, selection_config)
-    else:
-        train_module = module_config.build(model)
+    # Every arm, including full-loss and BLADE, runs through the same custom
+    # train module. BLADE's per-token weights come from batch["token_weight"]
+    # (set by BladeCallback.pre_step), read before selection_weights() is ever
+    # called; "full"'s weights are just every valid token.
+    train_module = _custom_module(model, module_config, selection_config)
 
     main_loader = _loader(
         corpus,
         work_dir=work_dir / "main",
-        seed=DATA_SEED,
+        seed=arm.data_seed,
         process_group=train_module.dp_process_group,
-        label_mask_paths=precomputed_label_mask_paths,
     )
     checkpoint_kwargs = checkpointer_kwargs_for_ladder(steps, 125, save_async=False)
     checkpoint_kwargs["pre_train_checkpoint"] = not resume
@@ -350,12 +303,7 @@ def build_trainer(
                     "method": arm.method,
                     "dataset_id": arm.dataset_id,
                     "max_tokens": max_tokens,
-                    "precomputed_selection": precomputed_middle_ppl,
-                    "precomputed_selection_binding": (
-                        dict(precomputed_selection_binding)
-                        if precomputed_selection_binding is not None
-                        else None
-                    ),
+                    "git_commit": git_commit,
                 },
             ),
         )
@@ -377,23 +325,30 @@ def build_trainer(
                 wandb_mode=os.environ.get("WANDB_MODE", "online"),
             ),
         )
-    if isinstance(train_module, TokenWeightedTrainModule):
-        trainer_config = trainer_config.with_callback(
-            "token_selection_state", TokenSelectionStateCallback()
-        )
+    # TokenSelectionStateCallback (priority 3) must advance the EMA/step
+    # counter before BladeCallback's own sync bookkeeping (priority 4) runs at
+    # the same post_train_batch boundary, so it is always attached: BLADE's
+    # arm doesn't use EMA, but this ordering only matters relative to BLADE's
+    # own callback, and attaching it unconditionally keeps every arm's
+    # TokenWeightedTrainModule.selection_state advancing the same way.
+    trainer_config = trainer_config.with_callback(
+        "token_selection_state", TokenSelectionStateCallback()
+    )
     if arm.method == "blade":
+        from olmo_core.optim import CosWithWarmup
+
         if refhq_corpus is None:
             raise ValueError("BLADE requires the immutable RefHQ corpus as its second stream")
         reference_train_loader = _loader(
             corpus,
             work_dir=work_dir / "blade-reference-train",
-            seed=DATA_SEED + 17,
+            seed=arm.data_seed + 17,
             process_group=train_module.dp_process_group,
         )
         refhq_loader = _loader(
             refhq_corpus,
             work_dir=work_dir / "blade-refhq",
-            seed=DATA_SEED + 101,
+            seed=arm.data_seed + 101,
             process_group=train_module.dp_process_group,
         )
 
@@ -411,24 +366,23 @@ def build_trainer(
                 reference_factory=reference_factory,
                 reference_train_stream=ResumableBatchStream(reference_train_loader),
                 refhq_stream=ResumableBatchStream(refhq_loader),
+                reference_scheduler=CosWithWarmup(warmup=WARMUP_STEPS, alpha_f=ALPHA_F),
+                reference_initial_lr=PEAK_LR,
+                reference_microbatch_tokens=arm.rank_microbatch_tokens,
+                selection_microbatch_tokens=arm.rank_microbatch_tokens,
             ),
         )
 
     trainer = trainer_config.build(train_module, main_loader)
     trainer.callbacks["config_saver"].config = {
-        "recipe": "unchanged-olmo2-370m-v1",
+        "recipe": "unified-olmo2-370m-farmshare-4xl40s-v1",
         "arm": arm.name,
         "method": arm.method,
-        "precomputed_selection": precomputed_middle_ppl,
-        "precomputed_selection_binding": (
-            dict(precomputed_selection_binding)
-            if precomputed_selection_binding is not None
-            else None
-        ),
+        "git_commit": git_commit,
         "scientific_constants": {
             "sequence_length": SEQUENCE_LENGTH,
             "global_batch_tokens": GLOBAL_BATCH_TOKENS,
-            "rank_microbatch_tokens": RANK_MICROBATCH_TOKENS,
+            "rank_microbatch_tokens": arm.rank_microbatch_tokens,
             "peak_lr": PEAK_LR,
             "warmup_steps": WARMUP_STEPS,
             "alpha_f": ALPHA_F,

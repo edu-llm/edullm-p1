@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-#SBATCH --partition=gpu
-#SBATCH --qos=gpu
+#SBATCH --partition=normal
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --time=06:00:00
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+#SBATCH --time=00:30:00
 #SBATCH --exclude=wheat-01
-#SBATCH --job-name=olmo-stage
+#SBATCH --job-name=token-selection-stage
 #SBATCH --output=logs/stage-%j.out
 #SBATCH --error=logs/stage-%j.err
 

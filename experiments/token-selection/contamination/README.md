@@ -80,17 +80,18 @@ superseded audit's 40,087 used -- see
 | `refhq-regmix-5p5b-v1` | HQ reference corpus (Reference A) | `refhq-regmix-5p5b-v1/out/<domain>/`, one directory per domain | 3,265,570 | 3,214,596,137 |
 | `refhq-new-v1` | Instruct reference corpus (Reference B) | `refhq-new-v1/out/<source>/<category>/documents/`, `category` is the aggregation domain | 6,193,748 | 2,738,073,602 |
 
-The HQ row is `refhq-regmix-5p5b-v1`, the build the HQ reference model trained
-on. The original audit scanned `hq-reference-v1` instead, an earlier build
-(3,367,856 docs, 2,298,753,521 words; 1,010 items, 2.49%, stem rate 2.22%) whose
-raw downloads [`submit_refhq_regmix_5p5.sh`](../datasets/refhq/scripts/submit_refhq_regmix_5p5.sh)
+The HQ row is `refhq-regmix-5p5b-v1`, the build the HQ reference model trains on
+(both HQ and Instruct references are trained in this study; see
+[`../arms/README.md`](../arms/README.md)). The original audit scanned `hq-reference-v1`
+instead, an earlier, superseded 4B-budget build (3,367,856 docs, 2,298,753,521 words;
+1,010 items, 2.49%, stem rate 2.22%) whose raw downloads
+[`submit_refhq_regmix_5p5.sh`](../datasets/refhq/scripts/submit_refhq_regmix_5p5.sh)
 reused for every domain except DCLM (freshly sampled) when it built the trained
 corpus under the `regmix-5p5` budget. `hq-reference-v1` has since been deleted from
-scratch; its reduced results stay in `results_hq-reference-v1.json` for reference.
-The 2026-09-24 rescan of `refhq-regmix-5p5b-v1` used the same `scan_corpus.py`,
-item index (`item_index_summary.json`) and `aggregate_by_domain.py`; re-reducing the
-original `hq-reference-v1` hits with this directory's aggregator reproduces
-`results_hq-reference-v1.json` exactly.
+scratch; its own build and reduced results are no longer kept, since the current
+`refhq-regmix-5p5b-v1` row above supersedes it. The 2026-09-24 rescan of
+`refhq-regmix-5p5b-v1` used the same `scan_corpus.py`, item index
+(`item_index_summary.json`) and `aggregate_by_domain.py`.
 
 All three share the domain set `{algebraic-stack, arxiv, dclm, open-web-math,
 pes2o, starcoder, wiki}` except `refhq-new-v1`, which is organized by

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Stage one token-selection arm (and RefHQ objects when required).
+# Bind the local, pinned FarmShare corpus directories into ready.json.
+#
+# No download and no AWS: STAGE_MODE=corpora (the default) just verifies the
+# pinned source files exist and records their sizes. STAGE_MODE=references
+# additionally materializes and averages the reference checkpoints trained by
+# the hq-reference/instruct-reference arms; run it only after those two arms
+# have finished.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,12 +14,7 @@ source "${SCRIPT_DIR}/common.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/config.env"
 
-ARM="${ARM:-attention}"
-
-[[ -f "${AWS_ENV_FILE}" ]] || {
-  echo "missing ${AWS_ENV_FILE}; push aws-session.env from the laptop first" >&2
-  exit 2
-}
+STAGE_MODE="${STAGE_MODE:-corpora}"
 
 bash "${SCRIPT_DIR}/setup_venv.sh"
 # shellcheck disable=SC1091
@@ -21,25 +22,18 @@ source "${VENV}/bin/activate"
 export PYTHONPATH="${REPO_DIR}/src:${REPO_DIR}/.edullm"
 
 stage_args=(
-  "${REPO_DIR}/.edullm/runpod/stage_inputs.py"
-  --credentials-file "${AWS_ENV_FILE}"
+  "${REPO_DIR}/.edullm/farmshare/stage_local.py"
   --stage-root "${STAGE_ROOT}"
-  --arm "${ARM}"
-  --dataset-version "${DATASET_VERSION}"
-  --workers "${STAGE_WORKERS:-12}"
+  --mode "${STAGE_MODE}"
 )
-if [[ "${ARM}" == "blade" ]]; then
-  stage_args+=(--refhq-version "${REFHQ_VERSION}")
+if [[ "${STAGE_MODE}" == "references" ]]; then
+  stage_args+=(--run-root "${RUN_ROOT}")
 fi
 
 "${PYTHON}" "${stage_args[@]}"
 
-if [[ -e "${AWS_ENV_FILE}" ]]; then
-  echo "staging finished but ${AWS_ENV_FILE} still exists" >&2
-  exit 2
-fi
 [[ -f "${INPUT_MANIFEST}" ]] || {
-  echo "staging did not publish ${INPUT_MANIFEST}" >&2
+  echo "staging did not write ${INPUT_MANIFEST}" >&2
   exit 2
 }
-echo "stage_ok manifest=${INPUT_MANIFEST}"
+echo "stage_ok mode=${STAGE_MODE} manifest=${INPUT_MANIFEST}"

@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
-"""Platform entrypoint for one README-faithful token-selection arm."""
+"""The one entrypoint for every token-selection arm, on FarmShare 4xL40S.
+
+Corpora are read from a local manifest (``ready.json``) staged onto FarmShare
+scratch by ``farmshare/stage_local.py`` from the local corpus directories
+pinned in ``datasets/manifests/<corpus>/outputs.json``. There is no RunPod
+path, no S3, and no ``edullm_data`` anywhere in this tree.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional, Sequence
 
 EDULLM_DIR = Path(__file__).resolve().parent
 if str(EDULLM_DIR) not in sys.path:
@@ -15,7 +24,7 @@ if str(EDULLM_DIR) not in sys.path:
 
 from production_contract.checkpoint import assert_resume_fingerprint  # noqa: E402
 from production_contract.wandb_artifacts import restore_checkpoint_artifact  # noqa: E402
-from token_selection_370m.arms import ARM_SPECS, REFHQ, get_arm  # noqa: E402
+from token_selection_370m.arms import ARM_SPECS, REFHQ_INSTRUCT, get_arm  # noqa: E402
 from token_selection_370m.recipe import (  # noqa: E402
     build_trainer,
     immutable_corpus_binding,
@@ -24,7 +33,96 @@ from token_selection_370m.recipe import (  # noqa: E402
     write_identity,
 )
 
-PRODUCTION_WORLD_SIZE = 8
+
+@dataclass(frozen=True)
+class Corpus:
+    dataset_id: str
+    version: str
+    paths: Sequence[str]
+    dtype: "object"
+    tokenizer: "object"
+    rows: Optional[int]
+
+
+def _manifest_path() -> Path:
+    return Path(
+        os.environ.get(
+            "EDULLM_INPUT_MANIFEST",
+            "/tmp/edullm-inputs/token-selection/ready.json",
+        )
+    )
+
+
+def _manifest() -> dict:
+    payload = json.loads(_manifest_path().read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 2 or payload.get("family") != "token-selection":
+        raise RuntimeError("invalid token-selection local input manifest")
+    return payload
+
+
+def resolve_corpus(*, dataset_id: str, version: str, tokenizer_id: str) -> Corpus:
+    """Resolve one corpus from the staged local manifest.
+
+    Every object's local path and size are checked; the manifest itself was
+    built by ``stage_local.py`` directly from ``datasets/manifests/*/outputs.json``,
+    so the per-file sha256 pinned there is the corpus's real reproducibility
+    record. Re-hashing multi-gigabyte files on every launch would be slow for
+    no benefit; ``stage_local.py`` verifies sha256 once, when it builds the
+    staged copy.
+    """
+    from olmo_core.data import NumpyDatasetDType, TokenizerConfig
+
+    if tokenizer_id != "tokenizer/dolma2-bpe":
+        raise RuntimeError(f"unsupported tokenizer: {tokenizer_id}")
+    record = _manifest()["corpora"].get(dataset_id)
+    if record is None:
+        raise RuntimeError(f"local manifest has no staged corpus for {dataset_id}")
+    if version not in ("", "latest", record["version"]):
+        raise RuntimeError(f"requested {dataset_id}/{version}, staged version is {record['version']}")
+    paths = []
+    for obj in record["objects"]:
+        path = Path(obj["path"])
+        if not path.is_file() or path.stat().st_size != int(obj["size"]):
+            raise RuntimeError(f"staged object is missing or changed: {path}")
+        paths.append(str(path))
+    return Corpus(
+        dataset_id=dataset_id,
+        version=str(record["version"]),
+        paths=paths,
+        dtype=NumpyDatasetDType(record["dtype"]),
+        tokenizer=TokenizerConfig.dolma2(),
+        rows=int(record["rows"]) if record.get("rows") is not None else None,
+    )
+
+
+def resolve_reference_path(contract: Optional[str]) -> Optional[str]:
+    """Resolve a symbolic reference contract to its materialized local .pt file."""
+    if contract is None:
+        return None
+    record = _manifest().get("references", {}).get(contract)
+    if record is None:
+        raise RuntimeError(f"local manifest has no materialized reference for {contract!r}")
+    path = Path(record)
+    if not path.is_file():
+        raise RuntimeError(f"materialized reference is missing: {path}")
+    return str(path)
+
+
+def git_commit() -> Optional[str]:
+    marker = EDULLM_DIR / "GIT_COMMIT"
+    if marker.is_file():
+        return marker.read_text(encoding="utf-8").strip() or None
+    try:
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(EDULLM_DIR), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
+    except Exception:
+        return None
 
 
 def _path(name: str, default: str = "") -> str | None:
@@ -79,13 +177,6 @@ def _latest_resume_checkpoint(save_folder: Path) -> tuple[Path, bool]:
     return path, is_sync_boundary
 
 
-def resolve_corpus(**kwargs):
-    """Import the dataset reader only in the runtime that needs to stage data."""
-    from train_on_corpus import resolve_corpus as resolve
-
-    return resolve(**kwargs)
-
-
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
     result.add_argument("--arm", choices=tuple(ARM_SPECS), required=True)
@@ -99,7 +190,7 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
-def assert_production_runtime(expected_world_size: int = PRODUCTION_WORLD_SIZE) -> None:
+def assert_production_runtime(expected_world_size: int) -> None:
     """Fail before model construction unless torchrun supplied the locked GPU topology."""
     import torch
 
@@ -109,7 +200,7 @@ def assert_production_runtime(expected_world_size: int = PRODUCTION_WORLD_SIZE) 
     local_world_size = int(os.environ.get("LOCAL_WORLD_SIZE", str(world_size)))
     if world_size != expected_world_size or local_world_size != expected_world_size:
         raise RuntimeError(
-            "production token-selection runs require one 8-GPU torchrun node "
+            "production token-selection runs require one 4-GPU torchrun node "
             f"(WORLD_SIZE={world_size}, LOCAL_WORLD_SIZE={local_world_size})"
         )
     visible_devices = torch.cuda.device_count()
@@ -121,24 +212,22 @@ def assert_production_runtime(expected_world_size: int = PRODUCTION_WORLD_SIZE) 
 
 
 def main() -> None:
+    from token_selection_370m.recipe import PRODUCTION_WORLD_SIZE
+
     args = parser().parse_args()
     # torchrun's own argparse (parse_args, not parse_known_args) scans the
     # entire argv for abbreviation matches against its own flags regardless of
     # position, and "--local" ambiguously matches its --local-addr /
     # --local-ranks-filter, so torchrun refuses to start if it's passed on the
-    # launcher command line. Callers that need --local under torchrun (e.g.
-    # FarmShare launches at a GPU count other than the locked production
-    # topology) should set EDULLM_LOCAL=1 instead.
+    # launcher command line. Callers that need --local under torchrun (e.g. a
+    # smoke test at a GPU count other than the locked production topology)
+    # should set EDULLM_LOCAL=1 instead.
     if os.environ.get("EDULLM_LOCAL") == "1":
         args.local = True
     arm = get_arm(args.arm)
     save_folder = args.save_folder or Path(
         os.environ.get("EDULLM_CHECKPOINT_DIR", f"/tmp/checkpoints/{arm.run_id}")
     )
-    if str(save_folder).startswith("s3://"):
-        raise SystemExit(
-            "token-selection outputs must use runtime scratch plus W&B, not an S3 output URI"
-        )
     progress_dir = args.progress_dir or Path(
         os.environ.get("EDULLM_PROGRESS_DIR", f"/tmp/progress/{arm.run_id}")
     )
@@ -159,16 +248,7 @@ def main() -> None:
     max_tokens = int(arm.max_tokens if arm.max_tokens is not None else (corpus.rows or 0))
     if max_tokens <= 0:
         raise SystemExit("reference corpus manifest must declare a positive row/token count")
-    reference_path = _path("EDULLM_REFERENCE_PATH")
-    early_path = _path("EDULLM_EARLY_REFERENCE_PATH")
-    late_path = _path("EDULLM_LATE_REFERENCE_PATH")
-    passive_path = _path("EDULLM_PASSIVE_REFERENCE_PATH")
-    if arm.reference_contract and not reference_path:
-        raise SystemExit(f"{arm.name} requires materialized EDULLM_REFERENCE_PATH")
-    if arm.early_reference_contract and not early_path:
-        raise SystemExit(f"{arm.name} requires EDULLM_EARLY_REFERENCE_PATH")
-    if arm.late_reference_contract and not late_path:
-        raise SystemExit(f"{arm.name} requires EDULLM_LATE_REFERENCE_PATH")
+    reference_path = resolve_reference_path(arm.reference_contract)
 
     refhq_corpus = None
     if arm.requires_refhq_stream:
@@ -176,21 +256,22 @@ def main() -> None:
         if not args.local and refhq_version in ("", "latest"):
             raise SystemExit("production BLADE requires a pinned EDULLM_REFHQ_DATASET_VERSION")
         refhq_corpus = resolve_corpus(
-            dataset_id=REFHQ,
+            dataset_id=REFHQ_INSTRUCT,
             version=refhq_version,
             tokenizer_id="tokenizer/dolma2-bpe",
         )
+    commit = git_commit()
     identity = scientific_identity(
         arm,
         dataset_binding=immutable_corpus_binding(arm.dataset_id, corpus),
         refhq_binding=(
-            immutable_corpus_binding(REFHQ, refhq_corpus) if refhq_corpus is not None else None
+            immutable_corpus_binding(REFHQ_INSTRUCT, refhq_corpus)
+            if refhq_corpus is not None
+            else None
         ),
         max_tokens=max_tokens,
         reference_path=reference_path,
-        early_reference_path=early_path,
-        late_reference_path=late_path,
-        passive_reference_path=passive_path,
+        git_commit=commit,
     )
     print(
         json.dumps(
@@ -202,6 +283,7 @@ def main() -> None:
                 "wandb_project": arm.wandb_project,
                 "max_tokens": max_tokens,
                 "total_steps": total_steps(max_tokens),
+                "git_commit": commit,
             },
             indent=2,
         ),
@@ -231,7 +313,7 @@ def main() -> None:
     prepare_training_environment(seed=6198)
     try:
         if not args.local:
-            assert_production_runtime()
+            assert_production_runtime(PRODUCTION_WORLD_SIZE)
         torch_imported = __import__("torch")
         torch_imported.set_float32_matmul_precision("high")
         seed_all(6198)
@@ -245,11 +327,9 @@ def main() -> None:
             progress_dir=progress_dir,
             task_loss_script=task_loss_script,
             reference_path=reference_path,
-            early_reference_path=early_path,
-            late_reference_path=late_path,
-            passive_reference_path=passive_path,
             resume=args.resume,
             production=not args.local,
+            git_commit=commit,
         )
         write_identity(save_folder, progress_dir, identity)
         if resume_checkpoint is not None:

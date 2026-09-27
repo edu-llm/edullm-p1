@@ -22,16 +22,16 @@ from olmo_core.train.train_module import TransformerTrainModule
 from .selection import (
     EMAHistory,
     WeightShadow,
+    aligned_normalized_attention_scores,
     capture_last_attention,
     ema_alpha,
-    scores_from_capture,
     selection_weights,
 )
 
 
 def load_flat_weights(path: str | Path) -> dict[str, Tensor]:
     source = Path(path)
-    if not source.is_file() or str(source).startswith("s3://"):
+    if not source.is_file():
         raise ValueError(f"reference must be a materialized local .pt file: {source}")
     payload = torch.load(source, map_location="cpu", weights_only=False)
     if isinstance(payload, Mapping):
@@ -55,9 +55,6 @@ class TokenSelectionConfig:
     total_steps: int
     seed: int = 42
     reference_path: Optional[str] = None
-    early_reference_path: Optional[str] = None
-    late_reference_path: Optional[str] = None
-    passive_reference_path: Optional[str] = None
     ema_seed: Optional[str] = None
     ema_alpha: Optional[float] = None
     ema_tau: Optional[float] = None
@@ -72,31 +69,11 @@ class TokenSelectionState:
             if config.reference_path
             else None
         )
-        self.early = (
-            WeightShadow.from_state_dict(model, load_flat_weights(config.early_reference_path))
-            if config.early_reference_path
-            else None
-        )
-        self.late = (
-            WeightShadow.from_state_dict(model, load_flat_weights(config.late_reference_path))
-            if config.late_reference_path
-            else None
-        )
-        self.passive = (
-            WeightShadow.from_state_dict(model, load_flat_weights(config.passive_reference_path))
-            if config.passive_reference_path
-            else None
-        )
         self.ema: Optional[EMAHistory] = None
         if config.method == "rel_ema":
-            seed = None
-            if config.ema_seed == "refhq":
-                if not config.reference_path:
-                    raise ValueError("RefHQ-seeded relative EMA requires reference_path")
-                seed = load_flat_weights(config.reference_path)
-            elif config.ema_seed != "zero":
-                raise ValueError("relative EMA must explicitly select zero or refhq initialization")
-            self.ema = EMAHistory(model, seed=seed)
+            if config.ema_seed != "zero":
+                raise ValueError("relative EMA must explicitly select zero initialization")
+            self.ema = EMAHistory(model, seed=None)
 
     def alpha(self) -> float:
         return ema_alpha(
@@ -186,9 +163,6 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 self.model.reset_auxiliary_metrics()
         return losses
 
-    def _score(self, shadow: WeightShadow | EMAHistory, ids, labels, kwargs) -> Tensor:
-        return self._score_many(shadow, [(ids, labels, kwargs)])[0]
-
     def _planned_weight(self, labels: Tensor, batch: Mapping[str, Any]) -> float:
         valid = self._valid(labels)
         provided = batch.get("token_weight")
@@ -246,20 +220,8 @@ class TokenWeightedTrainModule(TransformerTrainModule):
             if config.method in {"rho_excess", "middle_ppl"} and state.reference is not None
             else None
         )
-        early_scores = (
-            self._score_many(state.early, scoring_batches)
-            if config.method == "learnability" and state.early is not None
-            else None
-        )
-        late_scores = (
-            self._score_many(state.late, scoring_batches)
-            if config.method == "learnability" and state.late is not None
-            else None
-        )
         if config.method in {"rho_excess", "middle_ppl"} and reference_scores is None:
             raise RuntimeError(f"{config.method} is missing its frozen reference")
-        if config.method == "learnability" and (early_scores is None or late_scores is None):
-            raise RuntimeError("learnability is missing early/late references")
 
         ce_batch = torch.zeros((), device=self.device)
         z_batch = (
@@ -274,8 +236,6 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 reference = (
                     reference_scores[micro_index] if reference_scores is not None else None
                 )
-                early = early_scores[micro_index] if early_scores is not None else None
-                late = late_scores[micro_index] if late_scores is not None else None
 
                 capture = (
                     capture_last_attention(self.model)
@@ -299,7 +259,7 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 if config.method in {"rho_excess", "rel_ema"}:
                     current = token_ce.detach()
                 if config.method == "attention_topk":
-                    attention = scores_from_capture(captured)
+                    attention = aligned_normalized_attention_scores(captured)
 
                 supplied = micro.get("token_weight")
                 if supplied is not None:
@@ -314,8 +274,6 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                         current=current,
                         history=history,
                         reference=reference,
-                        early=early,
-                        late=late,
                         attention=attention,
                     )
                 observed_weight += weights.sum()
@@ -327,16 +285,6 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                     z_batch += z_loss.detach()
                 ce_batch += ce_loss.detach()
                 loss.backward()
-
-                if state.passive is not None:
-                    passive_ref = self._score(state.passive, ids, micro_labels, model_kwargs)
-                    excess = (token_ce.detach() - passive_ref)[valid].mean()
-                    self.record_metric(
-                        "passive excess loss",
-                        excess,
-                        ReduceType.mean,
-                        namespace="train",
-                    )
 
         observed_weight_value = float(observed_weight.item())
         if abs(observed_weight_value - divisor) > 1e-4:

@@ -1,8 +1,19 @@
 # Token selection (Mixing Laws Dataset 10B × OLMo-2 370M)
 
+> **Everything below "Question"/"Answer" is the pre-unification result, pending
+> rerun.** Four of the seven arms (rho-1, BLADE, Attention, Middle-PPL/Perplexity)
+> ran on 8×A100 through a separate RunPod code path and started from a different
+> initialization than the other three; BLADE ran the wrong methodology (full-loss
+> reference training, selection starting at step 500 instead of step 0); Attention's
+> score was unnormalized and one position off from the target it gated. All seven
+> arms — plus both frozen references, now trained in this study — are being rerun
+> on one code path, one hardware contract (FarmShare 4×L40S), and one initialization
+> group (see [`arms/README.md`](arms/README.md)). The tables and conclusions in this
+> file describe the confounded runs and will be replaced once the reruns finish.
+
 **Question.** Under a matched one-epoch Mixing Laws Dataset budget, can selecting a subset of tokens per sequence beat full-token CE on macro task-loss?
 
-**Answer.** No. Every selection arm finished **worse** than the full-CE baseline. Excess-loss ρ-1 was the least harmful: it does beat a random-60% keep-rate control (−0.0075 bpb, two-sided bootstrap **p = 0.048**, measured against a two-seed fit of that control), but it still loses to full CE by 0.0106 bpb. Middle-perplexity and relative-EMA selection collapsed performance.
+**Answer (pre-unification, pending rerun).** Every selection arm finished **worse** than the full-CE baseline. Excess-loss ρ-1 was the least harmful: it does beat a random-60% keep-rate control (−0.0075 bpb, two-sided bootstrap **p = 0.048**, measured against a two-seed fit of that control), but it still loses to full CE by 0.0106 bpb. Middle-perplexity and relative-EMA selection collapsed performance.
 
 ---
 
@@ -20,17 +31,16 @@
 | Primary metric               | Macro mean CE bits-per-byte over the **20 (task, split) labels** of the OLMo ladder, covering 10 OLMES benchmarks. MMLU supplies 8 of the 20 (**40% of the macro weight**), and 7 of the 20 are **test** splits, so "validation macro bpb" is a misnomer. |
 
 
-Arm-by-arm contract table: [ARMS.md](ARMS.md). Contamination audit (paper Section 2.3):
-[contamination/](contamination/). Code that built the training corpus and both reference
-corpora from Hugging Face sources (Appendix A): [datasets/](datasets/).
+Arm-by-arm contract table: [arms/README.md](arms/README.md). Contamination audit (paper
+Section 2.3): [contamination/](contamination/). Code that built the training corpus and
+both reference corpora from Hugging Face sources (Appendix A): [datasets/](datasets/).
 
 **Data availability.** We do not redistribute these datasets or our derived subsets. Each
 corpus can be rebuilt byte for byte from its public Hugging Face sources with the document
 manifests in [`../../datasets/manifests/`](../../datasets/manifests/): `regmix-10b-v1` (the
 10B training corpus), `refhq-regmix-5p5b-v1` (the HQ reference) and `refhq-new-v1` (the
 Instruct reference). (`olmo-127b-v1` there is the Domain weighting paper's 127B reservoir,
-not used here.) The `s3://edullm-data/` and `s3://edullm-datasets/` paths in these docs are
-the project's private stores, not public download locations.
+not used here.)
 
 Shared contract: same architecture, batch, LR, and step budget. The manipulation is **which tokens receive gradient** on each step (full CE vs a scored subset). Sequences still come from the same shuffled corpus; selection is per-token inside the batch.
 
@@ -119,8 +129,8 @@ final 1.6751. It replaced `full-loss-control-regmix10b-v2` (`hh19uatg`), which w
 from `eduLLM/hpo-ladder` and mismatched the selection arms on dataloader seed (6199 vs 42),
 step count (2384 vs 2360) and eval grid (~119 vs 125 steps). v3 is matched on init seed
 (6198), data seed, step count and eval grid, so that confound is resolved; its realized
-initialization matches the other 4xL40S arms but not the 8xA100 arms (below). See `ARMS.md`
-for the field-by-field comparison.
+initialization matches the other 4xL40S arms but not the 8xA100 arms (below). See
+[`arms/README.md`](arms/README.md) for the current, unified contract.
 
 Initialization is not uniform across the arms: the step-0 eval splits the eight runs into
 **4.4610** bpb (random control seed 69), **4.4662** bpb (full-loss control, random control

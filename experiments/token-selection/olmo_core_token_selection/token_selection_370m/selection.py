@@ -101,18 +101,19 @@ def selection_weights(
     current: Optional[Tensor] = None,
     history: Optional[Tensor] = None,
     reference: Optional[Tensor] = None,
-    early: Optional[Tensor] = None,
-    late: Optional[Tensor] = None,
     attention: Optional[Tensor] = None,
 ) -> Tensor:
-    """Return float weights; all README methods reduce to a deterministic 0/1 mask."""
+    """Return float weights; all reported methods reduce to a deterministic 0/1 mask.
+
+    ``blade`` is not handled here: BLADE's own token weights are computed by
+    ``BladeCallback`` (proxy-vs-outgoing-reference excess loss over the whole
+    batch) and passed in via ``batch["token_weight"]``, which
+    ``TokenWeightedTrainModule`` reads before ever calling this function.
+    """
     if method == "full":
         return valid.float()
     if method == "random":
         generator = torch.Generator(device=valid.device)
-        # The seed has no rank term, so every data-parallel rank draws the same
-        # mask for its local batch at a given step. Each token is still kept
-        # with the same marginal probability.
         generator.manual_seed(int(seed) + int(step) * 1_000_003)
         scores = torch.rand(valid.shape, device=valid.device, generator=generator)
         mask = per_row_topk(scores, keep_fraction, valid)
@@ -128,25 +129,10 @@ def selection_weights(
         if reference is None:
             raise ValueError("middle-PPL requires frozen reference losses")
         mask = per_row_middle(reference, keep_fraction, valid)
-    elif method == "learnability":
-        if early is None or late is None:
-            raise ValueError("learnability requires early and late reference losses")
-        mask = per_row_topk(early - late, keep_fraction, valid)
     elif method == "attention_topk":
         if attention is None:
             raise ValueError("attention selection requires received-attention scores")
         mask = per_row_topk(attention, keep_fraction, valid)
-    elif method == "blade":
-        # UNREACHABLE for the reported BLADE arm. recipe.py routes BLADE through
-        # method="full" plus BladeCallback, which thresholds scores once across the
-        # rank's whole batch; this branch instead selects per sequence, so it is NOT
-        # the rule the paper describes or that produced the reported BLADE run.
-        # Kept only so selection_weights stays total over ArmSpec.method values.
-        if current is None or reference is None:
-            raise ValueError("BLADE requires proxy and dynamic-reference losses")
-        # BLADE minimizes L_ref - L_proxy over the mask (Equation 5), which is
-        # equivalent to selecting the largest L_proxy - L_ref values.
-        mask = per_row_topk(current - reference, keep_fraction, valid)
     else:
         raise ValueError(f"unsupported token-selection method {method!r}")
     return mask.float()
@@ -319,7 +305,14 @@ def ema_alpha(step: int, *, tau: Optional[float], constant: Optional[float]) -> 
 def attention_received_from_qk(
     query: Tensor, key: Tensor, *, scale: Optional[float] = None, chunk: int = 256
 ) -> Tensor:
-    """Mean-head causal column mass: ``mean_h sum_{j>=i} A[j,i]``."""
+    """Mean-head causal column mass: ``mean_h sum_{j>=i} A[j,i]``.
+
+    This raw score is structurally larger for earlier positions: under uniform
+    attention it equals ``H_L - H_i`` (the harmonic-number tail from position
+    ``i``), simply because an earlier key is reachable by more queries. See
+    ``uniform_attention_normalizer`` and ``aligned_normalized_attention_scores``,
+    which correct for this before the score is used for token selection.
+    """
     batch, length, heads, dim = query.shape
     if key.shape[2] != heads:
         key = key.repeat_interleave(heads // key.shape[2], dim=2)
@@ -335,6 +328,52 @@ def attention_received_from_qk(
         )
         result.add_(logits.masked_fill(invalid[None, None], -torch.inf).softmax(-1).sum(-2))
     return result.mean(1)
+
+
+_UNIFORM_ATTENTION_NORMALIZER_CACHE: dict[tuple[int, torch.device, torch.dtype], Tensor] = {}
+
+
+def uniform_attention_normalizer(
+    length: int, device: torch.device, dtype: torch.dtype = torch.float32
+) -> Tensor:
+    """``e_i = sum_{j=i}^{L-1} 1/(j+1) = H_L - H_i`` for 0-indexed position ``i``.
+
+    This is the causal column mass position ``i`` would receive under uniform
+    (non-informative) attention: it is reachable by queries ``j = i, ..., L-1``,
+    and query ``j``'s causal row has ``j+1`` valid keys, so its uniform share of
+    attention on any one of them is ``1/(j+1)``. Dividing the raw score by this
+    removes the pure position effect, leaving only how much *more* attention a
+    token draws than its position alone would predict.
+    """
+    key = (int(length), device, dtype)
+    cached = _UNIFORM_ATTENTION_NORMALIZER_CACHE.get(key)
+    if cached is not None:
+        return cached
+    inv = 1.0 / torch.arange(1, length + 1, device=device, dtype=dtype)
+    normalizer = torch.flip(torch.cumsum(torch.flip(inv, dims=[0]), dim=0), dims=[0])
+    _UNIFORM_ATTENTION_NORMALIZER_CACHE[key] = normalizer
+    return normalizer
+
+
+def normalize_and_align_attention_scores(raw: Tensor) -> Tensor:
+    """Position-normalize a raw ``(batch, length)`` column-mass score, then align it.
+
+    ``raw[i]`` is the causal column mass at *input* position ``i``. ``get_labels``
+    shifts labels left by one, so the loss/label index ``t`` predicts input
+    position ``t+1`` -- the score that should gate that loss term is therefore
+    the target token's own score, ``s_{t+1}``, not ``s_t``. This normalizes for
+    position (dividing by ``uniform_attention_normalizer``) and then applies
+    that one-position shift, padding the now-unused last column with ``-inf``
+    so ``per_row_topk`` never selects it (that column has no label anyway).
+    """
+    normalizer = uniform_attention_normalizer(raw.shape[-1], raw.device, raw.dtype)
+    normalized = raw / normalizer
+    return torch.nn.functional.pad(normalized[:, 1:], (0, 1), value=-torch.inf)
+
+
+def aligned_normalized_attention_scores(capture: "AttentionCapture") -> Tensor:
+    """``normalize_and_align_attention_scores`` applied to a captured forward pass."""
+    return normalize_and_align_attention_scores(scores_from_capture(capture))
 
 
 @dataclass

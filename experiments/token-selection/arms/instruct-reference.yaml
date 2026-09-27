@@ -1,0 +1,23 @@
+# Trains the frozen Instruct reference the `rho-1` arm scores against, and BLADE's L_val stream.
+# Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["instruct-reference"]
+name: instruct-reference
+method: full
+dataset_id: pretrain/refhq-instruct
+run_id: instruct-reference-370m
+keep_fraction: 1.0
+init_seed: 6198
+data_seed: 42
+rank_microbatch_tokens: 16384
+max_tokens: null  # one whole-stream epoch of refhq-instruct's train split (3,942,810,012 tokens)
+total_steps: 940  # 3,942,645,760 of 3,942,810,012 train tokens at GBS=4,194,304; no wrap
+checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 940]  # omit 875 (65 steps from final)
+frozen_reference:
+  step: 940
+  contract: instruct-reference-370m/checkpoints/step940
+  consumers: [rho-1, blade]
+olmo_core:
+  repository: https://github.com/edu-llm/OLMo-core
+  branch: edullm/token-selection-370m-unified
+  revision: b1c905e3
+wandb_project: token-selection
+status: trained-in-this-study

@@ -1,0 +1,24 @@
+# Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["rel-ema-exp"]
+# Kept run -- NOT rerun under the unified commit; ran commit 53daffdf, whose REL-EMA
+# update code path is unchanged in the unification (protected by a golden hash test).
+name: rel-ema-exp
+method: rel_ema  # top 60% by L_curr - L_hist
+dataset_id: pretrain/regmix-10b
+run_id: rel-ema-exp-10b-scratch-v1
+keep_fraction: 0.6
+init_seed: 6198
+data_seed: 42
+rank_microbatch_tokens: 16384
+max_tokens: 9900000000
+total_steps: 2360
+checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250, 1375, 1500, 1625, 1750, 1875, 2000, 2125, 2360]  # omit 2250
+ema:
+  seed: zero  # bias-corrected EMA, zero-initialized
+  tau: 300.0  # alpha(t) = 1 - exp(-t/300)
+reference: null
+olmo_core:
+  repository: https://github.com/edu-llm/OLMo-core
+  branch: edullm/token-selection-370m-unified
+  revision: 53daffdf
+wandb_project: token-selection
+status: kept-not-rerun

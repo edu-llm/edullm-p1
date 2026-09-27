@@ -1,4 +1,23 @@
-"""BLADE dynamic-reference controller integrated through public callback APIs."""
+"""BLADE dynamic-reference controller integrated through public callback APIs.
+
+Follows Wang et al. 2026 ("BLADE: Scalable Bi-Level Adaptive Data Selection for
+LLM Training"), Sec. 2.2 / Algorithm 1 / App. A.1, C:
+
+- The reference is periodically reset from the proxy (``_sync_from_proxy``) and
+  then trained for K steps on H_lambda(alpha, w) = L_val(w) + lambda * L_train(alpha, w),
+  where L_val is the unmasked mean CE on one RefHQ/Instruct batch and L_train is
+  the alpha-weighted mean CE (selected tokens only) on one RegMix batch.
+- alpha for each K-update's RegMix batch is the top-gamma selection by
+  (proxy - outgoing reference) excess loss, scored *before* the reference is
+  overwritten (``_score_regmix_mask``), exactly mirroring the per-step selection
+  the proxy itself trains on (``pre_step`` -> ``batch["token_weight"]``).
+- The very first sync (step 0, before any training batch) has no outgoing
+  reference to score against, so alpha=1 (every RegMix token counts): this
+  matches the paper's "warm up the proxy, then sync at t=0" schedule collapsed
+  to a from-scratch run with no warmup.
+- A fresh AdamW is created at every sync (no momentum carried across episodes),
+  at the proxy's own scheduled LR for that step, held constant through K.
+"""
 
 from __future__ import annotations
 
@@ -54,20 +73,22 @@ except ImportError:  # pragma: no cover - production images take the branch abov
         ]
 
 
-BLADE_START = 500
-BLADE_SYNC_STEPS = (500, 875, 1250, 1625, 2000)
-BLADE_TAU = 375
+# Selection runs from step 0 (no full-loss warmup): every arm shares the same
+# 60%-keep, from-step-0 budget. Six equal episodes of length tau=400 cover the
+# full 2360-step budget's ladder-relevant span; K=75 matches every other arm's
+# reference-update depth.
+BLADE_SYNC_STEPS = (0, 400, 800, 1200, 1600, 2000)
+BLADE_TAU = 400
 BLADE_K = 75
 BLADE_GAMMA = 0.6
 BLADE_LAMBDA = 1.0
 BLADE_REFERENCE_MICROBATCH_TOKENS = 8_192
 BLADE_SELECTION_MICROBATCH_TOKENS = 32_768
-BLADE_CHECKPOINT_FORMAT = "blade_proxy_dynamic_ref_v2"
+BLADE_CHECKPOINT_FORMAT = "blade_selection_weighted_v3"
 
 
 @dataclass(frozen=True)
 class BladeSchedule:
-    start: int = BLADE_START
     sync_steps: tuple[int, ...] = BLADE_SYNC_STEPS
     tau: int = BLADE_TAU
     k_steps: int = BLADE_K
@@ -79,6 +100,17 @@ class BladeSchedule:
             raise ValueError("the approved BLADE schedule is locked; use a new run identity")
         if any(step > total_steps for step in self.sync_steps):
             raise ValueError("BLADE sync schedule exceeds the run duration")
+
+
+class _ConstantSchedule:
+    """Fallback LR schedule for unit tests that don't wire up the real one."""
+
+    def get_lr(self, initial_lr: float, current: int, t_max: int) -> float:
+        del current, t_max
+        return initial_lr
+
+
+_DEFAULT_SCHEDULE = _ConstantSchedule()
 
 
 class ResumableBatchStream:
@@ -141,7 +173,7 @@ def _full_proxy_state(model: nn.Module) -> dict[str, Tensor]:
 
 
 class BladeCallback(Callback):
-    """Runs sync/K updates in ``pre_step`` and stores all non-proxy state in checkpoints.
+    """Runs sync/K updates in ``post_train_batch``/``pre_train`` and checkpoints all non-proxy state.
 
     The proxy model and optimizer remain ordinary OLMo checkpointer state. This callback
     contributes the dynamic reference, its optimizer, both K-update streams, and schedule
@@ -158,7 +190,8 @@ class BladeCallback(Callback):
         reference_train_stream: ResumableBatchStream,
         refhq_stream: ResumableBatchStream,
         schedule: BladeSchedule = BladeSchedule(),
-        reference_lr: float = 4e-4,
+        reference_scheduler: Any = _DEFAULT_SCHEDULE,
+        reference_initial_lr: float = 4e-4,
         max_grad_norm: float = 1.0,
         reference_microbatch_tokens: int = BLADE_REFERENCE_MICROBATCH_TOKENS,
         selection_microbatch_tokens: int = BLADE_SELECTION_MICROBATCH_TOKENS,
@@ -169,7 +202,8 @@ class BladeCallback(Callback):
         self.reference_train_stream = reference_train_stream
         self.refhq_stream = refhq_stream
         self.schedule = schedule
-        self.reference_lr = float(reference_lr)
+        self.reference_scheduler = reference_scheduler
+        self.reference_initial_lr = float(reference_initial_lr)
         self.max_grad_norm = float(max_grad_norm)
         self.reference_microbatch_tokens = int(reference_microbatch_tokens)
         if self.reference_microbatch_tokens <= 0:
@@ -211,37 +245,75 @@ class BladeCallback(Callback):
         with contextlib.suppress(FileNotFoundError):
             self._k_progress_path().unlink()
 
-    def _new_reference(self) -> None:
+    def _new_reference(self, *, lr: float) -> None:
+        """Build a fresh reference module and a fresh AdamW at ``lr``.
+
+        Always called at sync time (never reused across episodes), so the
+        reference's optimizer state never carries momentum from a previous
+        episode's K-updates. Weight-decay groups mirror the proxy's own
+        (0.1 everywhere except 0.0 on ``embeddings.weight``).
+        """
         self.reference = self.reference_factory()
+        decay, no_decay = [], []
+        for name, parameter in self.reference.named_parameters():
+            (no_decay if name == "embeddings.weight" else decay).append(parameter)
+        groups = [
+            {"params": decay, "weight_decay": 0.1},
+            {"params": no_decay, "weight_decay": 0.0},
+        ]
         self.reference_optim = torch.optim.AdamW(
-            self.reference.parameters(),
-            lr=self.reference_lr,
-            betas=(0.9, 0.95),
-            weight_decay=0.1,
-            foreach=False,
+            groups, lr=lr, betas=(0.9, 0.95), foreach=False
         )
 
-    def _sync_from_proxy(self) -> None:
-        if self.reference is None:
-            self._new_reference()
+    def _sync_from_proxy(self, *, lr: float) -> None:
+        self._new_reference(lr=lr)
         assert self.reference is not None
         state = _full_proxy_state(self.trainer.train_module.model)
         self.reference.load_state_dict(state, strict=True)
 
-    def _mean_ce(
+    def _backward_mean_ce(
         self,
         model: nn.Module,
         batch: dict[str, Any],
         *,
-        loss_div_factor: Optional[Tensor] = None,
+        weight: float,
+        mask: Optional[Tensor] = None,
+    ) -> None:
+        """Backward the mean CE over ``mask & valid`` tokens (or just ``valid`` if ``mask`` is None).
+
+        ``mask=None`` is the unmasked RefHQ/Instruct term (L_val); a mask is the
+        selection-weighted RegMix term (L_train, alpha-weighted per Wang et al.).
+        """
+        sequence_length = int(batch["input_ids"].shape[1])
+        if self.reference_microbatch_tokens < sequence_length:
+            raise RuntimeError(
+                "BLADE reference microbatch token limit is smaller than sequence length"
+            )
+        labels = get_labels(batch)
+        valid = labels != -100
+        weight_tensor = (mask.to(valid.device) & valid) if mask is not None else valid
+        divisor = weight_tensor.sum().clamp(min=1)
+        micro_size = self.reference_microbatch_tokens // sequence_length
+        micro_batches = split_batch(batch, micro_size)
+        offset = 0
+        for micro_batch in micro_batches:
+            rows = int(micro_batch["input_ids"].shape[0])
+            micro_weight = weight_tensor[offset : offset + rows]
+            loss = self._mean_ce_with_weight(model, micro_batch, micro_weight, divisor)
+            (float(weight) * loss).backward()
+            offset += rows
+            del loss
+
+    def _mean_ce_with_weight(
+        self,
+        model: nn.Module,
+        batch: dict[str, Any],
+        weight: Tensor,
+        divisor: Tensor,
     ) -> Tensor:
         ids = batch["input_ids"].to(next(model.parameters()).device)
         labels = get_labels({"input_ids": ids})
-        valid = (
-            (labels != -100).sum().clamp(min=1)
-            if loss_div_factor is None
-            else loss_div_factor.to(ids.device)
-        )
+        weight = weight.to(ids.device)
         kwargs = {
             key: value.to(ids.device) if isinstance(value, Tensor) else value
             for key, value in batch.items()
@@ -252,63 +324,39 @@ class BladeCallback(Callback):
                 ids,
                 labels=labels,
                 ignore_index=-100,
-                loss_reduction="sum",
-                loss_div_factor=valid,
+                loss_reduction="none",
                 return_logits=False,
                 **kwargs,
             )
-        if not isinstance(output, LMOutputWithLoss):
-            raise RuntimeError("BLADE reference update requires LMOutputWithLoss")
-        return output.loss
+        ce = _output_ce(output, labels)
+        return (ce.float() * weight.float()).sum() / divisor.to(ce.device)
 
-    def _backward_mean_ce(
+    def _run_k_updates(
         self,
-        model: nn.Module,
-        batch: dict[str, Any],
+        regmix_batches: list[dict[str, Any]],
+        masks: list[Optional[Tensor]],
         *,
-        weight: float,
+        trainer_step: int,
     ) -> None:
-        sequence_length = int(batch["input_ids"].shape[1])
-        if self.reference_microbatch_tokens < sequence_length:
-            raise RuntimeError(
-                "BLADE reference microbatch token limit is smaller than sequence length"
-            )
-        micro_batches = split_batch(
-            batch, self.reference_microbatch_tokens // sequence_length
-        )
-        labels = get_labels(batch)
-        divisor = (labels != -100).sum().clamp(min=1)
-        for micro_batch in micro_batches:
-            loss = self._mean_ce(
-                model, micro_batch, loss_div_factor=divisor
-            )
-            (float(weight) * loss).backward()
-            del loss
-
-    def _run_k_updates(self, *, trainer_step: Optional[int] = None) -> None:
         assert self.reference is not None and self.reference_optim is not None
-        trainer_step = (
-            int(self.trainer.global_step) if trainer_step is None else int(trainer_step)
-        )
         self.reference.train()
         for parameter in self.reference.parameters():
             parameter.requires_grad_(True)
         try:
-            for k_idx in range(self.schedule.k_steps):
+            for k_idx, (regmix_batch, mask) in enumerate(zip(regmix_batches, masks)):
                 self._write_k_progress(trainer_step=trainer_step, k_step=k_idx + 1)
                 self.reference_optim.zero_grad(set_to_none=True)
-                # Both terms are the unmasked mean cross-entropy of one batch.
-                # BLADE's Eq. 4 instead weights the training-corpus term by the
-                # current selection; the reported run used the unmasked form.
                 self._backward_mean_ce(
                     self.reference,
-                    self.reference_train_stream.next(),
+                    regmix_batch,
                     weight=self.schedule.lambda_penalty,
+                    mask=mask,
                 )
                 self._backward_mean_ce(
                     self.reference,
                     self.refhq_stream.next(),
                     weight=1.0,
+                    mask=None,
                 )
                 if is_distributed() and get_world_size() > 1:
                     for parameter in self.reference.parameters():
@@ -337,7 +385,7 @@ class BladeCallback(Callback):
         module.model.eval()
         assert self.reference is not None
         self.reference.eval()
-        with torch.no_grad():
+        with torch.no_grad(), _autocast(module.device):
             proxy = module.model_forward(
                 ids,
                 labels=labels,
@@ -380,6 +428,53 @@ class BladeCallback(Callback):
             torch.cat(reference_ce, dim=0),
         )
 
+    def _select_mask(self, labels: Tensor, proxy_ce: Tensor, reference_ce: Tensor) -> Tensor:
+        """Exact top-``gamma`` mask by (proxy - reference) excess loss.
+
+        Uses ``topk`` indices rather than a ``>=`` threshold, so ties never
+        push the kept count above the exact budget.
+        """
+        valid = labels != self.trainer.train_module.label_ignore_index
+        selection_scores = proxy_ce - reference_ce
+        flat_scores = selection_scores[valid]
+        keep = max(1, int(torch.ceil(torch.tensor(self.schedule.gamma * flat_scores.numel()))))
+        keep = min(keep, flat_scores.numel())
+        _, top_indices = torch.topk(flat_scores, keep)
+        flat_mask = torch.zeros_like(flat_scores, dtype=torch.bool)
+        flat_mask[top_indices] = True
+        mask = torch.zeros_like(valid)
+        mask[valid] = flat_mask
+        return mask
+
+    def _score_regmix_mask(self, batch: dict[str, Any]) -> Tensor:
+        """Score one RegMix batch against the *current* (outgoing) reference."""
+        labels, proxy_ce, reference_ce = self._proxy_and_reference_ce(batch)
+        return self._select_mask(labels, proxy_ce, reference_ce)
+
+    def _perform_sync(self, sync_step: int) -> None:
+        """Pre-score (unless this is the first-ever sync), sync, and run K updates.
+
+        Pre-scoring the K RegMix batches against the *outgoing* reference,
+        before it is overwritten, is what makes the reference's own training
+        term selection-weighted like the proxy's. At the very first sync there
+        is no outgoing reference, so alpha=1 (every token counts).
+        """
+        first_sync = self.reference is None
+        regmix_batches = [
+            self.reference_train_stream.next() for _ in range(self.schedule.k_steps)
+        ]
+        masks: list[Optional[Tensor]] = (
+            [None] * self.schedule.k_steps
+            if first_sync
+            else [self._score_regmix_mask(batch) for batch in regmix_batches]
+        )
+        lr = float(
+            self.reference_scheduler.get_lr(self.reference_initial_lr, sync_step, self.total_steps)
+        )
+        self._sync_from_proxy(lr=lr)
+        self._run_k_updates(regmix_batches, masks, trainer_step=sync_step)
+        self.last_sync = sync_step
+
     def _sync_checkpoint_path(self, step: int, phase: str) -> str:
         return str(
             Path(self.trainer.save_folder)
@@ -410,51 +505,49 @@ class BladeCallback(Callback):
             callback.post_checkpoint_saved(path)
         log.info("BLADE %s-sync checkpoint saved", phase)
 
+    def pre_train(self) -> None:
+        """Run the step-0 sync before the first training batch.
+
+        ``0`` is a sync step, but it is not reachable from ``post_train_batch``
+        (there is no "batch 0" whose completion could trigger it) or from
+        ``pre_step`` (``trainer.global_step`` is never 0 there -- it is
+        incremented to 1 before the first batch's ``pre_step`` runs). This
+        fires exactly once, whether the run is fresh or is resuming from
+        before the first sync ever completed (``last_sync is None and
+        reference is None`` is true in both cases; a resume past that point
+        restores a non-None ``last_sync`` or ``reference`` and this no-ops).
+        """
+        if 0 in self.schedule.sync_steps and self.last_sync is None and self.reference is None:
+            self._save_sync_checkpoint(step=0, phase="pre")
+            self._perform_sync(0)
+            self._save_sync_checkpoint(step=0, phase="post")
+
     def pre_step(self, batch: dict[str, Any]) -> None:
         step = int(self.trainer.global_step)
         if step in self.schedule.sync_steps and self.last_sync != step:
-            # Compatibility fallback for checkpoints created before sync-boundary
-            # checkpoints moved the update to the end of the preceding step.
-            log.warning("Running BLADE sync %d in pre_step compatibility mode", step)
-            self._sync_from_proxy()
-            self._run_k_updates(trainer_step=step)
-            self.last_sync = step
-        if step >= self.schedule.start:
-            if self.reference is None:
-                raise RuntimeError(
-                    "BLADE selection has no dynamic reference; resume state is incomplete"
-                )
-            labels, proxy_ce, ref_ce = self._proxy_and_reference_ce(batch)
-            valid = labels != self.trainer.train_module.label_ignore_index
-            # Equation 5 minimizes L_ref - L_proxy over a fixed-size mask, so
-            # ranking in descending order must use the equivalent L_proxy - L_ref.
-            # The threshold is taken over this rank's local batch, not the global
-            # batch, and >= keeps every token tied at the threshold.
-            selection_scores = proxy_ce - ref_ce
-            flat_scores = selection_scores[valid]
-            keep = max(1, int(torch.ceil(torch.tensor(self.schedule.gamma * flat_scores.numel()))))
-            threshold = torch.topk(flat_scores, min(keep, flat_scores.numel())).values[-1]
-            batch["labels"] = labels.masked_fill(
-                ~(valid & (selection_scores >= threshold)), -100
+            # Resume-from-pre-sync-checkpoint fallback: we crashed after saving
+            # the pre-sync checkpoint (which still has last_sync at its
+            # *previous* value) but before finishing this sync's K updates.
+            # self.reference is already restored to the outgoing reference and
+            # the streams to their pre-draw position, so redoing the sync here
+            # reproduces exactly what would have happened without the crash.
+            log.warning("Resuming into pending BLADE sync %d in pre_step fallback", step)
+            self._perform_sync(step)
+        if self.reference is None:
+            raise RuntimeError(
+                "BLADE selection has no dynamic reference; resume state is incomplete"
             )
+        labels, proxy_ce, ref_ce = self._proxy_and_reference_ce(batch)
+        mask = self._select_mask(labels, proxy_ce, ref_ce)
+        batch["token_weight"] = mask.float()
 
     def post_train_batch(self) -> None:
         self.completed_step = int(self.trainer.global_step)
         sync_step = self.completed_step + 1
         if sync_step not in self.schedule.sync_steps or self.last_sync == sync_step:
             return
-
-        # The first pre-sync checkpoint still needs a reference state. Initializing
-        # it from the just-completed proxy is equivalent to the first sync. The
-        # actual sync is repeated below before K updates so phase boundaries remain
-        # explicit, while later pre-sync saves preserve the previous reference.
-        if self.reference is None:
-            self._sync_from_proxy()
         self._save_sync_checkpoint(step=sync_step, phase="pre")
-
-        self._sync_from_proxy()
-        self._run_k_updates(trainer_step=sync_step)
-        self.last_sync = sync_step
+        self._perform_sync(sync_step)
         self._save_sync_checkpoint(step=sync_step, phase="post")
 
     def post_attach(self) -> None:
@@ -464,7 +557,7 @@ class BladeCallback(Callback):
 
     def state_dict(self) -> dict[str, Any]:
         return {
-            "version": 2,
+            "version": 3,
             "checkpoint_format": BLADE_CHECKPOINT_FORMAT,
             "completed_step": self.completed_step,
             "last_sync": self.last_sync,
@@ -482,7 +575,7 @@ class BladeCallback(Callback):
         }
 
     def _restore(self, state: Mapping[str, Any]) -> None:
-        if state.get("version") != 2 or state.get("checkpoint_format") != BLADE_CHECKPOINT_FORMAT:
+        if state.get("version") != 3 or state.get("checkpoint_format") != BLADE_CHECKPOINT_FORMAT:
             raise ValueError("unsupported or incomplete BLADE checkpoint state")
         if dict(state["schedule"]) != self.schedule.__dict__:
             raise ValueError("BLADE resume schedule differs from checkpoint")
@@ -505,15 +598,15 @@ class BladeCallback(Callback):
         if reference_state is not None:
             if state.get("dynamic_reference_optim") is None:
                 raise ValueError("BLADE dynamic reference is missing optimizer state")
-            self._new_reference()
+            self._new_reference(lr=self.reference_initial_lr)
             assert self.reference is not None and self.reference_optim is not None
             self.reference.load_state_dict(reference_state, strict=True)
             self.reference_optim.load_state_dict(state["dynamic_reference_optim"])
             self.reference.eval()
             for parameter in self.reference.parameters():
                 parameter.requires_grad_(False)
-        elif self.completed_step >= self.schedule.start or self.last_sync is not None:
-            raise ValueError("post-warmup BLADE checkpoint is missing its dynamic reference")
+        elif self.completed_step > 0 or self.last_sync is not None:
+            raise ValueError("post-first-sync BLADE checkpoint is missing its dynamic reference")
         self.reference_train_stream.load_state_dict(state["reference_train_stream"])
         self.refhq_stream.load_state_dict(state["refhq_stream"])
 

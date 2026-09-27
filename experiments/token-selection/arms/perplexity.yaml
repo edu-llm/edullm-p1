@@ -1,0 +1,22 @@
+# Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["perplexity"]
+name: perplexity
+method: middle_ppl  # middle 60% by frozen reference loss
+dataset_id: pretrain/regmix-10b
+run_id: perplexity-regmix10b
+keep_fraction: 0.6
+init_seed: 6198
+data_seed: 42
+rank_microbatch_tokens: 16384
+max_tokens: 9900000000
+total_steps: 2360
+checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250, 1375, 1500, 1625, 1750, 1875, 2000, 2125, 2360]  # omit 2250
+reference:
+  arm: hq-reference
+  averaged_steps: [1000, 1125, 1315]
+  contract: hq-reference-370m/checkpoints/average-1000-1125-1315
+olmo_core:
+  repository: https://github.com/edu-llm/OLMo-core
+  branch: edullm/token-selection-370m-unified
+  revision: b1c905e3
+wandb_project: token-selection
+status: rerun-under-unified-commit

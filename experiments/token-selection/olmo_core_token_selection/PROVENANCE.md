@@ -1,102 +1,108 @@
 # Provenance of this directory
 
-This is the code that actually produced the runs reported in the paper. It is a
-**copy**, vendored here so that the paper's "all code is available" claim is true
-from this repository alone.
+This is the code that produced every run reported in the paper. It is a
+**copy**, vendored here so that the paper's "all code is available" claim is
+true from this repository alone.
 
 ## Where it came from
 
 | Field | Value |
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
-| Branch | `edullm/token-selection-370m` |
-| Commit | `53daffdf66d07f617e14b17beff3be89cafdc95d` |
+| Branch | `edullm/token-selection-370m-unified` |
+| Commit | `b1c905e3` (see below) |
 | Source path | `.edullm/` |
-| Copied on | 2026-09-19 |
+| Copied on | 2026-09-27 |
 
-This directory is byte-identical to `.edullm/` at that commit, for every file
-listed below, except three documentation files edited here afterwards to match the
-paper: `README-token-selection.md`, `runpod/README.md` and `farmshare/README.md` (they
-dropped an unreported `rel-ema-refhq` arm that `arms.py` does not define, name RHO-1's
-Instruct-v3 step-940 reference, and record the hardware the reported runs used). No
-code file was changed.
+This directory is byte-identical to `.edullm/` at that commit. No file was
+edited here after vendoring.
 
-At the time the study ran, this code existed only as an uncommitted working tree
-on one laptop. It was committed upstream as `bf087c8f` ("Commit the
-token-selection tree that produced the reported runs") and merged with the two
-commits that had landed on the branch meanwhile, giving `53daffdf`. Cite
-`53daffdf` for reproduction.
+`b1c905e3` unifies every arm onto one code path: one entrypoint
+(`token_selection_entrypoint.py`), one train module
+(`TokenWeightedTrainModule`), and one hardware contract (FarmShare, 4×L40S).
+It replaces `53daffdf`, the commit the previous version of this directory
+was vendored from, which still had four arms running through a separate
+RunPod path on 8×A100.
 
-## Why the previously pinned commit is not enough
+## What changed, and why
 
-The arm YAMLs in the sibling directories pin `revision: 98ea67c9…`, but that
-commit **cannot** have produced four of the seven reported arms. Diffing the
-code that ran against that older tip shows:
+The full history is in the branch's commits, but the paper-relevant changes
+are:
 
-- `token_selection_370m/arms.py` at `98ea67c9` contains no `full-loss-control`
-  and no `random-control` ArmSpec at all. Both arms exist only in the working
-  tree. The reported W&B runs `full-loss-control-regmix10b-v3` and
-  `random-control-regmix10b-v1` carry exactly the working-tree run ids.
-- `token_selection_370m/selection.py` at `98ea67c9` does not contain the
-  REL-EMA scorer that ran. The working tree computes
-  `per_row_topk(current - history, …)`, the current-minus-history convention
-  the paper describes.
-- `arms.py` at `98ea67c9` sets `REFHQ = "pretrain/refhq-regmix-5p5b"` (the HQ
-  corpus). The working tree sets `REFHQ = "pretrain/refhq-instruct"`, which is
-  what the paper states BLADE's dynamic reference was trained against, and the
-  reported run id is `blade-regmix10b-refhq-instruct-v3-v1` — again the
-  working-tree value.
+- **No RunPod path, no AWS/S3 code.** `runpod/`, `train_on_corpus.py`,
+  `precomputed.py` and `Dockerfile` are deleted. Corpora are resolved from a
+  local manifest (`farmshare/stage_local.py`) bound to the pinned FarmShare
+  directories verified against this repository's
+  `datasets/manifests/*/outputs.json`.
+- **Two new arms, trained in this study rather than read from elsewhere:**
+  `hq-reference` and `instruct-reference`. `rho-1` and `perplexity` read
+  their frozen references from these arms' own checkpoints.
+- **`random-control-seed69`** is now an ArmSpec (it previously ran from an
+  uncommitted hand edit; its seeds are confirmed against its W&B
+  `run_identity.json` artifact).
+- **Attention** (`selection.py`): the raw causal column-mass score is
+  normalized by its expectation under uniform attention (removing the bias
+  toward early positions) and aligned to the token whose loss it gates
+  (`get_labels` shifts labels left by one). See
+  `aligned_normalized_attention_scores`.
+- **BLADE** (`blade.py`): the reference's own training term is now
+  selection-weighted (Wang et al. 2026, Sec. 2.2), scored against the
+  *outgoing* reference before it is overwritten. The schedule moved to syncs
+  at steps 0/400/800/1200/1600/2000 (`tau=400`, `K=75`), so every arm selects
+  from step 0 at the same 60% budget. Each sync gets a fresh optimizer at the
+  proxy's own scheduled LR.
+- Every arm, including `full-loss-control` and `blade`, now runs through the
+  same `TokenWeightedTrainModule`; there is no separate stock-module branch.
+- `sync_repo.sh` refuses to sync a dirty tree and stamps the synced code with
+  its exact commit (`GIT_COMMIT`), which every run logs into its W&B config
+  and `run_identity.json`, closing the previous version's `git_commit=None`
+  gap.
 
-So `53daffdf`, not the `98ea67c9` revision the YAMLs pin, is the auditable
-record. The YAML `revision:` fields are stale and should be read as historical.
+## Kept runs: what code they ran
+
+Three runs are kept from before this unification and were **not** rerun:
+the two random-control seeds (`random-control-regmix10b-v1`,
+`random-control-regmix10b-seed69-v1`) and REL-EMA
+(`rel-ema-exp-10b-scratch-v1`). All three ran `53daffdf` (the previous
+commit), on FarmShare 4×L40S, through the RunPod-wrapper entrypoint that
+`token_selection_entrypoint.py` has since absorbed. The random-selection and
+REL-EMA code paths are unchanged in `b1c905e3`: no rank term was added to the
+mask seed, and the EMA update is untouched. This is protected by a golden
+test (`tests/test_token_selection_370m.py`) that checks the per-microbatch
+weight derivation, `EMAHistory`'s update sequence, and `ema_alpha` against
+hashes recorded from `53daffdf`, plus a GPU replay of each kept run's first
+few steps against its own W&B history before any rerun began.
 
 ## What is included, and why
 
-Only code that ran to produce reported results:
+Only code that produced a reported result:
 
 | Path | Role |
 | --- | --- |
-| `token_selection_entrypoint.py` | Entrypoint for the FarmShare runs (full-loss control v3, random control seeds 42/69, REL-EMA) |
-| `token_selection_370m/arms.py` | Arm definitions: run ids, keep rates, reference checkpoints |
+| `token_selection_entrypoint.py` | The one entrypoint every arm runs through |
+| `token_selection_370m/arms.py` | Arm definitions: run IDs, seeds, keep rates, reference contracts |
 | `token_selection_370m/selection.py` | The scoring and masking rules for every method |
-| `token_selection_370m/recipe.py` | Model, optimizer, data recipe; `INIT_SEED = 6198`, `DATA_SEED = 42` |
-| `token_selection_370m/train_module.py` | Token-weighted train module (mean over kept tokens) |
-| `token_selection_370m/blade.py` | BLADE dynamic-reference sync and K-update loop |
-| `token_selection_370m/precomputed.py` | Precomputed-mask path used by the Perplexity arm |
+| `token_selection_370m/recipe.py` | Model, optimizer, data recipe |
+| `token_selection_370m/train_module.py` | The one train module (mean over kept/weighted tokens) |
+| `token_selection_370m/blade.py` | BLADE's dynamic-reference sync, selection-weighted K-updates, and resume |
 | `production_contract/checkpoint.py` | Permanent-checkpoint ladder and resume durability |
 | `production_contract/task_loss.py` | Task-loss eval callback fired on each permanent save |
 | `production_contract/wandb_artifacts.py` | W&B artifact upload |
 | `eval_task_loss_olmo_core.py` | The 20-label OLMES evaluator behind every reported bpb number |
-| `runpod/entrypoint.py`, `runpod/stage_inputs.py` | RunPod path used for the August arms (RHO-1, Attention, Perplexity, BLADE) |
-| `runpod/precompute_middle_ppl_masks.py` | Offline mask precompute for the Perplexity arm |
-| `runpod/bootstrap.sh`, `runpod/launch.sh` | RunPod launch scaffolding |
-| `farmshare/*` | FarmShare staging and Slurm launch path for the September runs |
-| `Dockerfile`, `requirements-token-selection-eval.txt` | Runtime the RunPod arms were built against |
+| `farmshare/*` | The FarmShare staging and Slurm launch path every run used |
+| `requirements-token-selection-eval.txt` | Evaluator runtime pins |
 
 ## What is deliberately excluded
 
-- `train_on_corpus.py` — the general-purpose corpus trainer. The reported runs
-  do **not** go through it; they go through `token_selection_entrypoint.py`,
-  which has different checkpoint/resume behavior.
-- `tests/` — unit tests for the selection and contract logic. Useful, but they
-  did not produce any reported number.
-- `platform/`, `fixtures/` — eduLLM submission adapters and fixtures. The
-  reported runs were launched directly on RunPod and FarmShare, not through the
-  platform submission path.
-- `runpod/probe_rho_fsdp.py`, `rehearsal.md` — debugging and scratch material.
-- The OLMo-core library itself (`src/`). Pin it from the upstream branch above.
+- `tests/` (from the fork; the copy here is included for completeness, not
+  because it ran to produce a number) — kept as the record that the unified
+  code was tested before the reruns launched.
+- The OLMo-core library itself (`src/`). Pin it from the upstream branch and
+  commit above.
 
 ## Caveat
 
-The code now has an upstream commit, but it was committed *after* the study ran,
-and the reported W&B runs logged `git_commit=None`. So the correspondence
-between this code and those runs rests on the run ids, arm configuration, and
-reference paths lining up, as set out above — not on a commit hash recorded at
-training time.
-
-One asymmetry worth knowing: `runpod/launch.sh` defaults
-`OLMO_CORE_CHECKPOINT_SKIP_FDATASYNC=1`, so the four RunPod arms (RHO-1,
-Attention, Perplexity, BLADE) wrote checkpoints without a per-file `fdatasync`.
-The FarmShare arms (full-loss control, both random-control seeds, REL-EMA) do
-not set that flag and synced normally. This affects crash durability, not the
-contents of any checkpoint that was successfully read back and evaluated.
+The correspondence between this code and the reported runs rests on
+`GIT_COMMIT` (logged in every run's W&B config, stamped by `sync_repo.sh` at
+sync time from the exact commit that was synced), not on a commit hash
+recorded by some earlier, unrelated mechanism.

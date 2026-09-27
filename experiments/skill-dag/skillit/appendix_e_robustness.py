@@ -82,9 +82,9 @@ def probe_reference_check() -> dict:
     mixtures = json.loads((MIXLAW / "mixtures.json").read_text(encoding="utf-8"))
     row = next(m for m in mixtures["mixtures"] if m["id"] == 1)
     assert row["tag"] == "base", "mix01 is the Data Mixing Laws mixture"
-    progress = MIXLAW / "pilot_runs" / "mix01" / "progress"
-    final = json.loads((progress / "task_loss_final.json").read_text(encoding="utf-8"))
-    curve = [json.loads(line) for line in (progress / "task_loss.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    run_dir = MIXLAW / "pilot_runs" / "mix01"
+    final = json.loads((run_dir / "task_loss_final.json").read_text(encoding="utf-8"))
+    curve = [json.loads(line) for line in (run_dir / "task_loss.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     mix01 = {
         "domain_order": list(DOMAINS),
         "curve_families": list(CURVE_FAMILIES),

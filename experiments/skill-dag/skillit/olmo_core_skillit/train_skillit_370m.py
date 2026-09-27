@@ -49,7 +49,6 @@ from skillit_loader import (
     SEQUENCE_LENGTH,
     TOTAL_STEPS,
     WeightedDomainDataLoader,
-    resolve_domain_datasets,
 )
 from skillit_math import RECIPE, arm_by_index, initial_weights
 

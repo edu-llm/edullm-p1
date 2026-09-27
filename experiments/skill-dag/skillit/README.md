@@ -253,7 +253,7 @@ and the vendored files were left unmodified (see
 | File | Role |
 |------|------|
 | `patch_legacy_static_lgbm_arm.py` | Adds the static arm to a copy of the vendored `.edullm/` bundle (recipe, `skillit_math.py`, `skillit_controller.py`, `train_skillit_370m.py`), refusing to patch if any target text differs |
-| `farmshare_static_lgbm_l40s.sbatch` | The Slurm job: one 4×L40S node, no AWS, runs `runpod/entrypoint.py --arm-index 2` over the pre-staged data manifest |
+| `farmshare_static_lgbm_l40s.sbatch` | The Slurm job: one 4×L40S node, reads only the pre-staged local data manifest, runs `runpod/entrypoint.py --arm-index 2` |
 | `farmshare_preflight_submit_static_lgbm.sh` | Checks the staged run folder, venv and W&B/HF session files, then submits the job |
 
 The other controls the arms are compared against are the MixLaw runs; see

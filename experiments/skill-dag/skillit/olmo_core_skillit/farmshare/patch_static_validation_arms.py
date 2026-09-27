@@ -52,7 +52,7 @@ PRISTINE_SHA256 = {
     "skillit_recipe.json": "28506e7c3e15814c1dd0082c1c3c52dd228083fec83556616019504583b48f91",
     "skillit_math.py": "f8d4c1b8792fa56bbbe0733d1f78942179fbd903dbfdd74cb34ba9e6ce94a186",
     "skillit_controller.py": "eb5c41b0dd41ecabaa18e3743240eb30d6440babd5c30f1abf9ca7bfde421590",
-    "train_skillit_370m.py": "e112c2e42c57be4cc027d3552015b0071da84a69c86359a4e57c9d1617d1bb92",
+    "train_skillit_370m.py": "7dd20000c81dd3c1af29979c9c783060ce2180b34ce10cf194acc9502de70882",
 }
 
 # Identical to patch_legacy_static_lgbm_arm.STATIC_ARM (the zgmte13g rerun).

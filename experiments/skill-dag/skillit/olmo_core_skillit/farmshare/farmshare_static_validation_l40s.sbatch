@@ -9,7 +9,8 @@
 # Required exported variables:
 #   RUN_DIR, TRAIN_VENV, WANDB_ENV_FILE, HF_ENV_FILE, ARM_INDEX, ARM_ID, DATA_SEED
 #
-# The input manifest is read-only: this job never stages data or uses AWS.
+# The input manifest is read-only: this job never stages data or touches
+# external object storage.
 # Resources match farmshare_static_lgbm_l40s.sbatch (job 1744338, 17:11:45
 # elapsed); the time limit leaves headroom for a slower node.
 #SBATCH --job-name=static-validation
@@ -74,8 +75,9 @@ export WANDB_DIR="${ARM_ROOT}/wandb"
 export EDULLM_RUNPOD_INPUT_MANIFEST="${MANIFEST}"
 export PYTHONPATH="${REPO_DIR}/src:${EDULLM_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
 
-# The static runs are intentionally a no-AWS path over the verified pre-staged
-# manifest. Do not permit inherited credential variables to reach the loader.
+# The static runs are intentionally a local-manifest-only path over the
+# verified pre-staged manifest. Do not permit inherited cloud credential
+# variables to reach the loader.
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE \
   AWS_DEFAULT_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE \
   AWS_WEB_IDENTITY_TOKEN_FILE AWS_ROLE_ARN \

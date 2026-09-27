@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Create or refresh the per-run venv on FarmShare scratch, no AWS/S3 packages.
+# Create or refresh the per-run venv on FarmShare scratch, no cloud-storage packages.
 # Skill-It's local-manifest resolver (.edullm/runpod/entrypoint.py resolve_local_datasets)
 # never imports edullm_data/boto3 -- those are only pulled in lazily by the
-# AWS-staging path this handoff does not use.
+# cloud-staging path this handoff does not use.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,5 +39,5 @@ PYTHONPATH="${REPO_DIR}/src:${REPO_DIR}/.edullm" "${VENV}/bin/python" - <<'PY'
 import olmo_core
 import torch
 
-print("farmshare venv ok (no-aws)", torch.__version__, olmo_core.__file__)
+print("farmshare venv ok (local-manifest)", torch.__version__, olmo_core.__file__)
 PY

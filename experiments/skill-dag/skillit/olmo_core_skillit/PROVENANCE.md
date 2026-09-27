@@ -30,11 +30,12 @@ it.
 At the time the study ran, this code existed only as an uncommitted working tree.
 It has never been committed upstream. Against `f2ded0b6`, the nearest commit:
 
-- 8 of the 20 files here are identical, including `runpod/entrypoint.py`,
-  `skillit_loader.py`, `production_contract/` and the task-loss evaluator.
-- 8 differ, including `train_skillit_370m.py`, `skillit_controller.py`,
-  `skillit_math.py` and `skillit_recipe.json`.
-- 4 do not exist upstream: the no-AWS FarmShare launch path and its handoff note.
+- 7 of the 20 files here are identical, including `runpod/entrypoint.py`,
+  `production_contract/` and the task-loss evaluator.
+- 9 differ, including `train_skillit_370m.py`, `skillit_controller.py`,
+  `skillit_math.py`, `skillit_recipe.json` and, after this repository's own
+  post-vendoring edit below, `skillit_loader.py`.
+- 4 do not exist upstream: the local-manifest FarmShare launch path and its handoff note.
 
 No commit on any OLMo-core branch matches the differing files.
 
@@ -52,7 +53,10 @@ passed in as the task-loss evaluator. Training data came from the local manifest
 `manifest/ready.json` (SHA-256
 `176b9e79ee21664aa6ad7533769b48d018ea92a3fc8ac2a1634a63f45971392a`), which
 lists the tokenized `pretrain/olmo-127b` v1 shards already on FarmShare scratch.
-No S3 access was involved.
+No external object storage was touched. (The three scripts' `_no_aws` names are
+legacy, from when they were introduced to distinguish this path from an
+AWS-staging alternative that neither run used; see "What is deliberately
+excluded" below.)
 
 | Arm | W&B run (`eduLLM/skillit`) | Slurm job | How it ended |
 | --- | --- | --- | --- |
@@ -83,7 +87,7 @@ Only code on the path that produced the reported runs:
 | `runpod/entrypoint.py` | Entrypoint for both runs | same |
 | `train_skillit_370m.py` | Model, optimizer, schedule, checkpoints, eval hooks | differs |
 | `skillit_controller.py` | Mid-run Skill-It reweighting | differs |
-| `skillit_loader.py` | `WeightedDomainDataLoader`, the time-varying domain sampler | same |
+| `skillit_loader.py` | `WeightedDomainDataLoader`, the time-varying domain sampler | differs |
 | `skillit_math.py` | Update rule, arms, recipe and source-hash checks | differs |
 | `skillit_recipe.json` | Frozen recipe: arms, offline matrix, derivative fit | differs |
 | `production_contract/*` | Checkpoint ladder, task-loss callback, W&B artifacts | same |
@@ -91,7 +95,7 @@ Only code on the path that produced the reported runs:
 | `requirements-skillit-eval.txt` | Evaluator dependencies installed by the venv setup | same |
 | `farmshare/train_no_aws.sbatch`, `launch_no_aws.sh`, `setup_venv_no_aws.sh` | The launch path both jobs used | not upstream |
 | `farmshare/common.sh`, `config.env` | Shared settings those scripts source | differs |
-| `farmshare/README.md`, `HANDOFF.md` | Notes on the no-AWS launch path | differs / not upstream |
+| `farmshare/README.md`, `HANDOFF.md` | Notes on the local-manifest launch path | differs / not upstream |
 
 The evaluator here is not the same version as the one vendored for token
 selection (`experiments/token-selection/olmo_core_token_selection/`); each copy
@@ -101,9 +105,9 @@ SHA-256 of each vendored file here (LF):
 
 ```
 ba2de34db6a4cf6156c514a9f5bcf463fbd5343c1f34223d5ac459a5a74cb394  runpod/entrypoint.py
-e112c2e42c57be4cc027d3552015b0071da84a69c86359a4e57c9d1617d1bb92  train_skillit_370m.py
+7dd20000c81dd3c1af29979c9c783060ce2180b34ce10cf194acc9502de70882  train_skillit_370m.py
 eb5c41b0dd41ecabaa18e3743240eb30d6440babd5c30f1abf9ca7bfde421590  skillit_controller.py
-34c2c58c84217830e43ac2b3d2b628e970840778d5079bae0a1d6518c2a9a9c2  skillit_loader.py
+92bf41b139dc8db9ebbc1505e6249cd9870091ab4b64f75d7fd067b1f808174c  skillit_loader.py
 f8d4c1b8792fa56bbbe0733d1f78942179fbd903dbfdd74cb34ba9e6ce94a186  skillit_math.py
 b06871ef3f19fca1f982c6d66bc12f5942348504d03740eeb59a6fb165772f05  skillit_recipe.json
 c6d6a9d8292c5f48485e7ae170d913cf368cceccc4a8b6285c86ddbc4eaa7f18  production_contract/__init__.py
@@ -112,25 +116,47 @@ f633179af942067f859b561056863ca54b2b32479d8bd082db3f0e1331f25283  production_con
 638770b96742800c5b75e1f7f13fb8e74b177a5ee5b0dac70ffaf98f909ece5b  production_contract/wandb_artifacts.py
 a1fcb8c52ee8f438f69d543ea92da39d1b6d5cebb0c5f6f4ec7d187ca5d1dd32  eval_task_loss_olmo_core.py
 6baa90c2da9186bba9dd047c8ec50fadec98a644de431b835028ecb614be4b95  requirements-skillit-eval.txt
-7eeabaa290b8cedcf4223953967cf550f424087529c0c1a5960d5e2da392bf88  farmshare/README.md
-21e1d681645f8370ddb6513480b749007b994bb2f55e7c65f19c7c3ea7e8c1e3  farmshare/HANDOFF.md
-f8580f58284d0e748a1cea1ef12cd2eab0199496f5477abf8bc00a0b084cd4e6  farmshare/common.sh
+eff1b95b6370e794ae30a43ae20f77b96e426f334061318034bebc82a514a710  farmshare/README.md
+15c2f9d61894a338c43ce33407357082a70505d43af577d974a3d9e3c2155983  farmshare/HANDOFF.md
+05bf3d88c69572ce6562690ea6377aa27069b433a4fadf3b589b3620e682bb5b  farmshare/common.sh
 f387223dbf3eb6282b5295bfa1da8a7319a9784af574d961e0bee055dc6f42a3  farmshare/config.env
-819ad5a5a1b507b3873ba4c93db8bf768851c9f71684b8b11ffd7f51651526de  farmshare/setup_venv_no_aws.sh
-57fac534adc10cec4a0eef4bdc2c544f7e1638a8ce9df9b3ab6452dd34a413b6  farmshare/launch_no_aws.sh
+66b5cea98bf83c4b16444f37fc1651b6971643abcf9c78ad931a4c3574627253  farmshare/setup_venv_no_aws.sh
+c18ca465f60327415c81e48a7342eee7906a0c68fc2fcea376d18d3a9bd8df84  farmshare/launch_no_aws.sh
 16f6e6b1e2d6a9e788b6cd257f01e2e18dbc327bf26ab7a8fd4f912d23b51f4e  farmshare/train_no_aws.sbatch
 ```
 
 ## Edited after vendoring
 
-Two changes were made to the vendored bundle itself, both after the reported
-probe and derivative runs and neither touching training math:
+Several changes were made to the vendored bundle itself, all after the
+reported probe and derivative runs and none touching training math:
 
 - **`SKILLIT.md` was deleted.** It was an upstream design doc for an 8×A100
   platform profile that neither reported run used (see "What is included"
   above, and "What is deliberately excluded" below). Its original hash was
   `ea38b1a8b0d8fb0624a8791213c8cbddfee7acbef6550a9d29c297dd8445de8f`; the file
   is recoverable from this repository's git history before this change.
+- **`skillit_loader.py` dropped `resolve_domain_datasets`, its cloud-storage
+  resolver, and the now-unused imports that only it needed** (user decision,
+  to remove every trace of the vendored bundle's legacy cloud-staging path).
+  This function was never the code path any reported run, or any of the four
+  current static reruns, actually executed: `runpod/entrypoint.py` -- the only
+  entrypoint any of them used (see "How the runs were launched" above) --
+  always reassigns `resolve_domain_datasets` to its own `resolve_local_datasets`
+  before calling `main()`, and refuses to start at all if any `AWS_*`
+  credential variable is present in the environment. `train_skillit_370m.py`
+  correspondingly dropped `resolve_domain_datasets` from its `skillit_loader`
+  import; the bare name it calls is still resolved from the module's own
+  namespace at call time, so the entrypoint's reassignment works exactly as
+  before. `patch_static_validation_arms.py`'s `PRISTINE_SHA256` was updated to
+  match `train_skillit_370m.py`'s new hash (`patch_legacy_static_lgbm_arm.py`
+  never hashed this file). Both files' hashes before this edit were
+  `34c2c58c84217830e43ac2b3d2b628e970840778d5079bae0a1d6518c2a9a9c2`
+  (`skillit_loader.py`) and
+  `e112c2e42c57be4cc027d3552015b0071da84a69c86359a4e57c9d1617d1bb92`
+  (`train_skillit_370m.py`, the same value pinned against the probe and
+  derivative runs above); both are recoverable from git history before this
+  change, and `skillit_loader.py` moves from "same" to "differs" against
+  `f2ded0b6` in the table above as a result.
 - **`skillit_recipe.json`'s `initial_weights_source` string was rewritten.**
   It named the A100 RunPod LightGBM run
   (`wandb:eduLLM/mixlaw-1/78a3a85b7a5304a426f71629de27b198`) that first
@@ -159,13 +185,42 @@ probe and derivative runs and neither touching training math:
   `acb4754b46cd6a588dffce7e7ad0d9bd70b0188db010669a7cfccf8622da2bcc`; both are
   recoverable from git history before this change. Every other field in the
   recipe is untouched.
+- **`farmshare/common.sh` dropped its unused `AWS_ENV_FILE` line.** Neither
+  reported run, nor any of the four static reruns, ever reads that variable;
+  it was inert from before this bundle's own no-AWS pivot. No script's
+  behavior changes. The file's hash before this edit was
+  `f8580f58284d0e748a1cea1ef12cd2eab0199496f5477abf8bc00a0b084cd4e6`, the same
+  value recorded against the probe and derivative runs above; the
+  byte-identical original is recoverable from git history before this change.
+- **`farmshare/README.md`, `HANDOFF.md`, `launch_no_aws.sh` and
+  `setup_venv_no_aws.sh` were reworded to drop the literal words "AWS" and
+  "S3"** from their prose and comments (user decision). Every edit is
+  wording only: "no AWS/S3 access" became "no external object-storage
+  access", the same for its handful of variants, and the README's "Legacy
+  AWS-staging path" section — which only ever documented
+  `submit_from_laptop.sh` and the other scripts "What is deliberately
+  excluded" below already says were never vendored, so the section was
+  already non-executable in this repo — was removed outright rather than
+  reworded. No command, path, filename or behavior changed; the three
+  `_no_aws`-named scripts keep their names, since renaming them would ripple
+  into every launch/sbatch script that references them by that name, for no
+  benefit beyond the name itself. Hashes before this edit:
+  `7eeabaa290b8cedcf4223953967cf550f424087529c0c1a5960d5e2da392bf88`
+  (README.md),
+  `21e1d681645f8370ddb6513480b749007b994bb2f55e7c65f19c7c3ea7e8c1e3`
+  (HANDOFF.md),
+  `57fac534adc10cec4a0eef4bdc2c544f7e1638a8ce9df9b3ab6452dd34a413b6`
+  (launch_no_aws.sh) and
+  `819ad5a5a1b507b3873ba4c93db8bf768851c9f71684b8b11ffd7f51651526de`
+  (setup_venv_no_aws.sh); all four are recoverable from git history before
+  this change.
 
 ## What is deliberately excluded
 
-- The AWS staging and launch path: `farmshare/launch.sh`, `setup_venv.sh`,
-  `stage.sh`, `stage_job.sbatch`, `submit_from_laptop.sh`, `sync_repo.sh`,
-  `train_job.sbatch`, `runpod/stage_inputs.py` and `staging_plan.py`. Neither
-  reported run went through it.
+- The legacy cloud-staging and launch path: `farmshare/launch.sh`,
+  `setup_venv.sh`, `stage.sh`, `stage_job.sbatch`, `submit_from_laptop.sh`,
+  `sync_repo.sh`, `train_job.sbatch`, `runpod/stage_inputs.py` and
+  `staging_plan.py`. Neither reported run went through it.
 - RunPod-only scaffolding: `runpod/bootstrap.sh`, `runpod/launch.sh`,
   `runpod/README.md` and `Dockerfile`. Both runs were on FarmShare.
 - `skillit_entrypoint.py` and `fixtures/`: platform-submission adapters the

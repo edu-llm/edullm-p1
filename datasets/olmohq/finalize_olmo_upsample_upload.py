@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build final manifest and bulk-upload OLMo-mix corpus to S3.
+"""Build the final manifest and a local staging layout for the OLMo-mix corpus.
 
 Uses byte-proportional token estimates (published domain totals) and whole-shard
 selection for capped domains. Pass-through domains and DCLM are left unchanged.
@@ -12,7 +12,6 @@ import json
 import os
 import random
 import shutil
-import subprocess
 from collections import defaultdict
 from pathlib import Path
 
@@ -97,14 +96,10 @@ def select_shards(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
-    parser.add_argument("--bucket", default="edullm-datasets")
-    parser.add_argument("--prefix", default="olmo100b/olmo-mix-1124-30b")
-    parser.add_argument("--region", default="us-east-1")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    run = args.run_di
+    run = args.run_dir
     plan_dir = run / "plan"
     local_root = run / "data"
     summary = json.loads((plan_dir / "summary.json").read_text(encoding="utf-8"))
@@ -166,7 +161,7 @@ def main() -> int:
 """
     (run / "README.md").write_text(readme, encoding="utf-8")
 
-    staging = run / "s3-staging"
+    staging = run / "staging"
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
@@ -190,26 +185,10 @@ def main() -> int:
             dest.unlink()
         os.symlink(src.resolve(), dest)
 
-    s3_uri = f"s3://{args.bucket}/{args.prefix.strip('/')}/"
-    sync_cmd = [
-        "aws",
-        "s3",
-        "sync",
-        str(staging),
-        s3_uri,
-        "--region",
-        args.region,
-        "--follow-symlinks",
-    ]
-    if args.dry_run:
-        sync_cmd.append("--dryrun")
-    print(" ".join(sync_cmd), flush=True)
-    subprocess.run(sync_cmd, check=True)
-
     print(
         json.dumps(
             {
-                "s3_uri": s3_uri,
+                "staging_dir": str(staging),
                 "files": len(new_manifest),
                 "est_tokens": summary["est_tokens_selected"],
             },

@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
 # Append-only top-up of olmohq starcoder + pes2o so |plan-meas|/meas <= 10%.
-# NEVER modifies regmix-10b. Only appends under s3://edullm-datasets/olmo100b/olmo-mix-1124-30b/.
+# NEVER modifies regmix-10b. SRC_RUN_DIR is the prior submit_olmo_pool_tokenize.sh
+# run's RUN_DIR (its plan/manifest.jsonl and plan/tokenized_manifest.json).
 set -Eeuo pipefail
 
 SUNET="${SUNET:-nzhao2}"
 RUN_NAME="${RUN_NAME:-olmohq-topup-$(date +%Y%m%d-%H%M%S)}"
 RUN_DIR="${RUN_DIR:-/scratch/users/${SUNET}/agent-runs/${RUN_NAME}}"
 EDULLM_ROOT="${EDULLM_ROOT:-/scratch/users/${SUNET}/agent-runs/edullm-farmshare-staging}"
-BUCKET="${BUCKET:-edullm-datasets}"
-OLMOHQ_PREFIX="${OLMOHQ_PREFIX:-olmo100b/olmo-mix-1124-30b}"
+SRC_RUN_DIR="${SRC_RUN_DIR:?set SRC_RUN_DIR to the tokenized olmohq run to top up}"
 BASE_RUN="${BASE_RUN:-/scratch/users/${SUNET}/agent-runs/olmo-mix-30b-20260722}"
 DL_CONCURRENCY="${DL_CONCURRENCY:-40}"
 TOK_CONCURRENCY="${TOK_CONCURRENCY:-20}"
-
-# nvm (used by AWS session mint) rejects a set PREFIX env var.
-unset PREFIX || true
-export OLMOHQ_PREFIX
 
 mkdir -p "${RUN_DIR}/scripts" "${RUN_DIR}/logs" "${RUN_DIR}/data" "${RUN_DIR}/plan" "${RUN_DIR}/tokenized/shards"
 cd "${RUN_DIR}"
@@ -42,12 +38,12 @@ fi
 # shellcheck disable=SC1091
 source "${RUN_DIR}/venv/bin/activate"
 pip install -U pip wheel
-pip install "huggingface_hub[hf_transfer]" hf_transfer boto3 tqdm transformers "numpy<2.1" zstandard sentencepiece protobuf
+pip install "huggingface_hub[hf_transfer]" hf_transfer tqdm transformers "numpy<2.1" zstandard sentencepiece protobuf
 
 export EDULLM_ROOT RUN_DIR
 
-aws s3 cp "s3://${BUCKET}/${OLMOHQ_PREFIX}/plan/tokenized_manifest.json" "${RUN_DIR}/plan/tokenized_manifest.json"
-aws s3 cp "s3://${BUCKET}/${OLMOHQ_PREFIX}/plan/manifest.jsonl" "${RUN_DIR}/plan/manifest.jsonl"
+cp -a "${SRC_RUN_DIR}/plan/tokenized_manifest.json" "${RUN_DIR}/plan/tokenized_manifest.json"
+cp -a "${SRC_RUN_DIR}/plan/manifest.jsonl" "${RUN_DIR}/plan/manifest.jsonl"
 
 HF_ARGS=()
 if [[ -f "${RUN_DIR}/.hf_token" ]]; then
@@ -74,8 +70,6 @@ cat > "${RUN_DIR}/env.sh" <<EOF
 RUN_DIR=${RUN_DIR}
 VENV=${RUN_DIR}/venv
 EDULLM_ROOT=${EDULLM_ROOT}
-BUCKET=${BUCKET}
-OLMOHQ_PREFIX=${OLMOHQ_PREFIX}
 N=${N}
 EOF
 
@@ -88,7 +82,6 @@ cat > "${RUN_DIR}/scripts/download_topup.sbatch" <<'EOF'
 #SBATCH --time=06:00:00
 #SBATCH --exclude=wheat-01
 set -Eeuo pipefail
-unset PREFIX || true
 source "${RUN_DIR}/env.sh"
 # shellcheck disable=SC1091
 source "${VENV}/bin/activate"
@@ -149,7 +142,6 @@ cat > "${RUN_DIR}/scripts/tokenize_topup.sbatch" <<'EOF'
 #SBATCH --time=12:00:00
 #SBATCH --exclude=wheat-01
 set -Eeuo pipefail
-unset PREFIX || true
 source "${RUN_DIR}/env.sh"
 # shellcheck disable=SC1091
 source "${VENV}/bin/activate"
@@ -160,8 +152,7 @@ mkdir -p "$(dirname "${DST}")"
 python "${RUN_DIR}/scripts/tokenize_olmo_shard.py" --input "${SRC}" --output "${DST}"
 EOF
 
-# Slurm --wrap runs under /bin/sh; always use bash -lc. Put aws CLI on PATH.
-_AWS_PATH='export PATH="${HOME}/.local/bin:${HOME}/tools/aws/bin:${PATH}"'
+# Slurm --wrap runs under /bin/sh; always use bash -lc.
 
 # Build map after downloads complete, then tokenize.
 MAP_JOB=$(sbatch --parsable --exclude=wheat-01 \
@@ -170,7 +161,7 @@ MAP_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --job-name=topup-map \
   --chdir="${RUN_DIR}" \
   --output="${RUN_DIR}/logs/map-%j.out" \
-  --wrap="bash -lc 'set -Eeuo pipefail; unset PREFIX || true; source ${RUN_DIR}/env.sh; source ${RUN_DIR}/venv/bin/activate; export RUN_DIR=${RUN_DIR}; python ${RUN_DIR}/scripts/build_topup_tokenize_map.py'")
+  --wrap="bash -lc 'set -Eeuo pipefail; source ${RUN_DIR}/env.sh; source ${RUN_DIR}/venv/bin/activate; export RUN_DIR=${RUN_DIR}; python ${RUN_DIR}/scripts/build_topup_tokenize_map.py'")
 echo "map_job_id=${MAP_JOB}"
 
 TOK_JOB=$(sbatch --parsable --exclude=wheat-01 \
@@ -184,17 +175,17 @@ TOK_JOB=$(sbatch --parsable --exclude=wheat-01 \
 echo "tokenize_job_id=${TOK_JOB}"
 echo "${TOK_JOB}" > "${RUN_DIR}/tokenize_job_id.txt"
 
-# --- finalize append upload ---
-UP_JOB=$(sbatch --parsable --exclude=wheat-01 \
+# --- finalize local merge ---
+MERGE_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --partition=normal --cpus-per-task=8 --mem=32G --time=12:00:00 \
   --dependency="afterok:${TOK_JOB}" \
-  --job-name=topup-up \
+  --job-name=topup-merge \
   --chdir="${RUN_DIR}" \
-  --output="${RUN_DIR}/logs/upload-%j.out" \
-  --error="${RUN_DIR}/logs/upload-%j.err" \
-  --wrap="bash -lc 'set -Eeuo pipefail; unset PREFIX || true; ${_AWS_PATH}; source ${RUN_DIR}/env.sh; source ${RUN_DIR}/venv/bin/activate; python ${RUN_DIR}/scripts/finalize_olmohq_topup_upload.py --run-dir ${RUN_DIR} --bucket ${BUCKET} --prefix \${OLMOHQ_PREFIX}'")
-echo "upload_job_id=${UP_JOB}"
-echo "${UP_JOB}" > "${RUN_DIR}/upload_job_id.txt"
+  --output="${RUN_DIR}/logs/merge-%j.out" \
+  --error="${RUN_DIR}/logs/merge-%j.err" \
+  --wrap="bash -lc 'set -Eeuo pipefail; source ${RUN_DIR}/env.sh; source ${RUN_DIR}/venv/bin/activate; python ${RUN_DIR}/scripts/finalize_olmohq_topup_upload.py --run-dir ${RUN_DIR}'")
+echo "merge_job_id=${MERGE_JOB}"
+echo "${MERGE_JOB}" > "${RUN_DIR}/merge_job_id.txt"
 
 echo "RUN_DIR=${RUN_DIR}"
-echo "submitted dl=${DL_JOB} map=${MAP_JOB} tok=${TOK_JOB} up=${UP_JOB}"
+echo "submitted dl=${DL_JOB} map=${MAP_JOB} tok=${TOK_JOB} merge=${MERGE_JOB}"

@@ -8,7 +8,6 @@ from pathlib import Path
 _CODE_HQ_CONFIGS = {
     "taggers": "taggers-code-hq.yaml",
     "pre-mix": "pre-mix-code-hq.template.yaml",
-    "mix": "mix-code-hq-domain.template.yaml",
 }
 
 

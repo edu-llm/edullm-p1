@@ -1,6 +1,6 @@
 {
  "corpus_id": "regmix-10b-v1",
- "published_as": "pretrain/regmix-10b v1 (edullm-data), tokens/<source>/ layout",
+ "published_as": "pretrain/regmix-10b v1, tokens/<source>/ layout",
  "format": {
   "dtype": "uint32",
   "endianness": "little",

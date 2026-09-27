@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Stage olmohq (~127B) token shards for edullm-data and call publish().
+"""Build the local tokens/<source>/ layout split for olmohq (~127B tokens).
 
-Source: s3://edullm-datasets/olmo100b/olmo-mix-1124-30b/ (active tokenized_manifest).
-Layout: tokens/<source>/train-*.u32le.bin  → labels={source} only (domain omitted).
-Shards: max 1 GiB. Val: same fraction from every source (mix weights match).
+Reads the active plan/tokenized_manifest.json (post top-up trim) and streams
+each source's shards into tokens/<source>/train-*.u32le.bin (max 1 GiB each),
+then carves a matching validation fraction from every source so val mix
+weights match the full corpus. This is the local record of how the published
+`pretrain/olmo-127b` reservoir was laid out; rebuild it byte for byte from
+public data with ../manifests/olmo-127b-v1/rebuild.py instead of running this.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import shutil
-import sys
-import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,9 +27,6 @@ DEFAULT_PURPOSE = (
 MAX_SHARD_BYTES = 1_073_741_824
 DEFAULT_SHARD_BYTES = MAX_SHARD_BYTES
 VAL_FRACTION = 0.0015
-DEFAULT_BUCKET = "edullm-datasets"
-DEFAULT_PREFIX = "olmo100b/olmo-mix-1124-30b"
-DEFAULT_MANIFEST_KEY = f"{DEFAULT_PREFIX}/plan/tokenized_manifest.json"
 
 
 def _align_shard_bytes(n: int) -> int:
@@ -251,53 +248,13 @@ def resolve_local_shard(tokenized_root: Path, rel: str) -> Path:
     raise FileNotFoundError(path)
 
 
-def _s3_client():
-    """boto3 S3 client from the standard AWS credential chain."""
-    import boto3
-
-    region = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
-    return boto3.client("s3", region_name=region)
-
-
-def _open_shard_stream(
-    *,
-    rel: str,
-    tokenized_root: Path | None,
-    s3_bucket: str | None,
-    s3_tokenized_prefix: str | None,
-    s3,
-):
-    """Open a local file or an S3 StreamingBody for one input .npy shard."""
-    if tokenized_root is not None:
-        path = resolve_local_shard(tokenized_root, rel)
-        return path.open("rb"), path.stat().st_size, str(path)
-    assert s3_bucket and s3_tokenized_prefix and s3 is not None
-    key = f"{s3_tokenized_prefix.rstrip('/')}/{rel.lstrip('/')}"
-    last_exc: Exception | None = None
-    for attempt in range(1, 6):
-        try:
-            # Prefer GET only — avoids some HeadObject 400s with stale/odd signing.
-            obj = s3.get_object(Bucket=s3_bucket, Key=key)
-            size = int(obj["ContentLength"])
-            return obj["Body"], size, f"s3://{s3_bucket}/{key}"
-        except Exception as exc:  # noqa: BLE001 — retry
-            last_exc = exc
-            print(f"S3 open failed attempt {attempt}/5 for {key}: {exc}", flush=True)
-            time.sleep(min(30, 3 * attempt))
-    assert last_exc is not None
-    raise last_exc
-
-
 def stream_source_to_shards(
     *,
     source: str,
     shard_rows: list[dict],
     out_dir: Path,
     shard_bytes: int,
-    tokenized_root: Path | None = None,
-    s3_bucket: str | None = None,
-    s3_tokenized_prefix: str | None = None,
-    s3=None,
+    tokenized_root: Path,
 ) -> list[Path]:
     progress_path = out_dir / "_ingest_progress.json"
     completed: set[str] = set()
@@ -350,28 +307,19 @@ def stream_source_to_shards(
         rel = row["path"]
         if rel in completed:
             continue
-        src, actual, label = _open_shard_stream(
-            rel=rel,
-            tokenized_root=tokenized_root,
-            s3_bucket=s3_bucket,
-            s3_tokenized_prefix=s3_tokenized_prefix,
-            s3=s3,
-        )
+        path = resolve_local_shard(tokenized_root, rel)
+        actual = path.stat().st_size
         declared = int(row["bytes"] or 0)
         if declared and declared != actual:
-            raise SystemExit(f"{label}: manifest bytes {declared} != size {actual}")
+            raise SystemExit(f"{path}: manifest bytes {declared} != size {actual}")
         if actual % 4 != 0:
-            raise SystemExit(f"{label}: size {actual} not uint32-aligned")
-        try:
+            raise SystemExit(f"{path}: size {actual} not uint32-aligned")
+        with path.open("rb") as src:
             while True:
                 chunk = src.read(bufsize)
                 if not chunk:
                     break
                 writer.write(chunk)
-        finally:
-            close = getattr(src, "close", None)
-            if callable(close):
-                close()
         completed.add(rel)
         progress_path.write_text(
             json.dumps(
@@ -380,7 +328,7 @@ def stream_source_to_shards(
             ),
             encoding="utf-8",
         )
-        print(f"  ingested {label} ({actual:,} bytes)", flush=True)
+        print(f"  ingested {path} ({actual:,} bytes)", flush=True)
     written = writer.close()
     if writer.total_bytes != expected:
         raise SystemExit(
@@ -429,15 +377,11 @@ def stage_publish_layout(
     force: bool,
     resume: bool = False,
     val_fraction: float = VAL_FRACTION,
-    tokenized_root: Path | None = None,
-    s3_bucket: str | None = None,
-    s3_tokenized_prefix: str | None = None,
+    tokenized_root: Path,
 ) -> dict[str, list[str]]:
     """Stage as tokens/<source>/… only → entry.labels = {source: …}, domain omitted."""
     if shard_bytes > MAX_SHARD_BYTES:
         raise SystemExit(f"--shard-bytes {shard_bytes} exceeds max {MAX_SHARD_BYTES}")
-    if tokenized_root is None and not (s3_bucket and s3_tokenized_prefix):
-        raise SystemExit("need --tokenized-root or --s3-bucket/--s3-tokenized-prefix")
     if out_root.exists():
         if force and not resume:
             shutil.rmtree(out_root)
@@ -447,10 +391,6 @@ def stage_publish_layout(
             )
     out_root.mkdir(parents=True, exist_ok=True)
     (out_root / "tokens").mkdir(parents=True, exist_ok=True)
-
-    s3 = None
-    if tokenized_root is None:
-        s3 = _s3_client()
 
     staged: dict[str, list[str]] = {}
     for source in sorted(manifest["domains"]):
@@ -477,9 +417,6 @@ def stage_publish_layout(
             out_dir=out_dir,
             shard_bytes=shard_bytes,
             tokenized_root=tokenized_root,
-            s3_bucket=s3_bucket,
-            s3_tokenized_prefix=s3_tokenized_prefix,
-            s3=s3,
         )
         staged[source] = [str(rel_dir / p.name) for p in shards]
         print(
@@ -506,7 +443,7 @@ def stage_publish_layout(
     return staged
 
 
-def build_sources(manifest: dict) -> list[dict]:
+def build_sources(manifest: dict, *, tokenized_root: Path) -> list[dict]:
     total = int(manifest.get("total_stream_tokens_with_eos") or 0)
     sources: list[dict] = []
     for name in sorted(manifest["domains"]):
@@ -517,7 +454,7 @@ def build_sources(manifest: dict) -> list[dict]:
             "name": name,
             "tokens": tokens,
             "scope": "measured-in-this-dataset",
-            "uri": f"s3://{DEFAULT_BUCKET}/{DEFAULT_PREFIX}/tokenized/",
+            "uri": str(tokenized_root),
         }
         if share is not None:
             row["share"] = round(share, 6)
@@ -525,33 +462,13 @@ def build_sources(manifest: dict) -> list[dict]:
     return sources
 
 
-def ensure_edullm_data() -> None:
-    try:
-        import edullm_data  # noqa: F401
-    except ImportError:
-        raise SystemExit(
-            "edullm-data is not installed. Clone main and pip install -e it "
-            "(see publish_olmohq_edullm_data.sbatch)."
-        ) from None
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--tokenized-root",
         type=Path,
-        default=None,
-        help="optional local mirror of …/tokenized/ (contains shards/*.npy)",
-    )
-    parser.add_argument(
-        "--s3-bucket",
-        default=DEFAULT_BUCKET,
-        help="read tokenized shards from this bucket when --tokenized-root is omitted",
-    )
-    parser.add_argument(
-        "--s3-tokenized-prefix",
-        default=f"{DEFAULT_PREFIX}/tokenized",
-        help="S3 prefix containing shards/ (FarmShare streams from here)",
+        required=True,
+        help="local .../tokenized/ directory (contains shards/*.npy)",
     )
     parser.add_argument(
         "--manifest",
@@ -566,26 +483,11 @@ def main() -> int:
     parser.add_argument(
         "--about",
         default=None,
-        help="README about paragraph; default is derived from measured token count",
-    )
-    parser.add_argument(
-        "--legacy-uri",
-        default=None,
-        help="notes provenance URI (defaults to s3://<bucket>/<prefix>/)",
+        help="dataset_manifest.json about paragraph; default is derived from measured token count",
     )
     parser.add_argument("--shard-bytes", type=int, default=DEFAULT_SHARD_BYTES)
     parser.add_argument("--val-fraction", type=float, default=VAL_FRACTION)
-    parser.add_argument("--hash-workers", type=int, default=16)
-    parser.add_argument("--copy-workers", type=int, default=16)
-    parser.add_argument(
-        "--text-run-dir",
-        type=Path,
-        default=None,
-        help="FarmShare run dir with trim/<source>/*-trimmed.json.gz (or out/<source>/…)",
-    )
-    parser.add_argument("--skip-text-stage", action="store_true")
     parser.add_argument("--skip-stage", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
         "--resume",
@@ -593,10 +495,6 @@ def main() -> int:
         help="keep existing stage-dir; skip complete sources; restage incomplete ones",
     )
     args = parser.parse_args()
-
-    _datasets_root = Path(__file__).resolve().parents[1]
-    if str(_datasets_root) not in sys.path:
-        sys.path.insert(0, str(_datasets_root))
 
     manifest = load_shard_manifest(args.manifest)
     print(
@@ -615,109 +513,49 @@ def main() -> int:
             resume=args.resume,
             val_fraction=args.val_fraction,
             tokenized_root=args.tokenized_root,
-            s3_bucket=None if args.tokenized_root else args.s3_bucket,
-            s3_tokenized_prefix=None if args.tokenized_root else args.s3_tokenized_prefix,
         )
     elif not args.stage_dir.is_dir():
         raise SystemExit(f"--skip-stage but stage-dir missing: {args.stage_dir}")
-
-    if args.text_run_dir and not args.skip_text_stage:
-        from edullm_text_companion import stage_text_companion
-
-        stage_text_companion(
-            sources=sorted(manifest["domains"]),
-            run_dir=args.text_run_dir,
-            out_root=args.stage_dir,
-            shard_bytes=args.shard_bytes,
-        )
-    elif not args.skip_text_stage:
-        raise SystemExit(
-            "companion text requires --text-run-dir (FarmShare trim/out tree) or --skip-text-stage"
-        )
-
-    if args.dry_run:
-        print(f"dry-run: staged under {args.stage_dir}", flush=True)
-        return 0
-
-    ensure_edullm_data()
-    from edullm_data.contracts import validate_dataset_id
-    from edullm_data.publish import publish
-
-    try:
-        validate_dataset_id(args.dataset_id)
-    except Exception as exc:
-        raise SystemExit(f"invalid dataset_id {args.dataset_id!r}: {exc}") from exc
 
     about = args.about or (
         "Corpus mirroring allenai/olmo-mix-1124 domain mix, dolma2-tokenized to "
         f"~{manifest['total_stream_tokens_with_eos'] / 1e9:.1f}B tokens across seven sources "
         "(dclm, arxiv, starcoder, pes2o, open-web-math, algebraic-stack, wiki). "
         "Shards nest as tokens/<source>/ so each mix source is carried as entry.labels.source "
-        "(domain omitted). Per-source counts are measured from the published objects."
-    )
-    legacy = args.legacy_uri or (
-        f"s3://{args.s3_bucket}/{args.s3_tokenized_prefix.rstrip('/').removesuffix('/tokenized')}/"
-        if args.s3_tokenized_prefix
-        else f"s3://{DEFAULT_BUCKET}/{DEFAULT_PREFIX}/"
+        "(domain omitted). Per-source counts are measured from the staged objects."
     )
     notes = (
         f"Validation split: {args.val_fraction:.4%} of each source carved into "
-        f"tokens/<source>/val-00000.u32le.bin so val source weights match the full mix. "
-        f"Companion raw documents live under text/<source>/ (text-corpus/v1) as the complete "
-        f"selected document stream. Legacy path: {legacy}"
+        f"tokens/<source>/val-00000.u32le.bin so val source weights match the full mix."
     )
+    sources = build_sources(manifest, tokenized_root=args.tokenized_root)
 
-    # Stamp source URIs from the actual S3 prefix used for this publish.
-    sources = build_sources(manifest)
-    tok_uri = (
-        f"s3://{args.s3_bucket}/{args.s3_tokenized_prefix.rstrip('/')}/"
-        if args.s3_tokenized_prefix
-        else None
-    )
-    if tok_uri:
-        for row in sources:
-            row["uri"] = tok_uri
-
-    created_at = datetime.now(timezone.utc).isoformat()
-    from edullm_data.s3 import Boto3S3
-
-    s3 = Boto3S3.default()
-    from edullm_text_companion import PUBLISH_PROFILE, TEXT_GROUP_META
-
-    plan = publish(
-        args.stage_dir,
-        dataset_id=args.dataset_id,
-        purpose=args.purpose,
-        profile=PUBLISH_PROFILE,
-        tokenizer=args.tokenizer,
-        group_meta=TEXT_GROUP_META,
-        s3=s3,
-        created_at=created_at,
-        hash_workers=args.hash_workers,
-        copy_workers=args.copy_workers,
-        about=about,
-        sources=sources,
-        notes=notes,
+    dataset_manifest = {
+        "dataset_id": args.dataset_id,
+        "tokenizer": args.tokenizer,
+        "purpose": args.purpose,
+        "about": about,
+        "notes": notes,
+        "sources": sources,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (args.stage_dir / "dataset_manifest.json").write_text(
+        json.dumps(dataset_manifest, indent=2) + "\n", encoding="utf-8"
     )
     print(
         json.dumps(
             {
-                "dataset_id": plan.dataset_id,
-                "version": plan.version,
-                "payload_objects": len(plan.payload_keys),
-                "source_kind": plan.source_kind,
+                "stage_dir": str(args.stage_dir),
+                "dataset_id": args.dataset_id,
+                "sources": len(sources),
+                "total_tokens": manifest["total_stream_tokens_with_eos"],
             },
             indent=2,
         ),
-        flush=True,
-    )
-    print(
-        f"published to s3://edullm-landing/{plan.dataset_id}/{plan.version}/ "
-        f"(validator will promote to edullm-data)",
         flush=True,
     )
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

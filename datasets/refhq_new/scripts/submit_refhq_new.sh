@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Orchestrate refhq-new FarmShare pipeline -> s3://edullm-datasets/refhq/refhq-new/
-# then publish() as pretrain/refhq-new (tokenizer/dolma2-bpe).
+# Orchestrate refhq-new FarmShare pipeline, then build the local layout split as
+# pretrain/refhq-new (tokenizer/dolma2-bpe).
 #
 # Dependency chain (afterok):
 #   plan → download[0-5] → normalize[0-5] → dolma eng[0-5] → holdout
@@ -29,8 +29,6 @@ RUN_DIR="${RUN_DIR:-${SCRATCH_ROOT}}"
 STAGING_ROOT="${STAGING_ROOT:-/scratch/users/${SUNET}/agent-runs/edullm-farmshare-staging}"
 SOURCE_LIST="${SOURCE_LIST:-tulu-v2 openhermes-25 tulu-3 hermes-3 smoltalk dolci}"
 SEED="${SEED:-42}"
-S3_BUCKET="${S3_BUCKET:-edullm-datasets}"
-S3_PREFIX="${S3_PREFIX:-refhq/refhq-new}"
 STAGE_DIR="${STAGE_DIR:-${RUN_DIR}/publish-stage}"
 REFHQ_NEW_SCRIPTS="${REFHQ_NEW_SCRIPTS:-${RUN_DIR}/datasets/refhq_new/scripts}"
 SKIP_PUBLISH="${SKIP_PUBLISH:-0}"
@@ -78,7 +76,7 @@ if [[ ! -x "${RUN_DIR}/venv/bin/python" ]]; then
     "huggingface_hub[hf_transfer]>=0.23,<1" hf_transfer \
     "datasets>=2.19,<3" "tokenizers>=0.15.0,<=0.19.1" "transformers>=4.40,<4.45" \
     tqdm zstandard "numpy<2" \
-    "dolma[code]==1.1.2" pyyaml boto3 awscli
+    "dolma[code]==1.1.2" pyyaml
 else
   # shellcheck disable=SC1091
   source "${RUN_DIR}/venv/bin/activate"
@@ -89,8 +87,6 @@ read -r -a SOURCES_ARR <<< "${SOURCE_LIST}"
 python "${REFHQ_NEW_SCRIPTS}/plan_refhq_new.py" \
   --scratch-root "${SCRATCH_ROOT}" \
   --seed "${SEED}" \
-  --s3-bucket "${S3_BUCKET}" \
-  --s3-prefix "${S3_PREFIX}" \
   --sources "${SOURCES_ARR[@]}"
 
 PLAN="${PLAN:-${SCRATCH_ROOT}/manifests/plan.json}"
@@ -105,8 +101,6 @@ PLAN=${PLAN}
 SOURCE_LIST="${SOURCE_LIST}"
 SCRATCH_ROOT=${SCRATCH_ROOT}
 STAGING_ROOT=${STAGING_ROOT}
-S3_BUCKET=${S3_BUCKET}
-S3_PREFIX=${S3_PREFIX}
 STAGE_DIR=${STAGE_DIR}
 REFHQ_NEW_SCRIPTS=${REFHQ_NEW_SCRIPTS}
 SEED=${SEED}
@@ -119,7 +113,7 @@ source "${RUN_DIR}/env.sh"
 VENV="${RUN_DIR}/venv"
 refhq_new_export_pythonpath "${RUN_DIR}"
 
-COMMON_EXPORT="ALL,RUN_DIR=${RUN_DIR},VENV=${VENV},PLAN=${PLAN},SOURCE_LIST=${SOURCE_LIST},SCRATCH_ROOT=${SCRATCH_ROOT},REFHQ_NEW_SCRIPTS=${REFHQ_NEW_SCRIPTS},STAGE_DIR=${STAGE_DIR},S3_BUCKET=${S3_BUCKET},S3_PREFIX=${S3_PREFIX},SEED=${SEED},TOKENIZE_TASKS=${TOKENIZE_TASKS},ENGLISH_TASKS=${ENGLISH_TASKS}"
+COMMON_EXPORT="ALL,RUN_DIR=${RUN_DIR},VENV=${VENV},PLAN=${PLAN},SOURCE_LIST=${SOURCE_LIST},SCRATCH_ROOT=${SCRATCH_ROOT},REFHQ_NEW_SCRIPTS=${REFHQ_NEW_SCRIPTS},STAGE_DIR=${STAGE_DIR},SEED=${SEED},TOKENIZE_TASKS=${TOKENIZE_TASKS},ENGLISH_TASKS=${ENGLISH_TASKS}"
 
 require_sbatch() {
   local path="$1"
@@ -176,7 +170,7 @@ if [[ "${N_ENG}" -lt 1 ]]; then
 fi
 echo "english_tasks=${N_ENG} file=${ENGLISH_TASKS}"
 
-COMMON_EXPORT="ALL,RUN_DIR=${RUN_DIR},VENV=${VENV},PLAN=${PLAN},SOURCE_LIST=${SOURCE_LIST},SCRATCH_ROOT=${SCRATCH_ROOT},REFHQ_NEW_SCRIPTS=${REFHQ_NEW_SCRIPTS},STAGE_DIR=${STAGE_DIR},S3_BUCKET=${S3_BUCKET},S3_PREFIX=${S3_PREFIX},SEED=${SEED},TOKENIZE_TASKS=${TOKENIZE_TASKS},ENGLISH_TASKS=${ENGLISH_TASKS}"
+COMMON_EXPORT="ALL,RUN_DIR=${RUN_DIR},VENV=${VENV},PLAN=${PLAN},SOURCE_LIST=${SOURCE_LIST},SCRATCH_ROOT=${SCRATCH_ROOT},REFHQ_NEW_SCRIPTS=${REFHQ_NEW_SCRIPTS},STAGE_DIR=${STAGE_DIR},SEED=${SEED},TOKENIZE_TASKS=${TOKENIZE_TASKS},ENGLISH_TASKS=${ENGLISH_TASKS}"
 
 ENG_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --array=0-$((N_ENG - 1)) \
@@ -230,7 +224,7 @@ if [[ "${N_TASKS}" -lt 1 ]]; then
 fi
 echo "tokenize_tasks=${N_TASKS} file=${TASKS}"
 
-COMMON_EXPORT="ALL,RUN_DIR=${RUN_DIR},VENV=${VENV},PLAN=${PLAN},SOURCE_LIST=${SOURCE_LIST},SCRATCH_ROOT=${SCRATCH_ROOT},REFHQ_NEW_SCRIPTS=${REFHQ_NEW_SCRIPTS},STAGE_DIR=${STAGE_DIR},S3_BUCKET=${S3_BUCKET},S3_PREFIX=${S3_PREFIX},SEED=${SEED},TOKENIZE_TASKS=${TASKS}"
+COMMON_EXPORT="ALL,RUN_DIR=${RUN_DIR},VENV=${VENV},PLAN=${PLAN},SOURCE_LIST=${SOURCE_LIST},SCRATCH_ROOT=${SCRATCH_ROOT},REFHQ_NEW_SCRIPTS=${REFHQ_NEW_SCRIPTS},STAGE_DIR=${STAGE_DIR},SEED=${SEED},TOKENIZE_TASKS=${TASKS}"
 
 TOK_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --array=0-$((N_TASKS - 1)) \
@@ -279,6 +273,5 @@ POSTNORM_JOB=$(sbatch --parsable --exclude=wheat-01 \
 echo "post_normalize_job=${POSTNORM_JOB}"
 
 echo "submitted refhq-new under ${SCRATCH_ROOT}"
-echo "s3://${S3_BUCKET}/${S3_PREFIX}/"
 echo "dataset_id=pretrain/refhq-instruct tokenizer=tokenizer/dolma2-bpe"
 echo "chain download=${DL_JOB} normalize=${NORM_JOB} post_normalize=${POSTNORM_JOB}"

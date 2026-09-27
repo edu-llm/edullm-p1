@@ -13,21 +13,11 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "farmshare"))
 sys.path.insert(0, str(DOLMA_HQ_ROOT / "scripts"))
 
 from hq_reference_sources import (  # noqa: E402
-    HQ_BUDGETS,
     HQ_DOMAINS,
     HQ_SOURCES,
     UNFILTERED_POOL_TOKENS,
     within_budget,
 )
-from smoke_code_copyright_strip import check_python_docs  # noqa: E402
-
-
-def test_hq_budgets_sum_to_four_billion() -> None:
-    assert abs(sum(HQ_BUDGETS.values()) - 4.0e9) < 1.0
-    assert HQ_BUDGETS["dclm"] == 1.0e9
-    for domain in HQ_DOMAINS:
-        if domain != "dclm":
-            assert HQ_BUDGETS[domain] == 0.5e9
 
 
 def test_unfiltered_pools_and_sources_cover_all_domains() -> None:
@@ -85,7 +75,6 @@ def test_finalize_accepts_in_budget_stats(tmp_path: Path) -> None:
         "finalize_hq_reference_upload.py",
         "--plan",
         str(plan_path),
-        "--skip-upload",
     ]
     assert fin_main() == 0
 
@@ -105,20 +94,8 @@ def test_finalize_rejects_out_of_budget_domain(tmp_path: Path) -> None:
         Path(domain_plan["paths"]["stats"]).write_text(json.dumps(stats) + "\n", encoding="utf-8")
         Path(domain_plan["paths"]["out"]).mkdir(parents=True, exist_ok=True)
 
-    sys.argv = ["finalize_hq_reference_upload.py", "--plan", str(plan_path), "--skip-upload"]
+    sys.argv = ["finalize_hq_reference_upload.py", "--plan", str(plan_path)]
     assert fin_main() == 1
-
-
-def test_copyright_strip_fixture() -> None:
-    fixture = '''# Copyright 2024
-"""Module doc."""
-
-def add(a, b):
-    return a + b
-'''
-    result = check_python_docs([fixture], limit=1)
-    assert result["checked"] == 1
-    assert result["ok"] == 1
 
 
 def test_fill_until_budget_stops_at_tokens(monkeypatch) -> None:

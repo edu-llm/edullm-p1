@@ -19,10 +19,6 @@ def test_code_hq_domain_uses_hq_configs() -> None:
         dolma_config_path("code-hq", "pre-mix", config_root)
         == config_root / "pre-mix-code-hq.template.yaml"
     )
-    assert (
-        dolma_config_path("code-hq", "mix", config_root)
-        == config_root / "mix-code-hq-domain.template.yaml"
-    )
 
 
 def test_code_hq_taggers_are_code_only() -> None:

@@ -1,33 +1,44 @@
 #!/usr/bin/env bash
-# Dolma2-tokenize an OLMo-mix pool already on S3; upload tokenized/ back to the same bucket.
+# Dolma2-tokenize an OLMo-mix pool that a submit_olmo_mix_sample.sh run already
+# downloaded to local scratch; write tokenized/ and plan/tokenized_manifest.json
+# next to it. Does not touch AWS -- SRC_RUN_DIR is that sampling run's RUN_DIR.
 set -Eeuo pipefail
 
 SUNET="${SUNET:-nzhao2}"
 RUN_NAME="${RUN_NAME:-}"
-SRC_BUCKET="${SRC_BUCKET:?set SRC_BUCKET}"
-SRC_PREFIX="${SRC_PREFIX:-olmo-mix-1124-30b}"
-RUN_DIR="${RUN_DIR:-/scratch/users/${SUNET}/agent-runs/${RUN_NAME:-${SRC_BUCKET}-dolma2-tok-$(date +%Y%m%d-%H%M%S)}}"
+SRC_RUN_DIR="${SRC_RUN_DIR:?set SRC_RUN_DIR to the submit_olmo_mix_sample.sh run to tokenize}"
+RUN_DIR="${RUN_DIR:-/scratch/users/${SUNET}/agent-runs/${RUN_NAME:-olmo-mix-dolma2-tok-$(date +%Y%m%d-%H%M%S)}}"
 EDULLM_ROOT="${EDULLM_ROOT:-/scratch/users/${SUNET}/agent-runs/edullm-farmshare-staging}"
-LOCAL_MIRROR="${LOCAL_MIRROR:-}"
 BASE_RUN_DIR="${BASE_RUN_DIR:-}"
-SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-0}"
-DL_CONCURRENCY="${DL_CONCURRENCY:-60}"
+SKIP_LINK="${SKIP_LINK:-0}"
 TOK_CONCURRENCY="${TOK_CONCURRENCY:-40}"
 
 mkdir -p "${RUN_DIR}/scripts" "${RUN_DIR}/logs" "${RUN_DIR}/data" "${RUN_DIR}/plan" "${RUN_DIR}/tokenized/shards"
 cd "${RUN_DIR}"
 
 OLMO_ROOT="${EDULLM_ROOT}/datasets/olmo"
-DATASETS_SHARED="${EDULLM_ROOT}/datasets"
-for f in download_s3_shard.py download_s3_shard.sbatch; do
-  cp -a "${DATASETS_SHARED}/${f}" "${RUN_DIR}/scripts/"
-done
 for f in build_pool_tokenize_map.py \
-  tokenize_olmo_shard.py tokenize_olmo_shard.sbatch finalize_pool_tokenized_upload.py \
-  finalize_pool_tokenized_upload.sbatch; do
+  tokenize_olmo_shard.py tokenize_olmo_shard.sbatch \
+  finalize_pool_tokenized_upload.py finalize_pool_tokenized_upload.sbatch; do
   cp -a "${OLMO_ROOT}/${f}" "${RUN_DIR}/scripts/"
 done
-sed -i 's/\r$//' "${RUN_DIR}/scripts/"*.{sh,sbatch,py} 2>/dev/null || true
+sed -i 's/\r$//' "${RUN_DIR}/scripts/"*.{sbatch,py} 2>/dev/null || true
+
+MANIFEST="${RUN_DIR}/plan/manifest.jsonl"
+SUMMARY="${RUN_DIR}/plan/summary.json"
+cp -a "${SRC_RUN_DIR}/plan/manifest.jsonl" "${MANIFEST}"
+cp -a "${SRC_RUN_DIR}/plan/summary.json" "${SUMMARY}" 2>/dev/null || true
+N=$(wc -l < "${MANIFEST}")
+
+if [[ "${SKIP_LINK}" == "1" ]]; then
+  echo "skip_link=1"
+else
+  echo "hardlinking ${SRC_RUN_DIR}/data -> ${RUN_DIR}/data"
+  # SRC_RUN_DIR/data was populated directly by download_olmo_shard.py, keyed by
+  # the same manifest "path" values build_pool_tokenize_map.py resolves below;
+  # hardlink it in place of a download (fall back to copy across filesystems).
+  cp -al "${SRC_RUN_DIR}/data/." "${RUN_DIR}/data/" 2>/dev/null || cp -a "${SRC_RUN_DIR}/data/." "${RUN_DIR}/data/"
+fi
 
 if [[ -n "${BASE_RUN_DIR}" && -f "${BASE_RUN_DIR}/.hf_token" ]]; then
   cp -a "${BASE_RUN_DIR}/.hf_token" "${RUN_DIR}/.hf_token"
@@ -40,15 +51,9 @@ fi
 # shellcheck disable=SC1091
 source "${RUN_DIR}/venv/bin/activate"
 pip install -U pip wheel
-pip install boto3 tqdm transformers "numpy<2.1" zstandard sentencepiece protobuf
+pip install tqdm transformers "numpy<2.1" zstandard sentencepiece protobuf
 
 export EDULLM_ROOT RUN_DIR
-export PATH="${HOME}/.local/bin:${HOME}/tools/aws/bin:${PATH}"
-MANIFEST="${RUN_DIR}/plan/manifest.jsonl"
-SUMMARY="${RUN_DIR}/plan/summary.json"
-aws s3 cp "s3://${SRC_BUCKET}/${SRC_PREFIX}/plan/manifest.jsonl" "${MANIFEST}"
-aws s3 cp "s3://${SRC_BUCKET}/${SRC_PREFIX}/plan/summary.json" "${SUMMARY}" || true
-N=$(wc -l < "${MANIFEST}")
 
 if [[ -n "${BASE_RUN_DIR}" && -d "${BASE_RUN_DIR}" ]]; then
   echo "staging local base run ${BASE_RUN_DIR}"
@@ -85,37 +90,18 @@ VENV=${RUN_DIR}/venv
 MANIFEST=${MANIFEST}
 SUMMARY=${SUMMARY}
 LOCAL_ROOT=${RUN_DIR}/data
-SRC_BUCKET=${SRC_BUCKET}
-SRC_PREFIX=${SRC_PREFIX}
+SRC_RUN_DIR=${SRC_RUN_DIR}
 HF_TOKEN_FILE=${HF_TOKEN_FILE}
 EOF
 
-SBATCH_EXPORT_COMMON="RUN_DIR=${RUN_DIR},VENV=${RUN_DIR}/venv,MANIFEST=${MANIFEST},SRC_BUCKET=${SRC_BUCKET},SRC_PREFIX=${SRC_PREFIX},HF_TOKEN_FILE=${HF_TOKEN_FILE}"
-
-DL_JOB=""
-if [[ "${SKIP_DOWNLOAD}" == "1" ]]; then
-  echo "skip_download=1"
-else
-  DL_JOB=$(sbatch --parsable --exclude=wheat-01 \
-    --array=0-$((N - 1))%${DL_CONCURRENCY} \
-    --chdir="${RUN_DIR}" \
-    --export=ALL,${SBATCH_EXPORT_COMMON},LOCAL_ROOT="${RUN_DIR}/data",LOCAL_MIRROR="${LOCAL_MIRROR}" \
-    "${RUN_DIR}/scripts/download_s3_shard.sbatch")
-  echo "download_job=${DL_JOB}"
-fi
+SBATCH_EXPORT_COMMON="RUN_DIR=${RUN_DIR},VENV=${RUN_DIR}/venv,MANIFEST=${MANIFEST},HF_TOKEN_FILE=${HF_TOKEN_FILE}"
 
 TRIM_ARGS=()
 if [[ -n "${BASE_RUN_DIR}" && -d "${BASE_RUN_DIR}/trim" ]]; then
   TRIM_ARGS=(--trim-root "${BASE_RUN_DIR}/trim")
 fi
 
-MAP_DEP=""
-if [[ -n "${DL_JOB}" ]]; then
-  MAP_DEP="--dependency=afterok:${DL_JOB}"
-fi
-
 MAP_JOB=$(sbatch --parsable --exclude=wheat-01 \
-  ${MAP_DEP} \
   --cpus-per-task=4 \
   --mem=8G \
   --time=01:00:00 \
@@ -138,13 +124,13 @@ TOK_JOB=$(sbatch --parsable --exclude=wheat-01 \
   "${RUN_DIR}/scripts/tokenize_olmo_shard.sbatch")
 echo "tokenize_job=${TOK_JOB}"
 
-UP_JOB=$(sbatch --parsable --exclude=wheat-01 \
+CHECK_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --dependency=afterok:${TOK_JOB} \
   --chdir="${RUN_DIR}" \
   --export=ALL,${SBATCH_EXPORT_COMMON} \
   "${RUN_DIR}/scripts/finalize_pool_tokenized_upload.sbatch")
-echo "upload_job=${UP_JOB}"
+echo "check_job=${CHECK_JOB}"
 
 echo "RUN_DIR=${RUN_DIR}"
 echo "manifest_shards=${N}"
-echo "s3://${SRC_BUCKET}/${SRC_PREFIX}/tokenized/"
+echo "${RUN_DIR}/tokenized/"

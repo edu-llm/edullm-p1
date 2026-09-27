@@ -48,8 +48,6 @@ def main() -> int:
         choices=sorted(BUDGET_PROFILES),
         help="Token budget profile (default: 4B HQ; regmix-5p5: ~5.514B RegMix weights)",
     )
-    parser.add_argument("--s3-bucket", default="edullm-datasets")
-    parser.add_argument("--s3-prefix", default="olmo100b/hq-reference-v1")
     parser.add_argument(
         "--domains",
         nargs="*",
@@ -74,8 +72,6 @@ def main() -> int:
         "tokenizer_id": args.tokenizer,
         "seed": args.seed,
         "budget_profile": args.budget_profile,
-        "s3_bucket": args.s3_bucket,
-        "s3_prefix": args.s3_prefix,
         "domains": {},
     }
     for domain in domains:

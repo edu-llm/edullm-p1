@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RegMix-weighted ~5.514B HQ reference on FarmShare -> s3://edullm-datasets/refhq/
+# RegMix-weighted ~5.514B HQ reference on FarmShare scratch.
 # Max parallelization: all 7 domains download+build concurrently (no % throttle).
 set -Eeuo pipefail
 
@@ -12,8 +12,6 @@ REUSE_ROOT="${REUSE_ROOT:-/scratch/users/${SUNET}/hq-reference-v1}"
 DOMAIN_LIST="${DOMAIN_LIST:-dclm starcoder pes2o arxiv open-web-math algebraic-stack wiki}"
 SEED="${SEED:-42}"
 BUDGET_PROFILE="${BUDGET_PROFILE:-regmix-5p5}"
-S3_BUCKET="${S3_BUCKET:-edullm-datasets}"
-S3_PREFIX="${S3_PREFIX:-refhq/refhq-regmix-5p5b-v1}"
 HF_TOKEN_SRC="${HF_TOKEN_SRC:-${REUSE_ROOT}/.hf_token}"
 HQ_SCRIPTS="${RUN_DIR}/datasets/refhq/scripts"
 
@@ -56,7 +54,7 @@ if [[ ! -x "${RUN_DIR}/venv/bin/python" ]]; then
   pip install \
     "huggingface_hub[hf_transfer]" hf_transfer \
     "datasets>=2.19,<3" "tokenizers>=0.21.0" "transformers>=4.49.0" tqdm zstandard numpy \
-    "dolma[code]==1.1.2" pyyaml boto3 awscli || true
+    "dolma[code]==1.1.2" pyyaml || true
   pip install -U 'datasets>=2.19,<3' 'huggingface_hub>=0.23'
 else
   # shellcheck disable=SC1091
@@ -66,9 +64,7 @@ fi
 python "${HQ_SCRIPTS}/plan_hq_reference.py" \
   --scratch-root "${SCRATCH_ROOT}" \
   --seed "${SEED}" \
-  --budget-profile "${BUDGET_PROFILE}" \
-  --s3-bucket "${S3_BUCKET}" \
-  --s3-prefix "${S3_PREFIX}"
+  --budget-profile "${BUDGET_PROFILE}"
 
 PLAN="${SCRATCH_ROOT}/manifests/plan.json"
 read -r -a DOMAINS <<< "${DOMAIN_LIST}"
@@ -81,16 +77,12 @@ PLAN=${PLAN}
 DOMAIN_LIST="${DOMAIN_LIST}"
 SCRATCH_ROOT=${SCRATCH_ROOT}
 STAGING_ROOT=${STAGING_ROOT}
-S3_BUCKET=${S3_BUCKET}
-S3_PREFIX=${S3_PREFIX}
 HQ_SCRIPTS=${HQ_SCRIPTS}
 EOF
 
 # shellcheck disable=SC1091
 source "${RUN_DIR}/env.sh"
 dolma_hq_export_pythonpath "${RUN_DIR}"
-
-python "${HQ_SCRIPTS}/smoke_code_copyright_strip.py" --fixture
 
 DL_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --array=0-$((N - 1)) \
@@ -115,5 +107,4 @@ FIN_JOB=$(sbatch --parsable --exclude=wheat-01 \
 echo "finalize_job=${FIN_JOB}"
 
 echo "submitted RegMix 5.5B HQ reference under ${SCRATCH_ROOT}"
-echo "s3://${S3_BUCKET}/${S3_PREFIX}/"
 echo "parallel_domains=${N} download=${DL_JOB} build=${BUILD_JOB} finalize=${FIN_JOB}"

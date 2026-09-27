@@ -20,11 +20,14 @@ wandb>=0.28
 omegaconf>=2.3
 pyyaml>=6.0
 
-# Corpus construction, data staging and the contamination scan (datasets/ and
-# the *_from_edullm_data staging scripts). These read and write private S3
-# buckets and need credentials for them.
-edullm-data @ git+https://github.com/edu-llm/edullm-data.git@f0254ddb7aba589aa27e5a84ebaa95cb152edcfa
+# Corpus construction and the contamination scan (datasets/). These read only
+# local FarmShare scratch and public Hugging Face sources; no credentials needed.
 datasets>=2.18
 huggingface_hub>=0.21
 zstandard>=0.22
+
+# skill-dag's mixlaw/skillit pipelines only (experiments/skill-dag/): the
+# *_from_edullm_data staging scripts and skillit_loader.py still read and
+# write a private object store and need credentials for it.
+edullm-data @ git+https://github.com/edu-llm/edullm-data.git@f0254ddb7aba589aa27e5a84ebaa95cb152edcfa
 boto3>=1.34

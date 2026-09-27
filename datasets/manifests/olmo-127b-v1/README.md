@@ -54,6 +54,10 @@ which is lexicographically greater than any 5-digit numeric prefix.
 
 ## Manifest files
 
+`build_manifest.py`, the FarmShare script that derived this manifest, has been
+removed (it referenced FarmShare-only paths and is not needed to rebuild); it
+is kept in git history.
+
 - `sources.json` -- every one of the 512 public input files (`repo_id`,
   `repo_type`, `revision`, `path`, `size`, `sha256` = the HF LFS oid), plus
   the tokenizer repo/revision/files.
@@ -76,9 +80,6 @@ which is lexicographically greater than any 5-digit numeric prefix.
   sha256, token count, source, position in that source's stream) plus the
   512 per-file stream hashes described above, plus the format/layout rule.
 - `rebuild.py` -- standalone rebuild + verifier (see below).
-- `build_manifest.py` -- the one-off script that produced
-  `documents_per_file.tsv.gz`, `doc_windows.tsv.gz` and `outputs.json` (not
-  needed to rebuild; documents provenance). References FarmShare paths.
 - `verify_layout.py` -- cheap, network-free check that the layout rule in
   `outputs.json["layout"]` applied to `outputs.json["file_streams"]`'s
   per-file token counts reproduces every published object's name, byte

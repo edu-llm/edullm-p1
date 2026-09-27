@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Verify dolma2 tokenized memmaps and upload working store to edullm-datasets.
+"""Verify dolma2 tokenized memmaps and write the local tokenized manifest + staging layout.
 
 Assumptions (sibling tokenize_source.py / plan_refhq_new.py contract):
   tokenized/<source>/<domain>/{train,val}.npy   headerless uint32 memmaps
   tokenized/<source>/<domain>/{train,val}.json  meta with stream_tokens_with_eos
 
 Also accepts tok/ as an alias, and already-sharded
-  tokenized/<source>/<domain>/{train,val}-NNNNN.u32le.bin (uploaded as-is under tokens/).
+  tokenized/<source>/<domain>/{train,val}-NNNNN.u32le.bin (staged as-is under tokens/).
 
-Working store: s3://edullm-datasets/refhq/refhq-new/
 Holdout is document-level before tokenize — train/val npy already exist; no carve here.
 """
 
@@ -17,20 +16,11 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_BUCKET = "edullm-datasets"
-DEFAULT_PREFIX = "refhq/refhq-new"
 DEFAULT_SHARD_BYTES = 1_073_741_824
 SPLITS = ("train", "val")
-
-
-def _aws_s3_sync(local: Path, uri: str) -> None:
-    cmd = ["aws", "s3", "sync", str(local), uri, "--only-show-errors"]
-    print(" ".join(cmd), flush=True)
-    subprocess.run(cmd, check=True)
 
 
 def _align_shard_bytes(n: int) -> int:
@@ -179,7 +169,7 @@ def stage_tokens_from_tok(
     return staged
 
 
-def build_manifest(*, scratch_root: Path, tok_root: Path, bucket: str, prefix: str) -> dict:
+def build_manifest(*, scratch_root: Path, tok_root: Path) -> dict:
     reports: dict[str, dict] = {}
     failures: list[str] = []
     total_stream_tokens = 0
@@ -219,8 +209,6 @@ def build_manifest(*, scratch_root: Path, tok_root: Path, bucket: str, prefix: s
         "created_at": datetime.now(timezone.utc).isoformat(),
         "tokenizer_id": "allenai/dolma2-tokenizer",
         "eos_token_id": 100257,
-        "s3_bucket": bucket,
-        "s3_prefix": prefix,
         "tok_root": str(tok_root),
         "total_stream_tokens_with_eos": total_stream_tokens,
         "by_source": by_source,
@@ -237,23 +225,17 @@ def build_manifest(*, scratch_root: Path, tok_root: Path, bucket: str, prefix: s
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", type=Path, required=True)
-    parser.add_argument("--bucket", default=None)
-    parser.add_argument("--prefix", default=None)
     parser.add_argument(
         "--stage-dir",
         type=Path,
         default=None,
-        help="if set, also write tokens/<source>/<domain>/*.u32le.bin and sync to S3",
+        help="if set, also write tokens/<source>/<domain>/*.u32le.bin locally",
     )
     parser.add_argument("--shard-bytes", type=int, default=DEFAULT_SHARD_BYTES)
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--skip-upload", action="store_true")
     args = parser.parse_args()
 
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
-    bucket = args.bucket or plan.get("s3_bucket") or DEFAULT_BUCKET
-    prefix = args.prefix or plan.get("s3_prefix") or DEFAULT_PREFIX
     scratch_root = Path(plan.get("scratch_root") or plan.get("run_dir") or args.plan.parent.parent)
     tok_root = resolve_tok_root(scratch_root)
     manifests_dir = scratch_root / "manifests"
@@ -262,8 +244,6 @@ def main() -> int:
     manifest = build_manifest(
         scratch_root=scratch_root,
         tok_root=tok_root,
-        bucket=bucket,
-        prefix=prefix,
     )
     manifest_path = manifests_dir / "tokenized_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -284,16 +264,7 @@ def main() -> int:
             force=args.force,
         )
 
-    if args.dry_run or args.skip_upload:
-        print("skipping S3 upload", flush=True)
-        return 0
-
-    # Upload tokenized/ memmaps (RefHQ-style working store) + manifests + staged shards.
-    _aws_s3_sync(tok_root, f"s3://{bucket}/{prefix}/tokenized/")
-    _aws_s3_sync(manifests_dir, f"s3://{bucket}/{prefix}/manifests/")
-    if stage_dir is not None and (stage_dir / "tokens").is_dir():
-        _aws_s3_sync(stage_dir / "tokens", f"s3://{bucket}/{prefix}/tokens/")
-    print(f"upload complete -> s3://{bucket}/{prefix}/", flush=True)
+    print(f"accepted -> {manifest_path}", flush=True)
     return 0
 
 

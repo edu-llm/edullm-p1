@@ -22,7 +22,6 @@ rsync -avz -e "ssh -S ${SOCK} -o BatchMode=yes" \
 rsync -avz -e "ssh -S ${SOCK} -o BatchMode=yes" \
   "${REPO_ROOT}/datasets/olmo_shard_utils.py" \
   "${REPO_ROOT}/datasets/trim_and_tokenize_regmix.py" \
-  "${REPO_ROOT}/datasets/edullm_text_companion.py" \
   "${HOST}:${STAGING}/datasets/"
 
 ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" bash -s <<REMOTE

@@ -41,10 +41,6 @@ def test_plan_cli_writes_tokenize_tasks(tmp_path: Path) -> None:
             "openhermes-25",
             "--seed",
             "7",
-            "--s3-bucket",
-            "edullm-datasets",
-            "--s3-prefix",
-            "refhq/refhq-new",
         ],
         check=True,
         capture_output=True,
@@ -294,7 +290,6 @@ def test_lib_sh_helpers_present() -> None:
     # Shared utils include TokenWriter dependency
     assert "trim_and_tokenize_regmix.py" in text
     assert "olmo_shard_utils.py" in text
-    assert "edullm_text_companion.py" in text
 
 
 def test_normalize_fixture_applies_exclusions(tmp_path: Path) -> None:

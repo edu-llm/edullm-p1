@@ -1,28 +1,23 @@
 #!/usr/bin/env python3
-"""Stage refhq-new tokens+text and publish() as pretrain/refhq-instruct.
+"""Build the local tokens/<source>/<domain>/ layout split for refhq-new as pretrain/refhq-instruct.
 
-Note: dataset name cannot be ``refhq-new`` — edullm-data forbids version token
-``new`` in the name segment. Working store prefix remains ``refhq/refhq-new/``.
+Note: the dataset id is ``pretrain/refhq-instruct``, not ``refhq-new`` (kept for the
+FarmShare scratch layout only).
 
-
-Layout (two path labels; holdout already done before tokenize):
+Layout (holdout already done before tokenize):
   tokens/<source>/<domain>/{train,val}-NNNNN.u32le.bin
-  text/<source>/<domain>/train-NNNNN.jsonl.gz
 
 Reuses split_npy_to_shards pattern from datasets/refhq/scripts/publish_refhq_edullm_data.py
 but does NOT carve val (doc-level 0.15% holdout already produced train/val memmaps).
 
-Tokenizer dep: tokenizer/dolma2-bpe. Always install latest edullm-data (wheel from
-s3://edullm-landing/_dist/ or git@main) — never pin old tags.
+Tokenizer dep: tokenizer/dolma2-bpe.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import shutil
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,9 +30,6 @@ DEFAULT_PURPOSE = (
 )
 DEFAULT_SHARD_BYTES = 1_073_741_824
 SPLITS = ("train", "val")
-
-# Gate A does not ship text-corpus/v1 yet; publish raw companion as vendored/v1
-PUBLISH_PROFILE = {"tokens": "pretrain-tokens/v1", "vendor": "vendored/v1"}
 
 
 def _align_shard_bytes(n: int) -> int:
@@ -152,53 +144,6 @@ def stage_publish_layout(
     return staged
 
 
-def resolve_text_paths_for_pair(
-    *, source: str, domain: str, run_dir: Path
-) -> list[Path]:
-    """Prefer holdout train docs, then English out/, then docs/."""
-    candidates_dirs = [
-        run_dir / "holdout" / source / domain / "train",
-        run_dir / "holdout" / source / domain,
-        run_dir / "out" / source / domain / "documents",
-        run_dir / "out" / source / domain,
-        run_dir / "docs" / source / domain / "documents",
-        run_dir / "docs" / source / domain,
-    ]
-    for d in candidates_dirs:
-        if not d.is_dir():
-            continue
-        shards = sorted(d.glob("documents-*.jsonl.gz")) + sorted(d.glob("documents-*.json.gz"))
-        if shards:
-            return shards
-    raise FileNotFoundError(
-        f"no text docs for {source}/{domain} under holdout|out|docs in {run_dir}"
-    )
-
-
-def stage_nested_text_companion(
-    *,
-    pairs: list[tuple[str, str]],
-    run_dir: Path,
-    out_root: Path,
-    shard_bytes: int,
-) -> dict[str, dict[str, int]]:
-    from edullm_text_companion import stage_source_text
-
-    stats: dict[str, dict[str, int]] = {}
-    for source, domain in pairs:
-        key = f"{source}/{domain}"
-        paths = resolve_text_paths_for_pair(source=source, domain=domain, run_dir=run_dir)
-        out_dir = out_root / "text" / source / domain
-        # stage_source_text labels records with source=; nest path carries domain.
-        stats[key] = stage_source_text(
-            source=key,
-            text_paths=paths,
-            out_dir=out_dir,
-            shard_bytes=shard_bytes,
-        )
-    return stats
-
-
 def load_or_build_manifest(manifest_path: Path | None, tok_root: Path) -> dict:
     if manifest_path is not None and manifest_path.is_file():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -276,82 +221,6 @@ def build_sources(manifest: dict) -> list[dict]:
     return sources
 
 
-def _sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as handle:
-        while True:
-            chunk = handle.read(1 << 20)
-            if not chunk:
-                break
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def ensure_vendor_layout(stage_dir: Path) -> Path:
-    """Prefer vendor/; if only text/ exists (text-corpus layout), rename it.
-
-    Gate A currently rejects text-corpus/v1; vendored/v1 is the accepted companion.
-    """
-    vendor = stage_dir / "vendor"
-    text = stage_dir / "text"
-    if vendor.is_dir() and any(vendor.rglob("*.jsonl.gz")):
-        return vendor
-    if text.is_dir() and any(text.rglob("*.jsonl.gz")):
-        if vendor.exists():
-            shutil.rmtree(vendor)
-        text.rename(vendor)
-        print(f"renamed {text} -> {vendor} (vendored/v1 companion)", flush=True)
-        return vendor
-    raise SystemExit(f"missing text/vendor companion under {stage_dir}")
-
-
-def build_vendor_group_meta(vendor_root: Path, *, retrieved_at: str) -> dict:
-    upstream_files: list[dict] = []
-    for path in sorted(vendor_root.rglob("*.jsonl.gz")):
-        rel = path.relative_to(vendor_root).as_posix()
-        upstream_files.append(
-            {
-                "path": rel,
-                "bytes": path.stat().st_size,
-                "sha256": _sha256_file(path),
-            }
-        )
-    if not upstream_files:
-        raise SystemExit(f"no *.jsonl.gz under {vendor_root}")
-    # Concrete revision required by Gate A (no placeholders).
-    revision = "farmshare-holdout-docs-2026-08-04"
-    return {
-        "tokens": {},
-        "vendor": {
-            "vendor_root": "vendor",
-            "sentinels": [],
-            "upstream": {
-                "name": "refhq-instruct-holdout-docs",
-                "uri": "s3://edullm-datasets/refhq/refhq-new/",
-                "revision": revision,
-                "retrieved_at": retrieved_at,
-                "transport": {
-                    "name": "farmshare-holdout-docs",
-                    "uri": "s3://edullm-datasets/refhq/refhq-new/",
-                    "revision": revision,
-                },
-            },
-            "upstream_files": upstream_files,
-        },
-    }
-
-
-def ensure_edullm_data() -> None:
-    try:
-        import edullm_data  # noqa: F401
-    except ImportError:
-        raise SystemExit(
-            "edullm-data is not installed. Install the newest wheel from "
-            "s3://edullm-landing/_dist/ or: pip install "
-            "'edullm-data @ git+https://github.com/edu-llm/edullm-data@main'"
-        ) from None
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -377,23 +246,9 @@ def main() -> int:
     parser.add_argument("--tokenizer", default=DEFAULT_TOKENIZER)
     parser.add_argument("--purpose", default=DEFAULT_PURPOSE)
     parser.add_argument("--shard-bytes", type=int, default=DEFAULT_SHARD_BYTES)
-    parser.add_argument("--hash-workers", type=int, default=8)
-    parser.add_argument("--copy-workers", type=int, default=8)
-    parser.add_argument(
-        "--text-run-dir",
-        type=Path,
-        default=None,
-        help="run dir with holdout|out|docs (default: scratch-root)",
-    )
-    parser.add_argument("--skip-text-stage", action="store_true")
     parser.add_argument("--skip-stage", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
-
-    _datasets_root = Path(__file__).resolve().parents[2]
-    if str(_datasets_root) not in sys.path:
-        sys.path.insert(0, str(_datasets_root))
 
     scratch = args.scratch_root
     if scratch is None:
@@ -421,36 +276,6 @@ def main() -> int:
     elif not args.stage_dir.is_dir():
         raise SystemExit(f"--skip-stage but stage-dir missing: {args.stage_dir}")
 
-    text_run_dir = args.text_run_dir or scratch
-    if not args.skip_text_stage:
-        # Stage under text/ first, then rename to vendor/ for Gate A.
-        pairs = [(s, d) for s, d, _ in iter_source_domain_dirs(tok_root)]
-        stage_nested_text_companion(
-            pairs=pairs,
-            run_dir=text_run_dir,
-            out_root=args.stage_dir,
-            shard_bytes=args.shard_bytes,
-        )
-
-    vendor_root = ensure_vendor_layout(args.stage_dir)
-
-    if args.dry_run:
-        print(f"dry-run: staged under {args.stage_dir} vendor={vendor_root}", flush=True)
-        return 0
-
-    ensure_edullm_data()
-    from edullm_data.contracts import validate_dataset_id
-    from edullm_data.publish import publish
-    from edullm_data.s3 import Boto3S3
-
-    try:
-        validate_dataset_id(args.dataset_id)
-    except Exception as exc:
-        raise SystemExit(f"invalid dataset_id {args.dataset_id!r}: {exc}") from exc
-
-    created_at = datetime.now(timezone.utc).isoformat()
-    group_meta = build_vendor_group_meta(vendor_root, retrieved_at=created_at)
-
     about = (
         "One-pass filtered instruct mix for OLMo-2 370M CE reference / rho-1: "
         "Tulu-v2, OpenHermes-2.5, Tulu-3, Hermes-3, SmolTalk, Dolci. Metadata drops "
@@ -460,10 +285,7 @@ def main() -> int:
     )
     notes = (
         "Validation: 0.15% of documents per (source, domain) reserved before tokenize "
-        "(seed 42). Raw companion under vendor/<source>/<domain>/ as vendored/v1 "
-        "(Gate A does not yet accept text-corpus/v1). "
-        "Working store: s3://edullm-datasets/refhq/refhq-new/. "
-        "No dedup. No upsampling. Realized size is one filtered pass."
+        "(seed 42). No dedup. No upsampling. Realized size is one filtered pass."
     )
     limitations = [
         {
@@ -472,38 +294,30 @@ def main() -> int:
         }
     ]
 
-    plan = publish(
-        args.stage_dir,
-        dataset_id=args.dataset_id,
-        purpose=args.purpose,
-        profile=PUBLISH_PROFILE,
-        tokenizer=args.tokenizer,
-        group_meta=group_meta,
-        s3=Boto3S3.default(),
-        created_at=created_at,
-        hash_workers=args.hash_workers,
-        copy_workers=args.copy_workers,
-        about=about,
-        sources=build_sources(manifest),
-        license={"id": "ODC-By-1.0", "basis": "declared"},
-        notes=notes,
-        limitations=limitations,
+    dataset_manifest = {
+        "dataset_id": args.dataset_id,
+        "tokenizer": args.tokenizer,
+        "purpose": args.purpose,
+        "about": about,
+        "notes": notes,
+        "license": {"id": "ODC-By-1.0", "basis": "declared"},
+        "limitations": limitations,
+        "sources": build_sources(manifest),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (args.stage_dir / "dataset_manifest.json").write_text(
+        json.dumps(dataset_manifest, indent=2) + "\n", encoding="utf-8"
     )
     print(
         json.dumps(
             {
-                "dataset_id": plan.dataset_id,
-                "version": plan.version,
-                "payload_objects": len(plan.payload_keys),
-                "source_kind": plan.source_kind,
+                "stage_dir": str(args.stage_dir),
+                "dataset_id": args.dataset_id,
+                "sources": len(dataset_manifest["sources"]),
+                "total_tokens": manifest.get("total_stream_tokens_with_eos"),
             },
             indent=2,
         ),
-        flush=True,
-    )
-    print(
-        f"published to s3://edullm-landing/{plan.dataset_id}/{plan.version}/ "
-        f"(validator will promote to edullm-data)",
         flush=True,
     )
     return 0

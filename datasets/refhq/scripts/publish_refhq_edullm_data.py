@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Stage RefHQ RegMix 5.5B token memmaps for edullm-data and call publish()."""
+"""Build the local tokens/<source>/ layout split for the RefHQ RegMix 5.5B token memmaps."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import shutil
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -199,16 +198,6 @@ def build_sources(manifest: dict) -> list[dict]:
     return sources
 
 
-def ensure_edullm_data() -> None:
-    try:
-        import edullm_data  # noqa: F401
-    except ImportError:
-        raise SystemExit(
-            "edullm-data is not installed. Run:\n"
-            '  pip install "edullm-data @ git+https://github.com/edu-llm/edullm-data@v0.2.0"'
-        ) from None
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -237,24 +226,9 @@ def main() -> int:
         default=VAL_FRACTION,
         help="fraction of each source carved into val (same fraction → matching mix weights)",
     )
-    parser.add_argument("--hash-workers", type=int, default=16)
-    parser.add_argument("--copy-workers", type=int, default=16)
-    parser.add_argument(
-        "--text-run-dir",
-        type=Path,
-        default=None,
-        help="run dir with out/<source>/documents-*.json.gz (default: parent of tokenized-root)",
-    )
-    parser.add_argument("--skip-text-stage", action="store_true")
     parser.add_argument("--skip-stage", action="store_true")
-    parser.add_argument("--dry-run", action="store_true", help="stage only; do not publish")
     parser.add_argument("--force", action="store_true", help="replace existing stage-dir")
     args = parser.parse_args()
-
-    _datasets_root = Path(__file__).resolve().parents[2]
-    if str(_datasets_root) not in sys.path:
-        sys.path.insert(0, str(_datasets_root))
-    from edullm_text_companion import PUBLISH_PROFILE, TEXT_GROUP_META, stage_text_companion
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     if not manifest.get("accepted"):
@@ -272,79 +246,45 @@ def main() -> int:
     elif not args.stage_dir.is_dir():
         raise SystemExit(f"--skip-stage but stage-dir missing: {args.stage_dir}")
 
-    text_run_dir = args.text_run_dir or args.tokenized_root.parent
-    if not args.skip_text_stage:
-        stage_text_companion(
-            sources=sorted(manifest["domains"]),
-            run_dir=text_run_dir,
-            out_root=args.stage_dir,
-            shard_bytes=args.shard_bytes,
-        )
-
-    if args.dry_run:
-        print(f"dry-run: staged under {args.stage_dir}", flush=True)
-        return 0
-
-    ensure_edullm_data()
-    from edullm_data.contracts import validate_dataset_id
-    from edullm_data.publish import publish
-    from edullm_data.s3 import Boto3S3
-
-    try:
-        validate_dataset_id(args.dataset_id)
-    except Exception as exc:
-        raise SystemExit(f"invalid dataset_id {args.dataset_id!r}: {exc}") from exc
-
     about = (
         "HQ-filtered RegMix-weighted 5.5B-token dolma2 corpus: seven independent source pulls "
         "(dclm, arxiv, starcoder, pes2o, open-web-math, algebraic-stack, wiki) tokenized with "
         "allenai/dolma2-tokenizer. Shards are nested tokens/<source>/ so each mix source is "
         "carried in the object key as entry.labels.source (no domain level). Per-source token "
-        "counts are measured from the published objects."
+        "counts are measured from the staged objects."
     )
     notes = (
         f"Validation split: {args.val_fraction:.4%} of each source carved into "
         f"tokens/<source>/val-00000.u32le.bin so val source weights match the full mix "
-        f"(~{args.val_fraction:.2%} of corpus, olmo-150b-scale). Companion raw documents "
-        f"under text/<source>/ (text-corpus/v1) retain their complete selected document stream. Legacy path "
-        f"on edullm-datasets: refhq/refhq-regmix-5p5b-v1/tokenized/*.npy headerless uint32 memmaps."
+        f"(~{args.val_fraction:.2%} of corpus, olmo-150b-scale)."
     )
 
-    created_at = datetime.now(timezone.utc).isoformat()
-    plan = publish(
-        args.stage_dir,
-        dataset_id=args.dataset_id,
-        purpose=args.purpose,
-        profile=PUBLISH_PROFILE,
-        tokenizer=args.tokenizer,
-        group_meta=TEXT_GROUP_META,
-        s3=Boto3S3.default(),
-        created_at=created_at,
-        hash_workers=args.hash_workers,
-        copy_workers=args.copy_workers,
-        about=about,
-        sources=build_sources(manifest),
-        notes=notes,
+    dataset_manifest = {
+        "dataset_id": args.dataset_id,
+        "tokenizer": args.tokenizer,
+        "purpose": args.purpose,
+        "about": about,
+        "notes": notes,
+        "sources": build_sources(manifest),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (args.stage_dir / "dataset_manifest.json").write_text(
+        json.dumps(dataset_manifest, indent=2) + "\n", encoding="utf-8"
     )
     print(
         json.dumps(
             {
-                "dataset_id": plan.dataset_id,
-                "version": plan.version,
-                "payload_objects": len(plan.payload_keys),
-                "source_kind": plan.source_kind,
+                "stage_dir": str(args.stage_dir),
+                "dataset_id": args.dataset_id,
+                "sources": len(dataset_manifest["sources"]),
+                "total_tokens": manifest.get("total_stream_tokens_with_eos"),
             },
             indent=2,
         ),
-        flush=True,
-    )
-    print(
-        f"published to s3://edullm-landing/{plan.dataset_id}/{plan.version}/ "
-        f"(validator will promote to edullm-data)",
         flush=True,
     )
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

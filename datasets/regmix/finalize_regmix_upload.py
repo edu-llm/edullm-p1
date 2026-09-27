@@ -1,65 +1,17 @@
 #!/usr/bin/env python3
-"""Finalize RegMix 10B mix: stage trimmed shards and upload to destination bucket."""
+"""Finalize RegMix 10B mix: build the final manifest and a local staging layout."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import shutil
-import subprocess
 from pathlib import Path
-
-import boto3
-from botocore.exceptions import ClientError
-
-
-def provision_bucket(bucket: str, region: str) -> None:
-    s3 = boto3.client("s3", region_name=region)
-    try:
-        s3.head_bucket(Bucket=bucket)
-        print(f"bucket exists: s3://{bucket}", flush=True)
-        return
-    except ClientError as exc:
-        status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
-        if status not in {404, 403}:
-            raise
-    print(f"creating bucket s3://{bucket} in {region}", flush=True)
-    if region == "us-east-1":
-        s3.create_bucket(Bucket=bucket)
-    else:
-        s3.create_bucket(
-            Bucket=bucket,
-            CreateBucketConfiguration={"LocationConstraint": region},
-        )
-    s3.put_public_access_block(
-        Bucket=bucket,
-        PublicAccessBlockConfiguration={
-            "BlockPublicAcls": True,
-            "IgnorePublicAcls": True,
-            "BlockPublicPolicy": True,
-            "RestrictPublicBuckets": True,
-        },
-    )
-    s3.put_bucket_encryption(
-        Bucket=bucket,
-        ServerSideEncryptionConfiguration={
-            "Rules": [
-                {
-                    "ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"},
-                    "BucketKeyEnabled": True,
-                }
-            ]
-        },
-    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
-    parser.add_argument("--dst-bucket", default="edullm-datasets")
-    parser.add_argument("--dst-prefix", default="regmix/regmix-10b")
-    parser.add_argument("--region", default="us-east-1")
-    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     run = args.run_dir
@@ -140,10 +92,6 @@ def main() -> int:
         "tokenizer": "allenai/dolma2-tokenizer",
         "results": trim_meta,
     }
-    summary["destination"] = {
-        "bucket": args.dst_bucket,
-        "prefix": args.dst_prefix,
-    }
 
     plan_dir = run / "plan"
     final_manifest = plan_dir / "manifest_final.jsonl"
@@ -164,7 +112,7 @@ def main() -> int:
 
     readme = f"""# RegMix-optimized OLMo-mix 10B
 
-- Source: s3://{summary.get('source_bucket', 'edullm-datasets')}/{summary.get('source_prefix', 'olmo100b/olmo-mix-1124-30b')}
+- Source: {summary.get('source', 'the local olmohq run')}
 - Method: random whole-shard sample from source, then document-shuffle trim to RegMix-mapped budgets
 - Seed: {summary.get('seed', 42)}
 - Tokenizer: allenai/dolma2-tokenizer (OLMo-2 canonical; EOS=100257)
@@ -186,7 +134,7 @@ def main() -> int:
     readme += "\nSee plan/summary_final.json for full accounting.\n"
     (run / "README.md").write_text(readme, encoding="utf-8")
 
-    staging = run / "s3-staging"
+    staging = run / "staging"
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
@@ -215,24 +163,7 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    if args.dry_run:
-        print(f"dry-run staging ready at {staging}", flush=True)
-        print(f"would upload to s3://{args.dst_bucket}/{args.dst_prefix}/", flush=True)
-        return 0
-
-    provision_bucket(args.dst_bucket, args.region)
-    s3_uri = f"s3://{args.dst_bucket}/{args.dst_prefix.strip('/')}/"
-    cmd = [
-        "aws",
-        "s3",
-        "sync",
-        str(staging),
-        s3_uri,
-        "--only-show-errors",
-    ]
-    print(" ".join(cmd), flush=True)
-    subprocess.check_call(cmd)
-    print(f"uploaded to {s3_uri}", flush=True)
+    print(f"staging ready at {staging}", flush=True)
     print(json.dumps({"measured_tokens_total": total_tokens, "bytes_final": summary["bytes_final"]}, indent=2))
     return 0
 

@@ -34,6 +34,8 @@ val, with the same total token counts quoted above) matches this rule exactly.
 
 ## Repo layout of this manifest
 
+`build_manifest.py`, the FarmShare script that derived this manifest from the surviving build artifacts, has been removed (it referenced FarmShare-only paths and is not needed to rebuild); it is kept in git history.
+
 | File | Content |
 |---|---|
 | `sources.json` | Every public HF file this manifest's documents actually reference: repo id/type/revision (full commit SHA), path, size, sha256. |
@@ -41,7 +43,6 @@ val, with the same total token counts quoted above) matches this rule exactly.
 | `outputs.json` | Every trained-on object (name, bytes, sha256, tokens) plus the whole-domain `.npy` hashes and the layout rule, computed read-only from the surviving `tokenized/*.npy`. |
 | `rebuild.py` | `--out DIR --cache DIR [--only DOMAIN]`: downloads sources, replays the manifest, tokenizes, shards, and checks every sha256 against `outputs.json`. |
 | `requirements.txt` | Exact `==` pins (Python 3.12.3) -- this is the environment the whole rebuild was validated against on FarmShare. |
-| `build_manifest.py` | The scripts actually run on FarmShare (`tools2/sources_survey.py`, `tools2/resolve.py`, `tools2/dclm_resolve.py`) that derived this manifest from the surviving build artifacts. References FarmShare paths; not needed to rebuild. |
 
 ## How each domain was selected, and how it maps back to public data
 
@@ -123,7 +124,7 @@ re-deriving it:
   **42 of starcoder's 762,037 documents (0.0055%, 475 of 775,268,890 tokens, 0.00006%) are
   not code at all.** Their entire text is `f"{id}\n{repo_id}\n"` -- e.g. `"486\n
   bigcode/starcoderdata\n"` -- literally just the row's own id and the source repo name.
-  Code path (`experiments/token-selection/datasets/refhq/scripts/build_hq_reference_domain.py:265-269`
+  Code path (`datasets/refhq/scripts/build_hq_reference_domain.py:265-269`
   together with `olmo_shard_utils.py:126-131,142`, both in the code that ran on FarmShare):
   after Dolma's `code_copyright_comments_v1` span-replacement strips a *whole* document's
   `text` field to `""` (a `copyright_notice` or `comment_block` span covering the entire

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Stage RegMix 10B token memmaps for edullm-data and call publish()."""
+"""Build the local tokens/<source>/ layout split for the RegMix 10B token memmaps."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import shutil
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -241,16 +240,6 @@ def build_sources(manifest: dict) -> list[dict]:
     return sources
 
 
-def ensure_edullm_data() -> None:
-    try:
-        import edullm_data  # noqa: F401
-    except ImportError:
-        raise SystemExit(
-            "edullm-data is not installed. Clone main and pip install -e it "
-            "(see publish_regmix_edullm_data.sbatch)."
-        ) from None
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tokenized-root", type=Path, default=DEFAULT_TOKENIZED_ROOT)
@@ -266,40 +255,9 @@ def main() -> int:
     parser.add_argument("--purpose", default=DEFAULT_PURPOSE)
     parser.add_argument("--shard-bytes", type=int, default=DEFAULT_SHARD_BYTES)
     parser.add_argument("--val-fraction", type=float, default=VAL_FRACTION)
-    parser.add_argument("--hash-workers", type=int, default=16)
-    parser.add_argument("--copy-workers", type=int, default=16)
-    parser.add_argument(
-        "--text-run-dir",
-        type=Path,
-        default=None,
-        help="run dir with trim/<source>/*-trimmed.json.gz (default: parent of tokenized-root)",
-    )
-    parser.add_argument("--skip-text-stage", action="store_true")
-    parser.add_argument(
-        "--skip-text-sources",
-        default="",
-        help="Comma-separated sources with already-staged text companions",
-    )
-    parser.add_argument(
-        "--parallel-text-sources",
-        default="dclm",
-        help="Comma-separated sources to stage from pre-split chunks in parallel",
-    )
-    parser.add_argument(
-        "--text-workers",
-        type=int,
-        default=32,
-        help="Worker count for parallel text staging",
-    )
     parser.add_argument("--skip-stage", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
-
-    _datasets_root = Path(__file__).resolve().parents[1]
-    if str(_datasets_root) not in sys.path:
-        sys.path.insert(0, str(_datasets_root))
-    from edullm_text_companion import PUBLISH_PROFILE, TEXT_GROUP_META, stage_text_companion
 
     if args.manifest is not None:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -325,91 +283,44 @@ def main() -> int:
     elif not args.stage_dir.is_dir():
         raise SystemExit(f"--skip-stage but stage-dir missing: {args.stage_dir}")
 
-    text_run_dir = args.text_run_dir or args.tokenized_root.parent
-    if not args.skip_text_stage:
-        skip_sources = {
-            source.strip()
-            for source in args.skip_text_sources.split(",")
-            if source.strip()
-        }
-        parallel_sources = {
-            source.strip()
-            for source in args.parallel_text_sources.split(",")
-            if source.strip()
-        }
-        stage_text_companion(
-            sources=sorted(manifest["domains"]),
-            run_dir=text_run_dir,
-            out_root=args.stage_dir,
-            shard_bytes=args.shard_bytes,
-            parallel_sources=parallel_sources,
-            text_workers=args.text_workers,
-            skip_sources=skip_sources,
-        )
-
-    if args.dry_run:
-        print(f"dry-run: staged under {args.stage_dir}", flush=True)
-        return 0
-
-    ensure_edullm_data()
-    from edullm_data.contracts import validate_dataset_id
-    from edullm_data.publish import publish
-    from edullm_data.s3 import Boto3S3
-
-    try:
-        validate_dataset_id(args.dataset_id)
-    except Exception as exc:
-        raise SystemExit(f"invalid dataset_id {args.dataset_id!r}: {exc}") from exc
-
     about = (
         "RegMix-weighted 10B-token dolma2 corpus sampled from OLMo-mix-1124-30b across seven "
         "sources (dclm, arxiv, starcoder, pes2o, open-web-math, algebraic-stack, wiki). "
         "Shards are nested tokens/<source>/ so each mix source is carried in the object key "
-        "as entry.labels.source. Per-source token counts are measured from the published objects."
+        "as entry.labels.source. Per-source token counts are measured from the staged objects."
     )
     notes = (
         f"Validation split: {args.val_fraction:.4%} of each source carved into "
         f"tokens/<source>/val-00000.u32le.bin so val source weights match the full mix "
-        f"(~{args.val_fraction:.2%} of corpus). Companion raw documents under text/<source>/ "
-        f"(text-corpus/v1) retain their complete selected document stream. Legacy path on edullm-datasets: "
-        "regmix/regmix-10b/tokenized/*.npy headerless uint32 memmaps."
+        f"(~{args.val_fraction:.2%} of corpus)."
     )
 
-    created_at = datetime.now(timezone.utc).isoformat()
-    plan = publish(
-        args.stage_dir,
-        dataset_id=args.dataset_id,
-        purpose=args.purpose,
-        profile=PUBLISH_PROFILE,
-        tokenizer=args.tokenizer,
-        group_meta=TEXT_GROUP_META,
-        s3=Boto3S3.default(),
-        created_at=created_at,
-        hash_workers=args.hash_workers,
-        copy_workers=args.copy_workers,
-        about=about,
-        sources=build_sources(manifest),
-        notes=notes,
+    dataset_manifest = {
+        "dataset_id": args.dataset_id,
+        "tokenizer": args.tokenizer,
+        "purpose": args.purpose,
+        "about": about,
+        "notes": notes,
+        "sources": build_sources(manifest),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (args.stage_dir / "dataset_manifest.json").write_text(
+        json.dumps(dataset_manifest, indent=2) + "\n", encoding="utf-8"
     )
     print(
         json.dumps(
             {
-                "dataset_id": plan.dataset_id,
-                "version": plan.version,
-                "payload_objects": len(plan.payload_keys),
-                "source_kind": plan.source_kind,
+                "stage_dir": str(args.stage_dir),
+                "dataset_id": args.dataset_id,
+                "sources": len(dataset_manifest["sources"]),
+                "total_tokens": manifest.get("total_stream_tokens_with_eos"),
             },
             indent=2,
         ),
-        flush=True,
-    )
-    print(
-        f"published to s3://edullm-landing/{plan.dataset_id}/{plan.version}/ "
-        f"(validator will promote to edullm-data)",
         flush=True,
     )
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Plan a RegMix-aligned 10B mix by randomly sampling shards from olmohq S3.
+"""Plan a RegMix-aligned 10B mix by randomly sampling shards from the local olmohq pool.
 
-Lists objects under s3://SRC_BUCKET/SRC_PREFIX/data/, then for each domain
-randomly selects whole shards (byte-proportional token estimates) until the
-estimated tokens reach OVERSHOOT_FACTOR * target. Document-level trim later
-hits the exact budget.
+Lists shards under a local olmohq manifest or data mirror (--source-manifest or
+--local-data-root), then for each domain randomly selects whole shards
+(byte-proportional token estimates) until the estimated tokens reach
+OVERSHOOT_FACTOR * target. Document-level trim later hits the exact budget.
 """
 
 from __future__ import annotations
@@ -14,8 +14,6 @@ import json
 import random
 from collections import defaultdict
 from pathlib import Path
-
-import boto3
 
 # Data Mixing Laws (Ye et al. 2024, arXiv:2403.16952) **Pilot-01** weights, mapped
 # onto the OLMo-mix / OLMoHQ domain names below.
@@ -73,36 +71,6 @@ def domain_for_key(key: str, prefix: str) -> str | None:
     return domain if domain in DOMAIN_TARGETS else None
 
 
-def list_domain_files_s3(
-    s3, bucket: str, prefix: str
-) -> dict[str, list[dict]]:
-    paginator = s3.get_paginator("list_objects_v2")
-    by_domain: dict[str, list[dict]] = defaultdict(list)
-    data_prefix = f"{prefix.rstrip('/')}/data/"
-    for page in paginator.paginate(Bucket=bucket, Prefix=data_prefix):
-        for obj in page.get("Contents", []):
-            key = obj["Key"]
-            if not is_data_object(key):
-                continue
-            domain = domain_for_key(key, prefix.rstrip("/") + "/")
-            if domain is None:
-                domain = domain_for_key(key, prefix)
-            if domain is None:
-                continue
-            rel = key[len(prefix.rstrip("/")) + 1 :]  # e.g. data/arxiv/...
-            by_domain[domain].append(
-                {
-                    "key": key,
-                    "path": rel,
-                    "size": int(obj["Size"]),
-                    "domain": domain,
-                }
-            )
-    for domain in by_domain:
-        by_domain[domain].sort(key=lambda x: x["path"])
-    return by_domain
-
-
 def list_domain_files_manifest(manifest_path: Path, prefix: str) -> dict[str, list[dict]]:
     """Load shard inventory from an existing olmohq-style manifest.jsonl."""
     by_domain: dict[str, list[dict]] = defaultdict(list)
@@ -128,7 +96,7 @@ def list_domain_files_manifest(manifest_path: Path, prefix: str) -> dict[str, li
 
 
 def list_domain_files_local(local_root: Path, prefix: str) -> dict[str, list[dict]]:
-    """List shards from a local mirror of s3://bucket/prefix/ (root contains data/)."""
+    """List shards from a local olmohq run dir (root contains data/)."""
     by_domain: dict[str, list[dict]] = defaultdict(list)
     data_root = local_root / "data"
     if not data_root.is_dir():
@@ -194,9 +162,8 @@ def greedy_random_sample(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--src-bucket", default="edullm-datasets")
-    parser.add_argument("--src-prefix", default="olmo100b/olmo-mix-1124-30b")
-    parser.add_argument("--region", default="us-east-1")
+    parser.add_argument("--src-prefix", default="olmo100b/olmo-mix-1124-30b",
+                         help="label prefix recorded on each selected shard's synthetic 'key'")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--overshoot", type=float, default=OVERSHOOT_FACTOR)
     parser.add_argument("--out-dir", type=Path, required=True)
@@ -204,13 +171,13 @@ def main() -> int:
         "--local-data-root",
         type=Path,
         default=None,
-        help="If set, list shards from this local mirror instead of calling S3",
+        help="List shards from this local olmohq run dir's data/ (mutually exclusive with --source-manifest)",
     )
     parser.add_argument(
         "--source-manifest",
         type=Path,
         default=None,
-        help="If set, use this olmohq manifest.jsonl as the shard inventory (preferred)",
+        help="Use this olmohq manifest.jsonl as the shard inventory (preferred; mutually exclusive with --local-data-root)",
     )
     parser.add_argument(
         "--pool-summary",
@@ -219,6 +186,10 @@ def main() -> int:
         help="Optional local copy of olmohq plan/summary.json for pool token totals",
     )
     args = parser.parse_args()
+    if not args.source_manifest and not args.local_data_root:
+        parser.error("one of --source-manifest or --local-data-root is required")
+    if args.source_manifest and args.local_data_root:
+        parser.error("--source-manifest and --local-data-root are mutually exclusive")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -247,13 +218,9 @@ def main() -> int:
     if args.source_manifest is not None:
         print(f"loading inventory from {args.source_manifest}", flush=True)
         by_domain = list_domain_files_manifest(args.source_manifest, args.src_prefix)
-    elif args.local_data_root is not None:
-        print(f"listing local mirror {args.local_data_root}/data/ ...", flush=True)
-        by_domain = list_domain_files_local(args.local_data_root, args.src_prefix)
     else:
-        s3 = boto3.client("s3", region_name=args.region)
-        print(f"listing s3://{args.src_bucket}/{args.src_prefix}/data/ ...", flush=True)
-        by_domain = list_domain_files_s3(s3, args.src_bucket, args.src_prefix)
+        print(f"listing local run dir {args.local_data_root}/data/ ...", flush=True)
+        by_domain = list_domain_files_local(args.local_data_root, args.src_prefix)
 
     # Fill pool totals from listed bytes if summary missing / zero.
     for domain, files in by_domain.items():
@@ -280,7 +247,7 @@ def main() -> int:
     for domain in DOMAIN_ORDER:
         files = by_domain.get(domain, [])
         if not files:
-            raise SystemExit(f"no S3 objects for domain {domain}")
+            raise SystemExit(f"no shards found for domain {domain}")
         target = DOMAIN_TARGETS[domain]
         sample_target = target * args.overshoot
         chosen = greedy_random_sample(
@@ -324,7 +291,7 @@ def main() -> int:
 
     summary = {
         "kind": "regmix-optimized-10b",
-        "source_bucket": args.src_bucket,
+        "source": str(args.source_manifest or args.local_data_root),
         "source_prefix": args.src_prefix,
         "total_target_tokens": sum(DOMAIN_TARGETS.values()),
         "seed": args.seed,

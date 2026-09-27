@@ -77,8 +77,8 @@
     {"name": "tokens/wiki/val-00000.u32le.bin", "domain": "wiki", "bytes": 516576, "tokens": 129144, "sha256": "e24dba13353f3695103540afc7471f76563354db7a585984a5b45a7fbbec2e2e"}
   ],
   "notes": [
-    "The publish_objects sha256 values were computed directly from the surviving tokenized/<domain>/<domain>.npy files by streaming (never materializing the split), so they are exact regardless of whether the original S3-published copy under s3://edullm-landing/pretrain/refhq-regmix-5p5b/... still exists.",
-    "The original publish-stage log (hq-tok-up-*.out under the build dir) records only the S3 upload, not per-object hashes; no publish-stage hash manifest was found to survive on scratch. These hashes are therefore the first recorded sha256 for the published objects.",
+    "The publish_objects sha256 values were computed directly from the surviving tokenized/<domain>/<domain>.npy files by streaming (never materializing the split), so they are exact regardless of whether the original published copy still exists elsewhere.",
+    "The original publish-stage log (hq-tok-up-*.out under the build dir) records only the upload, not per-object hashes; no publish-stage hash manifest was found to survive on scratch. These hashes are therefore the first recorded sha256 for the published objects.",
     "docs count per domain here is content-document count (writer.finalize() docs), matching tokenized/<domain>/<domain>.json's 'docs' field; it is NOT the number of publish_objects (which are byte shards, not documents)."
   ]
 }

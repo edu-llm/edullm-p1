@@ -2,8 +2,8 @@
 """Trim olmohq top-up inventory so |plan-meas|/meas <= 10%.
 
 Keeps pre-topup shards plus a prefix of topup shards per domain until measured
-lands in [plan/1.1, plan/0.9]. Excess topup objects remain on S3 but are dropped
-from the active manifests. Never touches regmix-10b.
+lands in [plan/1.1, plan/0.9]. Excess topup objects remain on local scratch but
+are dropped from the active manifests. Never touches regmix-10b.
 """
 from __future__ import annotations
 
@@ -32,10 +32,9 @@ def main() -> int:
     ap.add_argument("--run-dir", type=Path, required=True)
     ap.add_argument("--tolerance", type=float, default=0.10)
     args = ap.parse_args()
-    run = args.run_di
+    run = args.run_dir
     pre = json.loads((run / "plan/tokenized_manifest.json").read_text(encoding="utf-8"))
-    # Prefer merged if present (post-upload local); else use current S3 copy already
-    # overwritten — fall back to pre + topup reports.
+    # Prefer the locally merged manifest if present; else fall back to pre + topup reports.
     merged_path = run / "plan/tokenized_manifest_merged.json"
     if merged_path.is_file():
         merged = json.loads(merged_path.read_text(encoding="utf-8"))
@@ -133,7 +132,7 @@ def main() -> int:
     out_tok["topup_trimmed_at"] = report["updated_at"]
     out_tok["topup_note"] = (
         "Active inventory trimmed so |plan-meas|/meas<=10%; excess topup objects "
-        "remain on S3 but are excluded from manifests."
+        "remain on local scratch but are excluded from manifests."
     )
 
     by_domain = {}

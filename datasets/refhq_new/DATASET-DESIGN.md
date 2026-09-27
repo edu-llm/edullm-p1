@@ -3,16 +3,15 @@
 **purpose:** Filtered instruct-sourced CE corpus for OLMo-2 370M reference / rho-1 scoring, tuned toward the 20-label OLMES BPB suite (not IFEval/tools/safety).
 
 **family:** `pretrain`  
-**profile:** `pretrain-tokens/v1` + `vendored/v1` raw companion  
-*(Prefer `text-corpus/v1` when Gate A ships it; until then a `vendor/` raw companion.)*  
+**profile:** `pretrain-tokens/v1` (tokens only; no raw-text companion is staged)  
 **name:** `refhq-instruct` → `pretrain/refhq-instruct`  
-*(Working-store prefix stays `refhq/refhq-new/`; `refhq-new` is invalid as a
-dataset name because `new` is a forbidden version token in edullm-data §2.)*  
+*(The FarmShare scratch layout keeps the `refhq-new` directory name; `refhq-new` was not
+usable as the dataset id itself, since `new` collides with a version-token convention.)*  
 (Sibling of `pretrain/refhq-regmix-5p5b`: same reference role, instruct mix instead of HQ web. No size suffix — realized size is whatever one pass yields.)
 
 **tokenizer:** HF `allenai/dolma2-tokenizer` → publish dep `tokenizer/dolma2-bpe` (EOS 100257). Already published; do not republish.
 
-**budget:** One pass of filtered unique data only. No upsampling, no 5.5B cap. Count tokens during build and report realized size in plan summary + `publish()` `sources[]`.
+**budget:** One pass of filtered unique data only. No upsampling, no 5.5B cap. Count tokens during build and report realized size in plan summary + the local `dataset_manifest.json` `sources[]`.
 
 **dedup:** None (explicit). Keep SmolTalk `openhermes-100k` even though it overlaps full OpenHermes-2.5.
 
@@ -31,8 +30,6 @@ dataset name because `new` is a forbidden version token in edullm-data §2.)*
 
 - **source:** `tulu-v2` \| `openhermes-25` \| `tulu-3` \| `hermes-3` \| `smoltalk` \| `dolci`
 - **domain:** `general` \| `math` \| `code` \| `science` \| `chat` — from row metadata / SmolTalk config; default `general`
-
-Companion text (optional): `text/<source>/<domain>/…` via `stage_text_companion`.
 
 ---
 
@@ -82,10 +79,10 @@ Drop Tulu-3/Dolci Aya via metadata **before** Dolma so those rows never hit lang
 
 ```
 tokens/<source>/<domain>/<split>-NNNNN.u32le.bin
-text/<source>/<domain>/…          # companion via stage_text_companion
 ```
 
-Working / landing: `s3://edullm-datasets/refhq/refhq-new/` → Gate A → `s3://edullm-data/pretrain/refhq-instruct/v1/`.
+Staged locally under `RUN_DIR/publish-stage/` (see `publish_refhq_new.py`); no raw-text
+companion, no remote object store.
 
 ---
 
@@ -102,33 +99,24 @@ Working / landing: `s3://edullm-datasets/refhq/refhq-new/` → Gate A → `s3://
 
 ---
 
-## `publish()` call (target)
+## Local layout split (`publish_refhq_new.py`)
+
+The dataset is not published to a remote object store. `publish_refhq_new.py` builds the
+`tokens/<source>/<domain>/` layout under `--stage-dir` and writes a local
+`dataset_manifest.json` recording `dataset_id`, `purpose`, `about`, `notes`, `license`,
+`limitations`, and measured per-source token counts (`sources[]`):
 
 ```python
-from edullm_data.publish import publish
-from edullm_data.s3 import Boto3S3
-from edullm_text_companion import PUBLISH_PROFILE, TEXT_GROUP_META
-import datetime
-
-publish(
-    stage_dir,
-    dataset_id="pretrain/refhq-instruct",
-    purpose=(
-        "One-pass filtered instruct mix (Tulu-v2/OH-2.5, Tulu-3/Hermes-3, SmolTalk/Dolci) "
-        "for OLMo-2 370M CE reference / rho-1; tool/safety/IF/Aya removed; Dolma English; "
-        "tuned for 20-label OLMES BPB"
-    ),
-    profile=PUBLISH_PROFILE,  # tokens + text
-    tokenizer="tokenizer/dolma2-bpe",
-    s3=Boto3S3.default(),
-    created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    group_meta=TEXT_GROUP_META,
-    about=...,  # TODO after counts
-    sources=[...],  # measured token counts per HF source after filters
-    license={"id": "ODC-By-1.0", "basis": "declared"},
-    notes="No dedup. No upsampling. Realized size is one filtered pass.",
-    limitations=[{"kind": "license", "detail": "Tulu ODC-BY with some NC subsets; research use"}],
+dataset_id = "pretrain/refhq-instruct"
+purpose = (
+    "One-pass filtered instruct mix (Tulu-v2/OH-2.5, Tulu-3/Hermes-3, SmolTalk/Dolci) "
+    "for OLMo-2 370M CE reference / rho-1; tool/safety/IF/Aya removed; Dolma English; "
+    "tuned for 20-label OLMES BPB"
 )
+tokenizer = "tokenizer/dolma2-bpe"
+license = {"id": "ODC-By-1.0", "basis": "declared"}
+notes = "No dedup. No upsampling. Realized size is one filtered pass."
+limitations = [{"kind": "license", "detail": "Tulu ODC-BY with some NC subsets; research use"}]
 ```
 
 **Licensing, as stated in the token selection paper (Appendix A).** The single

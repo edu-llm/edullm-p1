@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plan + download + shard-select finalize + bulk-upload to S3.
+# Plan + download + shard-select finalize into a local staging layout.
 set -Eeuo pipefail
 
 SUNET="${SUNET:-nzhao2}"
@@ -7,8 +7,6 @@ BASE_RUN="${BASE_RUN:-/scratch/users/${SUNET}/agent-runs/olmo-mix-30b-20260722}"
 RUN_NAME="${RUN_NAME:-olmo-mix-upsample-$(date +%Y%m%d-%H%M%S)}"
 RUN_DIR="${RUN_DIR:-/scratch/users/${SUNET}/agent-runs/${RUN_NAME}}"
 CAP_TOKENS="${CAP_TOKENS:-20000000000}"
-BUCKET="${BUCKET:-edullm-datasets}"
-PREFIX="${PREFIX:-olmo100b/olmo-mix-1124-30b}"
 EDULLM_ROOT="${EDULLM_ROOT:-/scratch/users/${SUNET}/agent-runs/edullm-farmshare-staging}"
 DOMAIN_LIST="${DOMAIN_LIST:-starcoder pes2o arxiv open-web-math algebraic-stack wiki}"
 
@@ -21,16 +19,15 @@ if [[ ! -d "${BASE_RUN}/data/data/dclm" ]]; then
 fi
 
 DATASETS_SHARED="${EDULLM_ROOT}/datasets"
-for f in olmo_shard_utils.py download_s3_shard.py trim_olmo_overshoot.py trim_and_tokenize_regmix.py; do
-  cp -a "${DATASETS_SHARED}/${f}" "${RUN_DIR}/scripts/"
-done
-cp -a "${DATASETS_SHARED}/download_s3_shard.sbatch" "${RUN_DIR}/scripts/"
+cp -a "${DATASETS_SHARED}/olmo_shard_utils.py" "${RUN_DIR}/scripts/"
+cp -a "${EDULLM_ROOT}/datasets/olmo/download_olmo_shard.py" "${EDULLM_ROOT}/datasets/olmo/download_olmo_shard.sbatch" "${RUN_DIR}/scripts/"
+cp -a "${EDULLM_ROOT}/datasets/olmohq/plan_olmo_mix_upsample.py" "${EDULLM_ROOT}/datasets/olmohq/finalize_olmo_upsample_upload.py" "${RUN_DIR}/scripts/"
 
 python3 -m venv "${RUN_DIR}/venv"
 # shellcheck disable=SC1091
 source "${RUN_DIR}/venv/bin/activate"
 pip install -U pip wheel
-pip install "huggingface_hub[hf_transfer]" hf_transfer boto3 tqdm transformers zstandard
+pip install "huggingface_hub[hf_transfer]" hf_transfer tqdm transformers zstandard
 
 # Reuse DCLM shards from the prior 30B run (no re-download).
 ln -sfn "${BASE_RUN}/data/data/dclm" "${RUN_DIR}/data/data/dclm"
@@ -67,8 +64,6 @@ MANIFEST=${MANIFEST}
 NON_DCLM_MANIFEST=${NON_DCLM_MANIFEST}
 SUMMARY=${SUMMARY}
 LOCAL_ROOT=${RUN_DIR}/data
-BUCKET=${BUCKET}
-PREFIX=${PREFIX}
 DOMAIN_LIST="${DOMAIN_LIST}"
 EDULLM_ROOT=${EDULLM_ROOT}
 EOF
@@ -106,8 +101,9 @@ FINAL_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --time=12:00:00 \
   ${FINAL_DEP:+--dependency="${FINAL_DEP}"} \
   --chdir="${RUN_DIR}" \
-  --wrap "set -Eeuo pipefail; source ${RUN_DIR}/env.sh; source ${VENV}/bin/activate; export EDULLM_ROOT=${EDULLM_ROOT}; export RUN_DIR=${RUN_DIR}; python ${RUN_DIR}/scripts/finalize_olmo_upsample_upload.py --run-dir ${RUN_DIR} --bucket ${BUCKET} --prefix ${PREFIX}")
-echo "finalize_upload_job_id=${FINAL_JOB}"
+  --wrap "set -Eeuo pipefail; source ${RUN_DIR}/env.sh; source ${VENV}/bin/activate; export EDULLM_ROOT=${EDULLM_ROOT}; export RUN_DIR=${RUN_DIR}; python ${RUN_DIR}/scripts/finalize_olmo_upsample_upload.py --run-dir ${RUN_DIR}")
+echo "finalize_job_id=${FINAL_JOB}"
 
 echo "RUN_DIR=${RUN_DIR}" | tee "${RUN_DIR}/RUN_DIR.txt"
 cat "${SUMMARY}"
+echo "next: SRC_RUN_DIR=${RUN_DIR}/staging bash ../olmo/submit_olmo_pool_tokenize.sh"

@@ -18,8 +18,6 @@ setup_paths()
 from refhq_new.domain_map import DOMAINS, SOURCES  # noqa: E402
 from refhq_new.exclusion import load_exclusion_rules  # noqa: E402
 from refhq_new_sources import (  # noqa: E402
-    DEFAULT_S3_BUCKET,
-    DEFAULT_S3_PREFIX,
     DEFAULT_SCRATCH_ROOT,
     DEFAULT_SEED,
     EOS_TOKEN_ID,
@@ -38,8 +36,6 @@ def main() -> int:
     parser.add_argument("--tokenizer", default=TOKENIZER_ID)
     parser.add_argument("--eos-token-id", type=int, default=EOS_TOKEN_ID)
     parser.add_argument("--holdout-fraction", type=float, default=HOLDOUT_FRACTION)
-    parser.add_argument("--s3-bucket", default=DEFAULT_S3_BUCKET)
-    parser.add_argument("--s3-prefix", default=DEFAULT_S3_PREFIX)
     parser.add_argument(
         "--sources",
         nargs="*",
@@ -86,8 +82,6 @@ def main() -> int:
             "Reserve holdout_fraction of documents per (source, domain) BEFORE tokenize "
             "(seed above). Uniform fraction keeps mix weights."
         ),
-        "s3_bucket": args.s3_bucket,
-        "s3_prefix": args.s3_prefix,
         "domains": list(DOMAINS),
         "splits": list(SPLITS),
         "sources": {},

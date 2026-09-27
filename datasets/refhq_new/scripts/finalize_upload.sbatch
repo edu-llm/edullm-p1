@@ -22,9 +22,6 @@ source "${RUN_DIR}/env.sh" 2>/dev/null || true
 : "${REFHQ_NEW_SCRIPTS:=${RUN_DIR}/datasets/refhq_new/scripts}"
 STAGE_DIR="${STAGE_DIR:-${RUN_DIR}/publish-stage}"
 
-export PATH="${PATH}:${HOME}/.local/bin:${HOME}/tools/aws/bin"
-export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
-
 # shellcheck disable=SC1091
 source "${REFHQ_NEW_SCRIPTS}/lib.sh"
 refhq_new_export_pythonpath "${RUN_DIR}"

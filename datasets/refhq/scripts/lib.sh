@@ -9,8 +9,7 @@ dolma_hq_stage_shared_utils() {
   local shared
   for shared in \
     olmo_shard_utils.py \
-    trim_and_tokenize_regmix.py \
-    download_s3_shard.py; do
+    trim_and_tokenize_regmix.py; do
     if [[ -f "${staging_root}/datasets/${shared}" ]]; then
       cp -a "${staging_root}/datasets/${shared}" "${run_dir}/datasets/"
     fi

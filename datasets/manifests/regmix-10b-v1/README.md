@@ -30,6 +30,8 @@ Tables 3 and 4). We do not redistribute the corpus; this manifest is how to rebu
 
 ## Files in this directory
 
+`build_manifest.py`, the one-off FarmShare script that derived these files from the surviving build artifacts, has been removed (it referenced FarmShare-only paths and is not needed to rebuild); it is kept in git history.
+
 | File | Content |
 |---|---|
 | `sources.json` | The 54 `allenai/olmo-mix-1124` files (repo/revision/path/size/sha256), plus the tokenizer repo+revision+files. |
@@ -37,7 +39,6 @@ Tables 3 and 4). We do not redistribute the corpus; this manifest is how to rebu
 | `outputs.json` | Every trained-on object: name, bytes, sha256, token/doc counts, format (dtype/endianness/EOS id), and the tokenized/publish layout rules. Also carries, per domain, the file materialization order, per-file document counts, and (for 5 domains) the embedded-EOS finding below. |
 | `rebuild.py` | Standalone rebuild + verifier. `python rebuild.py --out DIR --cache DIR [--only NAME]`. |
 | `requirements.txt` | Exact pins for everything `rebuild.py` imports. Python 3.12.3. |
-| `build_manifest.py` | The one-off script run on FarmShare to derive the files above from the surviving build artifacts. Not needed to rebuild; kept for provenance. Also has the `retok` stage used to fix the embedded-EOS finding below. |
 
 ## Selection rule (recorded, not recomputed)
 

@@ -1,15 +1,13 @@
 # refhq-new-v1 document manifest
 
 Corpus id: `refhq-new-v1` — the ~3.9B-token Instruct reference corpus of the
-token-selection paper, published internally as `pretrain/refhq-instruct`
-(profile `pretrain-tokens/v1` + `vendored/v1`; working store
-`s3://edullm-datasets/refhq/refhq-new/`, promoted to
-`s3://edullm-data/pretrain/refhq-instruct/v3/`, both private project stores). The
-Instruct reference model trained on it; its checkpoints scored the RHO-1 arm, and
-BLADE's reference updates also drew from this corpus. We do not redistribute the
-corpus; this manifest is how to rebuild it.
+token-selection paper, published locally as `pretrain/refhq-instruct`
+(profile `pretrain-tokens/v1`, tokens only). The Instruct reference model trained
+on it; its checkpoints scored the RHO-1 arm, and BLADE's reference updates also
+drew from this corpus. We do not redistribute the corpus; this manifest is how to
+rebuild it.
 
-Built by `experiments/token-selection/datasets/refhq_new/scripts/` (see
+Built by `datasets/refhq_new/scripts/` (see
 `DATASET-DESIGN.md` there) and run on FarmShare 2026-08-03/04 under
 `/scratch/users/nzhao2/refhq-new-v1/` (read-only build dir; raw/normalized
 text was deleted after tokenization — only `manifests/*.json`,
@@ -198,6 +196,10 @@ user) — none of the delay was compute time.
 
 ## Files
 
+`build_manifest.py`, the FarmShare script that derived this manifest, has been
+removed (it referenced FarmShare-only paths and is not needed to rebuild); it
+is kept in git history.
+
 | File | Content |
 |---|---|
 | `sources.json` | Every public source file (repo, pinned revision, path, size, sha256) + tokenizer. |
@@ -205,7 +207,6 @@ user) — none of the delay was compute time.
 | `outputs.json` | The 46 trained files: bytes/sha256/doc count/parts (with `doc_start`/`docs` for slicing `documents-<source>.tsv.gz`), plus derived v3 `tokens/.../*.u32le.bin` shard objects. |
 | `rebuild.py` | Standalone rebuild + verify. |
 | `requirements.txt` | Exact pins, Python 3.12.3. |
-| `build_manifest.py` | The FarmShare script that derived this manifest (provenance; not needed to rebuild). |
 | `match_stats.json` | Per-`(source,domain)` matching diagnostics (holdout-seed replay check, unmatched counts, duplicate-match notes). |
 
 ## Manifest recovery method

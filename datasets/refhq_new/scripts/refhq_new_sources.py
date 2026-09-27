@@ -14,8 +14,6 @@ EOS_TOKEN_ID = 100257
 DEFAULT_SEED = 42
 HOLDOUT_FRACTION = 0.0015  # 0.15% of documents per (source, domain)
 DEFAULT_SCRATCH_ROOT = Path("/scratch/users/nzhao2/refhq-new-v1")
-DEFAULT_S3_BUCKET = "edullm-datasets"
-DEFAULT_S3_PREFIX = "refhq/refhq-new"
 # Smaller shards → more Slurm array tasks for English filter + tokenize.
 DOCS_PER_SHARD = 10_000
 SPLITS: tuple[str, ...] = ("train", "val")

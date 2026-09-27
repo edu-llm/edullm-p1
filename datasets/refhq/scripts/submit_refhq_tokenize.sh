@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Upload text corpus (if needed), dolma2-tokenize all domains, upload tokenized/ to S3.
+# Verify the text corpus, dolma2-tokenize all domains, write the local tokenized manifest.
 set -Eeuo pipefail
 
 SUNET="${SUNET:-nzhao2}"
@@ -32,14 +32,14 @@ dolma_hq_export_pythonpath "${RUN_DIR}"
 read -r -a DOMAINS <<< "${DOMAIN_LIST}"
 N=${#DOMAINS[@]}
 
-UPLOAD_JOB=$(sbatch --parsable --exclude=wheat-01 \
+TEXT_CHECK_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --chdir="${RUN_DIR}" \
   --export=ALL,RUN_DIR="${RUN_DIR}",VENV="${VENV}",PLAN="${PLAN}",HQ_SCRIPTS="${HQ_SCRIPTS}" \
   "${HQ_SCRIPTS}/finalize_hq_reference_upload.sbatch")
-echo "text_upload_job=${UPLOAD_JOB}"
+echo "text_check_job=${TEXT_CHECK_JOB}"
 
 TOK_JOB=$(sbatch --parsable --exclude=wheat-01 \
-  --dependency=afterok:${UPLOAD_JOB} \
+  --dependency=afterok:${TEXT_CHECK_JOB} \
   --array=0-$((N - 1)) \
   --chdir="${RUN_DIR}" \
   --export=ALL,RUN_DIR="${RUN_DIR}",VENV="${VENV}",PLAN="${PLAN}",DOMAIN_LIST="${DOMAIN_LIST}",HQ_SCRIPTS="${HQ_SCRIPTS}" \
@@ -51,9 +51,8 @@ TOK_UP_JOB=$(sbatch --parsable --exclude=wheat-01 \
   --chdir="${RUN_DIR}" \
   --export=ALL,RUN_DIR="${RUN_DIR}",VENV="${VENV}",PLAN="${PLAN}",HQ_SCRIPTS="${HQ_SCRIPTS}" \
   "${HQ_SCRIPTS}/finalize_refhq_tokenized_upload.sbatch")
-echo "tokenized_upload_job=${TOK_UP_JOB}"
+echo "tokenized_check_job=${TOK_UP_JOB}"
 
-S3_BUCKET=$(python3 -c "import json; print(json.load(open('${PLAN}'))['s3_bucket'])")
-S3_PREFIX=$(python3 -c "import json; print(json.load(open('${PLAN}'))['s3_prefix'])")
-echo "text s3://${S3_BUCKET}/${S3_PREFIX}/"
-echo "tokenized s3://${S3_BUCKET}/${S3_PREFIX}/tokenized/"
+SCRATCH_ROOT=$(python3 -c "import json; print(json.load(open('${PLAN}'))['scratch_root'])")
+echo "text ${SCRATCH_ROOT}/out/"
+echo "tokenized ${SCRATCH_ROOT}/tokenized/"

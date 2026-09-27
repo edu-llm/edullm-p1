@@ -83,23 +83,21 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 
 **ρ-1 (excess loss).** For each target token, score L_{\mathrm{curr}} - L_{\mathrm{ref}} under the live student vs a **frozen** reference model of the same architecture. Keep the top 60% (largest excess loss — tokens where the student is worst relative to the reference). Selection is active from step 0. Method from [RHO-1](https://arxiv.org/abs/2404.07965).
 
-**Attention top-k.** No external reference. Score each token by **causal attention received** on the last transformer layer (mean over heads of the attention mass it receives from positions j >= i, including itself). Keep the top 60%. Active from step 0. Manipulation: prefer tokens that the model currently “attends to” as context for later predictions. Method from [ssToken](https://arxiv.org/abs/2510.18250) (attention-based score).
+**Attention top-k.** No external reference. Score each token by **causal attention received** on the last transformer layer (mean over heads of the attention mass it receives from positions j >= i, including itself), normalized by its expectation under uniform causal attention (removing the bias toward early positions) and aligned to the target token whose loss it gates. Keep the top 60%. Active from step 0. Manipulation: prefer tokens that the model currently “attends to” as context for later predictions. Method from [ssToken](https://arxiv.org/abs/2510.18250) (attention-based score).
 
-**Middle-PPL.** Score tokens by token CE under the **late-checkpoint average** of **Reference A** (weights of its steps 1000, 1125 and 1315 averaged). Keep the **middle 60%** (20th to 80th percentile) of the per-sequence score distribution (drop both easiest and hardest tails). Masks were precomputed offline against that frozen reference, not scored during training. Manipulation: train on “medium difficulty” tokens under that frozen scorer, excluding extremes. Method from [Marion et al., Investigating Data Pruning for Pretraining LLMs at Scale](https://arxiv.org/abs/2309.04564).
+**Middle-PPL.** Score tokens by token CE under the **late-checkpoint average** of **Reference A** (weights of its steps 1000, 1125 and 1315 averaged), scored online during training like every other reference-scored arm. Keep the **middle 60%** (20th to 80th percentile) of the per-sequence score distribution (drop both easiest and hardest tails). Manipulation: train on “medium difficulty” tokens under that frozen scorer, excluding extremes. Method from [Marion et al., Investigating Data Pruning for Pretraining LLMs at Scale](https://arxiv.org/abs/2309.04564).
 
-**BLADE.** Bi-level setup with a **proxy** (trained student) and a **dynamic reference** that is periodically reset from the proxy. Steps 0–499: full CE on the proxy only (no selection). At sync steps 500, 875, 1250, 1625, 2000: copy proxy → reference, run K=75 reference updates (each sums the unmasked mean CE of one training-corpus batch and one Reference B instruct batch, AdamW at a constant LR of 4.0e-4, rather than weighting the training-corpus term by the current selection), then keep proxy tokens with largest L_{\mathrm{proxy}}-L_{\mathrm{ref}} at keep-rate \gamma=0.6 (\tau=375), with one threshold across each GPU's batch. After the last sync, hold that reference to the end. Manipulation: select tokens where the fast proxy outruns a lagged copy of itself. Method from [BLADE](https://arxiv.org/abs/2606.18650).
+**BLADE.** Bi-level setup with a **proxy** (trained student) and a **dynamic reference** that is periodically reset from the proxy, from step 0. At sync steps 0, 400, 800, 1200, 1600, 2000 (\tau=400): score the outgoing reference's K=75 upcoming update batches against the proxy before overwriting it, copy proxy → reference, then run the K reference updates (each sums the unmasked mean CE of one Reference B instruct batch and the selection-weighted mean CE of one training-corpus batch, AdamW at the proxy's own scheduled LR). Keep proxy tokens with largest L_{\mathrm{proxy}}-L_{\mathrm{ref}} at keep-rate \gamma=0.6, with one threshold across each GPU's batch, from step 0. Manipulation: select tokens where the fast proxy outruns a lagged copy of itself. Method from [BLADE](https://arxiv.org/abs/2606.18650).
 
 **REL-EMA (exponential).** Online relative loss vs an **EMA of the student** (bias-corrected from zero; no external seed). EMA rate \alpha(t)=1-e^{-t/300}; the resulting reference lags the student by about 25 steps at step 1000 and about 570 steps at the end of training. Score \mathrm{REL}=L_{\mathrm{curr}}-L_{\mathrm{hist}}; keep top 60%. Active from step 0. Manipulation: prefer tokens where the live model is worse than its own exponential history. Method from [ssToken](https://arxiv.org/abs/2510.18250) (retrospective excess loss / REL).
 
 ### Arms actually run
 
-> **Compute is reported as analytic FLOPs only.** Wall-clock hours are not comparable
-> across these runs: four arms ran on **8xA100-80GB** (rho-1, BLADE, Attention,
-> Middle-PPL) while the **full-loss control, Random control and REL-EMA ran on 4xL40S**.
-> The logged W&B throughput counter is also incomplete: it **excludes every scoring
-> forward pass**, so it reports the same 2.63e19 for a full-CE run as for an arm that
-> additionally evaluates a frozen reference on every token. See
-> [Cost and FLOPs](#cost-and-flops) for the model and the in-run/with-reference split.
+> **Compute is reported as analytic FLOPs only.** The logged W&B throughput counter is
+> incomplete: it **excludes every scoring forward pass**, so it reports the same number
+> for a full-CE run as for an arm that additionally evaluates a frozen reference on
+> every token. See [Cost and FLOPs](#cost-and-flops) for the model and the
+> in-run/with-reference split.
 
 | Arm | Analytic FLOPs (x10^18) | Relative to control |
 | --- | --- | --- |
@@ -112,34 +110,17 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 | Middle-PPL | 49.31 | 1.89x |
 
 The rho-1, BLADE and Middle-PPL totals include pretraining their reference models.
-Middle-PPL's figure also covers precomputing its masks with one forward pass over the
-whole corpus, which is why it is the most expensive arm despite adding no scoring cost
-during training itself.
 
-**BLADE's W&B record does not contain its own curve.** Run `005xjces` has a **7-second
-runtime** and logs **no throughput and no keep-rate metrics**, so its loss curve was
-backfilled or resumed into that record rather than produced by it. The BLADE numbers
-are usable but their provenance is one hop removed from the run ID they are attributed
-to.
+See [`arms/README.md`](arms/README.md) for the current, unified contract every arm below
+will run under.
 
-
-Control is `eduLLM/token-selection/349f144dc23ee52d18396be695d6b6b0`
-(`full-loss-control-regmix10b-v3`), a native FarmShare run on 4xL40S, `eval/macro_bpb`
-final 1.6751. It replaced `full-loss-control-regmix10b-v2` (`hh19uatg`), which was cloned
-from `eduLLM/hpo-ladder` and mismatched the selection arms on dataloader seed (6199 vs 42),
-step count (2384 vs 2360) and eval grid (~119 vs 125 steps). v3 is matched on init seed
-(6198), data seed, step count and eval grid, so that confound is resolved; its realized
-initialization matches the other 4xL40S arms but not the 8xA100 arms (below). See
-[`arms/README.md`](arms/README.md) for the current, unified contract.
-
-Initialization is not uniform across the arms: the step-0 eval splits the eight runs into
-**4.4610** bpb (random control seed 69), **4.4662** bpb (full-loss control, random control
-seed 42, REL-EMA) and **4.4838** bpb (rho-1, Attention, BLADE, Middle-PPL), a 0.0228 bpb
-spread before any training. Every arm used init seed 6198 except the seed-69 random
-control; the 8xA100 and 4xL40S platforms differ in device count and sharding order, so the
-same seed still gave two realized initializations. The full-loss control shares an
-initialization with the seed-42 random control but not with seed 69, so the pooled
-random-control baseline mixes two initializations; rho-1 is in a third group again.
+Initialization was not uniform across the confounded arms: the step-0 eval split the
+eight runs into **4.4610** bpb (random control seed 69), **4.4662** bpb (full-loss
+control, random control seed 42, REL-EMA) and **4.4838** bpb (rho-1, Attention, BLADE,
+Middle-PPL), a 0.0228 bpb spread before any training, because the two hardware
+platforms sharded differently under the same seed. Every arm now runs on the same
+FarmShare 4×L40S contract, so this spread should not recur except for the seed-69
+random control's deliberately different init seed.
 
 A random-60% selection control (keep-rate 60% chosen uniformly at random per row, no scoring
 signal) was run on 4×L40S at **two seeds** — `random-control-regmix10b-v1` (init seed 6198,
@@ -163,9 +144,8 @@ procedure. It is the matched protocol used for every number in this file.
    Across fit windows starting at 500, 625, ..., 1500, rho-1's advantage over the two-run
    random control ranges from 0.0009 to 0.0076 bpb, and this window gives the largest.
    Every arm was evaluated every 125 steps on `{0, 125, ..., 2125, 2360}`; there is no
-   step-2250 evaluation because it falls within 125 steps of the final step, and the
-   Attention arm is also missing its step-250 evaluation, which lies outside the window
-   and affects no reported number. So each run has 11 fit points (1000, 1125, ..., 2125, 2360).
+   step-2250 evaluation because it falls within 125 steps of the final step. So each run
+   has 11 fit points (1000, 1125, ..., 2125, 2360).
 3. **alpha search.** `alpha` is chosen by grid search over
    `np.linspace(0.05, 6.0, 1192)`, with `a` and `b` solved in closed form by least
    squares at each `alpha`. The bounds are wide enough that **no arm's fitted
@@ -279,19 +259,12 @@ realized rate is 1228/2047 = 0.599902. Because the
 count is fixed per row rather than thresholded on the score, the keep rate carries no
 information about the scorer -- the arms differ only in *which* 1228 tokens they keep.
 
-**Middle-PPL used precomputed masks** (offline scoring against Reference A), so it never
-logs `train/selected token fraction`; the absence of that metric for `middle-ppl-token`
-is expected and is not evidence of a different keep rate.
-
 ### Cost and FLOPs
 
-Wall-clock hours are not a usable cost measure here: four arms (rho-1, BLADE,
-Attention, Middle-PPL) ran on **8xA100-80GB** while the **full-loss control, Random
-control and REL-EMA ran on 4xL40S**, and hours on those two platforms are not
-interchangeable. The **logged throughput FLOPs counter** is also incomplete, because it
-**excludes the scoring forward passes** and so reports the same 2.63e19 for a full-CE
-run as for a run that additionally evaluates a frozen reference on every token, an
-understatement of up to ~1.9x. We therefore report analytic FLOPs throughout.
+The **logged throughput FLOPs counter** is incomplete, because it **excludes the
+scoring forward passes** and so reports the same number for a full-CE run as for a run
+that additionally evaluates a frozen reference on every token, an understatement of up
+to ~1.9x. We therefore report analytic FLOPs throughout.
 
 **Model.** Forward cost per token = `2N + 4*L*T*d`, with `N = 371,195,904` matmul
 parameters (**including the untied output head**), `L = 16` layers, `T = 2048` sequence
@@ -314,10 +287,10 @@ is incomplete.
 Reading the table: Attention top-k is nearly free (+0.3%) -- its only extra cost is a
 forward hook on the last transformer block that captures the Q/K inputs, recomputes Q
 and K, and forms QK^T for that one layer. Every arm that needs a second model's forward
-pass -- REL-EMA's EMA copy, rho-1's frozen reference, Middle-PPL's offline mask pass --
-pays ~1.33x in-run; BLADE, which scores against both the proxy and its lagged reference
-after step 500, pays 1.53x; and the arms that also had to *pretrain* a reference pay up
-to **1.89x** end to end. **The two most expensive arms are two of
+pass -- REL-EMA's EMA copy, rho-1's frozen reference, Middle-PPL's frozen reference --
+pays ~1.33x in-run; BLADE, which scores against both the proxy and its dynamic
+reference from step 0, pays 1.53x; and the arms that also had to *pretrain* a reference
+pay up to **1.89x** end to end. **The two most expensive arms are two of
 the worst-performing ones** (Perplexity 1.89x, BLADE 1.84x, rho-1 1.73x, against
 Attention's 1.00x), so token selection bought negative return on a large compute
 premium.

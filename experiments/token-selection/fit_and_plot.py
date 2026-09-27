@@ -14,7 +14,7 @@ which tokens contribute to the loss:
   * RHO-1              -- reference-model excess loss
   * Attention          -- last-block attention top-k
   * BLADE              -- dynamic-reference excess loss
-  * Perplexity         -- offline middle-perplexity band
+  * Perplexity         -- middle-perplexity band
   * REL-EMA            -- self-reference EMA excess loss
 
 The metric is held-out macro bits-per-byte (``eval/macro_bpb``), lower better.
@@ -128,6 +128,11 @@ ALPHA_GRID = np.linspace(0.05, 6.0, 1192)
 ALPHA_FREE = True
 
 WANDB_PROJECT = "eduLLM/token-selection"
+# STALE: these are the confounded pre-unification runs (rho_1, attention, blade and
+# middle_ppl ran on RunPod 8xA100, on a different code path than the other three; see
+# ../../experiments/token-selection/README.md and arms/README.md). Repoint every key at
+# its rerun's W&B id once the unified-commit runs finish -- random_control,
+# random_control_seed69 and rel_ema are kept and do not change.
 WANDB_RUNS = {
     "control": "349f144dc23ee52d18396be695d6b6b0",
     "rho_1": "ebf1fa33048b3459f768cd471c2a8917",

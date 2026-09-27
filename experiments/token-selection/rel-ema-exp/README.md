@@ -9,8 +9,9 @@ which ran on 4xL40S.
 
 | Knob | Value |
 |------|--------|
-| EMA | Bias-corrected from **zero** (no RefHQ / θ₀ seed) |
+| EMA | Reference starts from the randomly initialized model; its weights are an EMA of the student's, bias-corrected from **zero** (`shadow_0 = correction_0 = 0`, reference = `shadow_t / correction_t`; no RefHQ / θ₀ seed) |
 | α schedule | `α(t) = 1 − exp(−t/300)` (`tau=300`) |
+| Reference lag | ~25 steps behind the student at step 1000, ~570 steps at the end of training |
 | `t0` | **0** (selection from step 0) |
 | `k` / γ | 0.6 |
 | Arch | `olmo2_370M` (RefHQ-matched) |
@@ -23,8 +24,7 @@ which ran on 4xL40S.
 **Ephemeral scratch:** set `RUN_DIR` empty; stage edullm-data each job; durable
 export via the shared spine.
 
-Only the EMA seed mode and α schedule
-should differ. Shared package: [`../token_selection/`](../token_selection/).
+Shared package: [`../token_selection/`](../token_selection/).
 Config: [`configs/run_rel_ema_exp_10b.yaml`](configs/run_rel_ema_exp_10b.yaml).
 
 ## α schedule API

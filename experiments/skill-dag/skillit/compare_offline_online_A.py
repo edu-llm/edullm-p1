@@ -8,10 +8,12 @@ not give the same matrix:
 
   * ``r_DML``  -- the Data Mixing Laws paper mixture (``mix01``). This is the
     reference the *offline* probe matrix is built against
-    (``A_ij = max(0, L_j(r_DML) - L_j(i))``), so it is the like-for-like point
-    for comparing the two constructions. The published Figure IV plots this one.
+    (``A_ij = max(0, L_j(r_DML) - L_j(i))``, with ``L_j(r_DML)`` the MixLaw fit's
+    prediction at that mixture), so it is the like-for-like point for comparing
+    the two constructions.
   * ``LGB-min1pct`` -- the LightGBM-optimized mixture the derivative arm actually
-    starts from, i.e. the matrix used at its first update (step 500).
+    starts from, i.e. the matrix used at its first update (step 500). The
+    paper's Figure IV and its Pearson r = 0.07 use this one.
 
 Evaluated at ``r_DML`` the online matrix is roughly twice the magnitude it has at
 ``LGB-min1pct`` (e.g. dclm -> arc_challenge 0.154 vs 0.065), and its Pearson
@@ -61,8 +63,8 @@ def main() -> None:
     A_off = np.load(Path(__file__).parent / "artifacts/probes_full/A_offline.npy")
 
     points = {
-        "ONLINE @ r_DML (mix01; the point Figure IV plots)": regmix_weight_vector(DOMAINS),
-        "ONLINE @ LGB-min1pct (the arm's own starting mixture)": np.array(
+        "ONLINE @ r_DML (mix01; like-for-like with the probe reference)": regmix_weight_vector(DOMAINS),
+        "ONLINE @ LGB-min1pct (the arm's own starting mixture; the point Figure IV plots)": np.array(
             [LGB_MIN1PCT[d] for d in DOMAINS], dtype=np.float64
         ),
     }

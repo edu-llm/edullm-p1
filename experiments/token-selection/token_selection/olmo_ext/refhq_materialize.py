@@ -33,7 +33,7 @@ def default_ref_cache() -> Path:
     env = (os.environ.get("TOKEN_SELECTION_REF_CACHE") or "").strip()
     if env:
         return Path(env).expanduser().resolve()
-    # Shared across arms so rho-1 and rel-ema-refhq reuse step1315.
+    # Shared across arms so every arm reuses one materialized copy of each reference.
     root = Path(__file__).resolve().parents[2]  # experiments/token-selection
     return (root / ".cache" / "refhq").resolve()
 

@@ -4,9 +4,10 @@ Corpus id: `refhq-new-v1` — the ~3.9B-token Instruct reference corpus of the
 token-selection paper, published internally as `pretrain/refhq-instruct`
 (profile `pretrain-tokens/v1` + `vendored/v1`; working store
 `s3://edullm-datasets/refhq/refhq-new/`, promoted to
-`s3://edullm-data/pretrain/refhq-instruct/v3/`). The Instruct reference model
-trained on it; its checkpoints scored the RHO-1 arm, and BLADE's reference
-updates also drew from this corpus.
+`s3://edullm-data/pretrain/refhq-instruct/v3/`, both private project stores). The
+Instruct reference model trained on it; its checkpoints scored the RHO-1 arm, and
+BLADE's reference updates also drew from this corpus. We do not redistribute the
+corpus; this manifest is how to rebuild it.
 
 Built by `experiments/token-selection/datasets/refhq_new/scripts/` (see
 `DATASET-DESIGN.md` there) and run on FarmShare 2026-08-03/04 under
@@ -35,6 +36,17 @@ Total 3,948,804,069 stream tokens (with EOS), matching
 `manifests/tokenized_manifest.json`'s `total_stream_tokens_with_eos` on the
 build dir. Tokenizer: `allenai/dolma2-tokenizer` @
 `5292e5d6c0f40b67cc765fe41bec991cf4345b5c`.
+
+The paper's Table 6 reports train-split content tokens (EOS excluded): SmolTalk 1.607B,
+Dolci 0.901B, Tulu-3 0.537B, OpenHermes-2.5 0.342B, Hermes-3 0.342B, Tulu-v2 0.208B
+(3.937B in total), i.e. the sum of `ntok` over the `split == train` rows of each
+`documents-<source>.tsv.gz`.
+
+Each source keeps its own license (paper Appendix A): Tulu-v2, Tulu-3 and
+Dolci-Instruct-SFT are ODC-By v1.0; Hermes-3 is Apache-2.0; SmolTalk has no dataset-level
+license (its author-created subsets are Apache-2.0); OpenHermes-2.5 declares no license
+(research use only). Non-commercial subsets: GPT4-Alpaca and Code-Alpaca (CC-BY-NC-4.0)
+and LIMA (CC-BY-NC-SA) within Tulu-v2, and No Robots (CC-BY-NC-4.0) within Tulu-3.
 
 46 trained-on files: `tokenized/<source>/<domain>/{train,val}.npy`, headerless
 little-endian `uint32` token-id streams, EOS(100257) after every document, no

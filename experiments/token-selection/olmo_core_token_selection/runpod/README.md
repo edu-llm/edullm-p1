@@ -1,6 +1,7 @@
 # Token selection on RunPod (8 × A100)
 
-This additive adapter supports the six approved token-selection arms. It stages
+This additive adapter supports the arms in `token_selection_370m/arms.py`; the reported
+RunPod runs are RHO-1, Attention, Perplexity (`middle-ppl-token`) and BLADE. It stages
 the selected sealed corpus and, when required, RefHQ inputs before training.
 Frozen RefHQ DistCP checkpoints are materialized locally; the late reference
 uses the source methodology's float32 accumulation over steps 1000, 1125, and
@@ -38,10 +39,12 @@ PYTHONPATH="$PWD/src:$PWD/.edullm" python3 .edullm/runpod/stage_inputs.py \
 
 For BLADE, also pass `--refhq-version v3`; this binds the HQ/reference-update
 stream to `pretrain/refhq-instruct/v3`. Reference-checkpoint-dependent arms
-automatically download only the required prefixes beneath:
+automatically download only the required prefixes beneath (the RefHQ steps 1000, 1125
+and 1315 for `middle-ppl-token`; the Instruct-v3 step 940 for `rho-1`):
 
 ```text
 s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-5p5b/checkpoints/
+s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/
 ```
 
 The staging process also reads the selected sealed corpus under
@@ -71,11 +74,6 @@ python3 .edullm/runpod/stage_inputs.py \
   --arm blade --dataset-version v1 --refhq-version v3
 ARM=blade RECOVERY_MODE=fresh bash .edullm/runpod/launch.sh
 ```
-
-`ARM=rel-ema-refhq` uses the same training path and constants as
-`ARM=rel-ema-exp`; only the documented EMA seed and alpha differ. The seed is the
-Instruct-v3 step-940 checkpoint at
-`s3://edullm-checkpoints/olmo-370m/edullm-370M-refhq-instruct-v3/checkpoints/step940/`.
 
 For `ARM=middle-ppl-token`, the launcher first makes a resumable, reference-bound
 boolean mask cache with all eight GPUs. Training then uses OLMo's standard

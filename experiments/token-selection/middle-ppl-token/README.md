@@ -2,24 +2,28 @@
 
 > **Launch sections below are historical.** The scripts they name were removed with the superseded in-repo trainer, which produced none of the reported runs. The code and launch path behind the reported numbers are in `../olmo_core_token_selection/` (`farmshare/` and `runpod/`); see `../olmo_core_token_selection/PROVENANCE.md`.
 
-Keep the **middle 60%** of valid tokens per sequence by **frozen RefHQ late-avg**
-token CE (`L_ref` ≈ log-PPL). Drop the easiest and hardest `(1−k)/2` each.
+Keep the **middle 60%** (20th to 80th percentile) of valid tokens per sequence by
+token CE (`L_ref` ≈ log-PPL, rank-equivalent to perplexity) under the **frozen RefHQ
+late average**. Drop the easiest and hardest `(1−k)/2` each.
 Per Marion et al. ([2309.04564](https://arxiv.org/pdf/2309.04564)), perplexity
 ranking uses a **separate reference model**, not the training model.
 
-Scorer lives in the shared package (`middle_ppl`); this directory owns the run
-config, launch scripts, and artifacts.
+The reported run's masks were **precomputed offline** against that frozen reference
+(`../olmo_core_token_selection/runpod/precompute_middle_ppl_masks.py`) rather than scored
+during training; the rule itself is `middle_ppl` in
+`../olmo_core_token_selection/token_selection_370m/selection.py`. This directory owns the
+run config and documentation.
 
 | Knob | Value |
 |------|-------|
 | Method | `middle_ppl` |
-| Reference | RefHQ avg(steps 1000, 1125, 1315) |
+| Reference | RefHQ weight average of steps 1000, 1125 and 1315 (1315 is the HQ reference run's final step) |
 | Keep rate `k` | 0.6 |
 | Masking warmup | `t0_steps=0` (selection from step 0) |
 | Arch | `olmo2_370M` (RefHQ-matched) |
 | Corpus | `pretrain/regmix-10b` v1 on `s3://edullm-data/` — realized **10,004,807,041** tokens — **2360** steps (`9900000000 // GBS`) = 9,898,557,440 tokens, 98.94% of one epoch, no wrap (the offline mask precompute scores the whole corpus) |
 | Permanent ckpts | `{0, 125, …, 2125, 2360}` (skip 2250) |
-| `run_id` | `middle-ppl-token-10b-v2` |
+| `run_id` | `middle-ppl-token-10b-v2` (reported run: W&B `eduLLM/token-selection/2bbd4ec49b531d37115a44f73a0512e2`, 8xA100) |
 | Task loss | full 20-label RC 5-shot `task_loss_bpb` on every permanent ckpt |
 | Artifact durability | Runtime scratch + W&B |
 

@@ -41,7 +41,7 @@ def source_specs(rules: dict[str, Any] | None = None) -> dict[str, dict[str, Any
             "repo_type": "dataset",
             "split": "train",
             "multi_config": source == "smoltalk",
-            "gated": source in {"hermes-3"},  # Hermes often needs HF auth
+            "gated": source in {"hermes-3"},  # stale: Hermes-3 downloads without auth
         }
     return specs
 

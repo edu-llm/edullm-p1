@@ -1,8 +1,8 @@
 # Provenance of this directory
 
 This is the code that actually produced the two Skill-It 370M runs reported in
-the paper. It is a **copy**, vendored here so that the paper's "all code is
-available" claim is true from this repository alone.
+the paper. It is a **copy**, vendored here so that the code behind the paper's
+dynamic-reweighting results is available from this repository alone.
 
 ## Where it came from
 

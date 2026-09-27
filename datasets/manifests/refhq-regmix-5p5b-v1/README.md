@@ -2,10 +2,14 @@
 
 The 5.5B-token HQ (quality-filtered) reference corpus for the token-selection paper's
 Perplexity arm: the HQ reference model was trained on it, and its checkpoints scored that
-arm. It mixes seven domains -- dclm, arxiv, starcoder, pes2o, open-web-math,
-algebraic-stack, wiki -- each independently sampled/filtered from a public Hugging Face
-source, tokenized with `allenai/dolma2-tokenizer`, and published as 24 train + 7 val
-objects (one EOS token, id 100257, appended after every document's content tokens).
+arm. It mixes the training corpus's seven domains -- dclm, arxiv, starcoder, pes2o,
+open-web-math, algebraic-stack, wiki -- each independently sampled/filtered from a public
+Hugging Face source, tokenized with `allenai/dolma2-tokenizer`, and published internally as
+24 train + 7 val objects (one EOS token, id 100257, appended after every document's content
+tokens). Only arxiv comes from `allenai/olmo-mix-1124`; the other six domains come from their
+original public releases (`sources.json`), each under its own terms: StarCoderData is gated
+under The Stack's terms of use, and Wikipedia is CC-BY-SA 3.0 and GFDL. We do not
+redistribute the corpus; this manifest is how to rebuild it.
 
 This directory is a **document-level manifest**: for every document that ended up in the
 trained-on token files, it records exactly which public-HF row it came from (or, for dclm,
@@ -176,9 +180,9 @@ default. See the Verification table for the sampled byte-equality check.
 
 ## Rebuilding
 
-StarCoder comes from `bigcode/starcoderdata`, which is gated. Before rebuilding it, accept the
-dataset's terms on its Hugging Face page, then make a read token available to the script:
-set `HF_TOKEN`, run `huggingface-cli login`, or pass `--hf-token`. The other six domains
+StarCoder comes from `bigcode/starcoderdata`, which is gated under The Stack's terms of use.
+Before rebuilding it, accept the dataset's terms on its Hugging Face page, then make a read
+token available to the script: set `HF_TOKEN`, run `huggingface-cli login`, or pass `--hf-token`. The other six domains
 download anonymously.
 
 ```

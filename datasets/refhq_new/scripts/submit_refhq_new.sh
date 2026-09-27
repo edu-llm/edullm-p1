@@ -48,7 +48,8 @@ fi
 refhq_new_export_pythonpath "${RUN_DIR}"
 REFHQ_NEW_SCRIPTS="${RUN_DIR}/datasets/refhq_new/scripts"
 
-# Prefer copying HF token before any download array starts (Hermes-3 is gated).
+# Prefer copying HF token before any download array starts (plan.json marks Hermes-3
+# gated, so download_hf_source.py wants a token; the repo itself is not gated).
 if [[ ! -f "${RUN_DIR}/.hf_token" ]]; then
   for cand in "${HF_TOKEN_SRC}" \
     "/scratch/users/${SUNET}/hq-reference-v1/.hf_token" \

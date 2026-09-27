@@ -4,13 +4,13 @@
 Reproduces Tables II and III of the paper from the committed curve file
 ``skill_dag_370m_wandb_curves.json``. No network or W&B access required.
 
-Table III compares the two dynamic-reweighting (Skill-It) arms with two runs of
-the static 1%-floor LightGBM mixture they start from: the original 8xA100 run
-(``lightgbm``) and a 4xL40S rerun with dynamic reweighting disabled
-(``lightgbm-l40s``). The rerun shares the dynamic arms' hardware,
-initialization, data seed and training code; the 8xA100 run does not. Both
-dynamic arms are tested against both static runs, and the two static runs
-against each other, which measures run-to-run variation at a fixed mixture.
+Every arm is a static or dynamic 370M run on FarmShare 4xL40S with the
+vendored Skill-It trainer: the discarded 8xA100 campaign and the mismatched-
+trainer seed-12345 control no longer appear anywhere in this file or the
+curve JSON it reads. Table III compares the two dynamic-reweighting
+(Skill-It) arms against the single static 1%-floor LightGBM mixture
+(``lightgbm-l40s``) they start from and share hardware, initialization, data
+seed and training code with.
 
 Method
 ------
@@ -38,17 +38,25 @@ be independent. Drawing every arm's resample indices from one seeded generator
 silently couples them and distorts every between-arm interval -- here it made
 the derivative arm's bootstrap draws correlate +0.91 with the control's and the
 probe arm's -0.43, shrinking one difference interval and inflating the other.
-``SeedSequence.spawn`` children are indexed by position, so a run appended at
-the end of the curve file's ``runs`` (as ``lightgbm-l40s`` was) leaves every
-earlier arm's stream, and every earlier number, unchanged.
 
-The Olmo-mix-1124 control is the *average of the two dataloader seeds*: its
+Each run's stream index is fixed explicitly by its ``bootstrap_stream`` field
+in the curve JSON (``SeedSequence(seed).spawn(bootstrap_stream_count)[index]``),
+not by its position in the file or in ``VS_CONTROL``/``VS_STATIC`` below. That
+is what let the discarded 8xA100 LightGBM arm's stream (index 4) retire
+unused, and the four new all-L40S arms take fresh indices, while probe,
+derivative and lightgbm-l40s keep the exact stream indices (5, 6, 7) they held
+in the discarded 8-arm file -- so their own fitted-final CIs are bit-identical
+to every previously reported number; only their comparisons against the new
+control change.
+
+The Olmo-mix-1124 control is the *average of the two data seeds*: its
 bootstrap distribution is the element-by-element mean of the two seeds' own
 alpha-free bootstrap distributions, and its CI is the 2.5/97.5 percentiles of
-that averaged distribution. The two control runs differ in dataloader seed,
-hardware (8xA100 vs 4xL40S, which also changed the realized initialization)
-and training code, so their difference (``seed_variance_estimate``) is not a
-pure data-order contrast.
+that averaged distribution. The two control runs share hardware, initialization
+and training code, and differ only in data seed -- though even matched runs on
+this stack are not bit-reproducible (see the skillit README's run-to-run note),
+so their difference (``seed_variance_estimate``) still carries some run-to-run
+noise beyond pure data order.
 
 p-values are two-sided bootstrap tests on the difference of two independent
 distributions, ``p = 2 * min(P(diff <= 0), P(diff >= 0))``, floored at the
@@ -78,20 +86,16 @@ MIN_STEP = 1000
 VS_CONTROL = [
     "data-mixing-laws-paper",
     "mixlaw-fit",
-    "lightgbm",
     "skillit-probe",
     "skillit-derivative",
     "lightgbm-l40s",
 ]
 
-# (arm, reference) pairs reported as arm - reference: both dynamic arms against
-# both static LightGBM runs, then the two static runs against each other.
+# (arm, reference) pairs reported as arm - reference: both dynamic arms
+# against the single static LightGBM mixture they start from.
 VS_STATIC = [
-    ("skillit-probe", "lightgbm"),
-    ("skillit-derivative", "lightgbm"),
     ("skillit-probe", "lightgbm-l40s"),
     ("skillit-derivative", "lightgbm-l40s"),
-    ("lightgbm-l40s", "lightgbm"),
 ]
 
 
@@ -184,11 +188,15 @@ def main() -> None:
     final_step = int(data["final_step"])
     runs = data["runs"]
 
-    # One independent stream per arm -- see the module docstring.
-    streams = np.random.SeedSequence(args.seed).spawn(len(runs))
+    # One independent stream per arm, indexed by each run's own
+    # bootstrap_stream field rather than by position -- see the module
+    # docstring for why.
+    stream_count = int(data.get("bootstrap_stream_count", len(runs)))
+    streams = np.random.SeedSequence(args.seed).spawn(stream_count)
 
     fitted, finals, observed = {}, {}, {}
-    for (key, run), stream in zip(runs.items(), streams):
+    for key, run in runs.items():
+        stream = streams[run["bootstrap_stream"]]
         f, dist = fit_and_bootstrap(
             run["steps"], run["macro_bpb"],
             final_step=final_step, n_boot=args.n_boot, seed=stream,
@@ -197,7 +205,7 @@ def main() -> None:
         observed[key] = float(run["macro_bpb"][-1])
 
     # Control = element-by-element average of the two seeds' bootstrap draws.
-    s1, s2 = "olmo-mix-1124-seed6198", "olmo-mix-1124-seed12345"
+    s1, s2 = "olmo-mix-1124-s42", "olmo-mix-1124-s69"
     finals["olmo-mix-1124-average"] = 0.5 * (finals[s1] + finals[s2])
     fitted["olmo-mix-1124-average"] = 0.5 * (fitted[s1] + fitted[s2])
     observed["olmo-mix-1124-average"] = 0.5 * (observed[s1] + observed[s2])
@@ -241,9 +249,7 @@ def main() -> None:
         }
         print(f"{key:28s} vs olmo avg: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
-    # Dynamic arms against the static LightGBM mixture they start from, both the
-    # 8xA100 run and the matched 4xL40S rerun, and the two static runs against
-    # each other (run-to-run variation at a fixed mixture).
+    # Dynamic arms against the static LightGBM mixture they start from.
     print()
     for key, ref in VS_STATIC:
         d = finals[key] - finals[ref]
@@ -262,14 +268,16 @@ def main() -> None:
     p = diff_p(finals[s1], finals[s2])
     lo, hi = ci(d)
     out["seed_variance_estimate"] = {
-        "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (the two controls "
-                       "differ in dataloader seed, hardware and training code)",
+        "description": "Olmo-mix-1124 data seed 42 minus data seed 69 (same hardware, "
+                       "initialization and training code; not a pure data-order "
+                       "contrast, since matched runs on this stack are not "
+                       "bit-reproducible)",
         "mean_diff_bpb": round(float(d.mean()), 6),
         "ci95": [round(lo, 6), round(hi, 6)],
         "p_value": p,
         "p_display": fmt_p(p, args.n_boot),
     }
-    print(f"\nseed variance (12536 - 12345): {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
+    print(f"\nseed variance (42 - 69): {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
     args.out.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
     print(f"\nwrote {args.out}")

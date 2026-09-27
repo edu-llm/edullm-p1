@@ -76,34 +76,44 @@ assert len(ALL_LABELS) == 20 and len(set(ALL_LABELS)) == 20
 
 HISTORY_KEYS = ["_step", "eval/macro_bpb"] + [f"eval/bpb/{label}" for label in ALL_LABELS]
 
-# key -> (wandb_project, id_or_None, display_name_or_None). Exactly one of
-# id/display_name is set; display_name is resolved to a run at pull time.
+# key -> (wandb_project, id_or_None, display_name_or_None, label, bootstrap_stream).
+# Exactly one of id/display_name is set; display_name is resolved to a run at
+# pull time. ``bootstrap_stream`` is the fixed index into
+# ``SeedSequence(seed).spawn(N)`` that fit_and_bootstrap_370m.py draws this
+# arm's resample stream from -- NOT the arm's position in this dict. The three
+# already-reported arms (probe, derivative, lightgbm-l40s) keep the stream
+# indices (5, 6, 7) they held in the discarded 8-arm curve file, so their own
+# fitted-final CIs stay bit-identical; only their comparisons against the new
+# control change. Index 4, the discarded 8xA100 LightGBM run's old stream, is
+# deliberately left unused rather than reassigned. The four new arms, which
+# have no prior reported numbers to preserve, take indices 0-3.
 RUNS = {
-    "skillit-probe": ("skillit", "87ad0201c4b5781a3df50d7bb394776c", None,
-                       "Skill-It offline probe"),
-    "skillit-derivative": ("skillit", "c0844ce36f24d6773c7f45cb31d810f4", None,
-                            "Skill-It online derivative"),
-    "lightgbm-l40s": ("mixlaw-new", "zgmte13g", None,
-                       "LightGBM fit (ours), 4x L40S rerun"),
     "olmo-mix-1124-s42": ("mixlaw-new", None, "static-olmo-mix-1124-s42-farmshare-1745704",
-                           "Olmo-mix-1124 control, data seed 42"),
+                           "Olmo-mix-1124 control, data seed 42", 0),
     "olmo-mix-1124-s69": ("mixlaw-new", None, "static-olmo-mix-1124-s69-farmshare-1745710",
-                           "Olmo-mix-1124 control, data seed 69"),
+                           "Olmo-mix-1124 control, data seed 69", 1),
     "data-mixing-laws-paper": ("mixlaw-new", None, "static-mix01-s42-farmshare-1745708",
-                                "Data Mixing Laws paper mixture"),
+                                "Data Mixing Laws paper mixture", 2),
     "mixlaw-fit": ("mixlaw-new", None, "static-ml-min1pct-s42-farmshare-1745706",
-                    "MixLaw fit (ours), 1%-floor optimum"),
+                    "MixLaw fit (ours), 1%-floor optimum", 3),
+    "skillit-probe": ("skillit", "87ad0201c4b5781a3df50d7bb394776c", None,
+                       "Skill-It offline probe", 5),
+    "skillit-derivative": ("skillit", "c0844ce36f24d6773c7f45cb31d810f4", None,
+                            "Skill-It online derivative", 6),
+    "lightgbm-l40s": ("mixlaw-new", "zgmte13g", None,
+                       "LightGBM fit (ours), 4x L40S rerun", 7),
 }
-# Order fixes each arm's alpha-free bootstrap stream in fit_and_bootstrap_370m.py
-# (SeedSequence(seed).spawn(len(runs))[index]). Keeping the three already-reported
-# arms (probe, derivative, lightgbm-l40s) at the end preserves their existing
-# fitted-final CIs bit-for-bit; only their comparisons against the new control
-# change.
+BOOTSTRAP_STREAM_COUNT = 8  # spawn() width; index 4 is intentionally unused
+
+# Iteration/output order. Cosmetic only -- fit_and_bootstrap_370m.py resolves
+# each arm's random stream from its own bootstrap_stream field, not from this
+# order or from position in the written JSON.
 ORDER = [
     "olmo-mix-1124-s42", "olmo-mix-1124-s69", "data-mixing-laws-paper", "mixlaw-fit",
     "skillit-probe", "skillit-derivative", "lightgbm-l40s",
 ]
 assert set(ORDER) == set(RUNS)
+assert sorted(v[4] for v in RUNS.values()) == [0, 1, 2, 3, 5, 6, 7]
 
 
 def _resolve_run(api, project: str, run_id: str | None, display_name: str | None):
@@ -119,7 +129,7 @@ def _resolve_run(api, project: str, run_id: str | None, display_name: str | None
 
 
 def pull_arm(api, key: str) -> dict:
-    project, run_id, display_name, label = RUNS[key]
+    project, run_id, display_name, label, bootstrap_stream = RUNS[key]
     run = _resolve_run(api, project, run_id, display_name)
     by_step: dict[int, dict] = {}
     for row in run.scan_history(keys=HISTORY_KEYS):
@@ -152,6 +162,7 @@ def pull_arm(api, key: str) -> dict:
     return {
         "label": label,
         "wandb_run": f"eduLLM/{project}/{run.id}",
+        "bootstrap_stream": bootstrap_stream,
         "steps": steps,
         "macro_bpb": macro_bpb,
         "_per_label": per_label,  # consumed below; not written to the curves file
@@ -177,6 +188,7 @@ def build_curves_payload(arms: dict[str, dict]) -> dict:
             "so it is excluded from every power-law fit and from these series."
         ),
         "fit_window": {"min_step": 1000, "form": "y = a + b / step**alpha"},
+        "bootstrap_stream_count": BOOTSTRAP_STREAM_COUNT,
         "runs": {
             key: {k: v for k, v in arms[key].items() if not k.startswith("_")}
             for key in ORDER

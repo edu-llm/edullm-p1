@@ -117,12 +117,20 @@ def _ols_over_alpha(X: np.ndarray, Y: np.ndarray):
     return sse, slope, intercept
 
 
-def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000):
+def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000,
+                       return_params=False):
     """Point fit + alpha-free residual bootstrap. Returns (fitted, finals).
 
     ``seed`` should be a per-arm :class:`numpy.random.SeedSequence` so that arms
     are resampled independently; see the module docstring. Draws are generated
     in blocks of ``chunk`` to bound peak memory at large ``n_boot``.
+
+    With ``return_params=True``, also returns the per-draw ``(a, b, alpha)``
+    arrays (each shape ``(n_boot,)``), so a caller can evaluate the bootstrapped
+    power law at any step, not just ``final_step`` -- e.g. to bootstrap a
+    step-count crossing between two arms (see ``bootstrap_crossing`` below).
+    The returned tuple is then ``(fitted, finals, a_draws, b_draws, alpha_draws)``;
+    default behavior and every existing caller are unaffected.
     """
     s = np.asarray(steps, dtype=float)
     y = np.asarray(losses, dtype=float)
@@ -142,6 +150,10 @@ def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000):
 
     rng = np.random.default_rng(seed)
     finals = np.empty(n_boot, dtype=float)
+    if return_params:
+        a_draws = np.empty(n_boot, dtype=float)
+        b_draws = np.empty(n_boot, dtype=float)
+        alpha_draws = np.empty(n_boot, dtype=float)
     for lo in range(0, n_boot, chunk):
         hi = min(lo + chunk, n_boot)
         draws = rng.integers(0, resid.size, (hi - lo, resid.size))
@@ -150,7 +162,51 @@ def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000):
         pick = np.argmin(sse, axis=0)                  # alpha-free: per-draw alpha
         cols = np.arange(hi - lo)
         finals[lo:hi] = icept[pick, cols] + slope[pick, cols] * final_step ** (-ALPHA_GRID[pick])
+        if return_params:
+            a_draws[lo:hi] = icept[pick, cols]
+            b_draws[lo:hi] = slope[pick, cols]
+            alpha_draws[lo:hi] = ALPHA_GRID[pick]
+    if return_params:
+        return fitted, finals, a_draws, b_draws, alpha_draws
     return fitted, finals
+
+
+def bootstrap_crossing(a_from, b_from, alpha_from, target, *, at_or_above=False):
+    """Per-draw step at which ``a_from + b_from / step**alpha_from`` first
+    reaches ``target``, given per-draw fit parameters and a per-draw target
+    value (e.g. the other arm's own bootstrapped final, paired draw-by-draw
+    as ``ci``/``diff_p`` already pair independent arms' distributions).
+
+    The power law is monotonic in ``step`` for ``b > 0, alpha > 0`` (decreasing
+    as step grows), so the crossing has a closed form:
+    ``step = (b / (target - a)) ** (1 / alpha)``. Used for two directions:
+
+    - **A given arm reaches a fixed target from above** (the "N% fewer steps"
+      metric): the fitted curve is decreasing, so it reaches ``target`` once
+      ``target > a`` (otherwise the curve never gets that high again past the
+      fit window, and by construction ``target`` -- the other arm's own
+      final -- should already be within the descending regime).
+    - **Extrapolating an arm forward until it reaches a lower target it
+      hasn't achieved within the observed budget** (the "N times longer"
+      metric): same formula, just typically evaluated far beyond
+      ``final_step``; ``at_or_above=True`` documents that direction for
+      readability at the call site, but the math is identical.
+
+    A row where ``target <= a`` (asymptote at or above the target -- this arm's
+    fitted curve never reaches it, even in the infinite-step limit) has no
+    finite crossing and is returned as ``np.inf``, so it never spuriously wins
+    a ``min``/percentile and shows up as a visibly non-finite tail instead of a
+    silently wrong number. Callers should report the fraction of non-finite
+    draws alongside the CI.
+    """
+    a_from = np.asarray(a_from, dtype=float)
+    b_from = np.asarray(b_from, dtype=float)
+    alpha_from = np.asarray(alpha_from, dtype=float)
+    target = np.asarray(target, dtype=float)
+    gap = target - a_from
+    with np.errstate(divide="ignore", invalid="ignore"):
+        step = np.where(gap > 0, (b_from / np.maximum(gap, 1e-300)) ** (1.0 / alpha_from), np.inf)
+    return step
 
 
 def ci(finals):

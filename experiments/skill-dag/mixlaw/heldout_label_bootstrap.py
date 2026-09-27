@@ -72,3 +72,9 @@ for field, pretty, n_lab in (("targeted", "12 targeted labels", 12),
         sign = "better" if d.mean() < 0 else "WORSE"
         print(f"{arm + ' - control':28s} {d.mean():+8.4f}   "
               f"[{lo:+.4f}, {hi:+.4f}]   {fmt_p(p, N_BOOT)}  ({sign})")
+
+    d = finals["olmo_s69"] - finals["olmo_s42"]
+    lo, hi = ci(d)
+    p = diff_p(finals["olmo_s69"], finals["olmo_s42"])
+    print(f"\n{'seed spread (s69 - s42)':28s} {d.mean():+8.4f}   "
+          f"[{lo:+.4f}, {hi:+.4f}]   {fmt_p(p, N_BOOT)}")

@@ -152,6 +152,24 @@ exactly once in the files here. The two shell scripts preflighted, submitted
 and ran that patched copy. The vendored files themselves were left unmodified,
 and their hashes above still hold.
 
+Three more files in `farmshare/` run the four static validation arms on
+4×L40S (Slurm jobs 1745704, 1745706, 1745708, 1745710; W&B
+`eduLLM/mixlaw-new`):
+
+- `patch_static_validation_arms.py`: on a separate copy of this bundle, adds
+  arm 2 exactly as `patch_legacy_static_lgbm_arm.py` did, plus static arms
+  3–6, each with its own weights (read from `mixlaw/validation_mixtures_10b.json`
+  and `mixlaw_fit_chinchilla.json`) and data seed. It also replaces
+  OLMo-core's `WandBCallback.finalize` with one that calls
+  `wandb.finish(exit_code=…)` without `quiet`.
+- `farmshare_static_validation_l40s.sbatch`: trains one of arms 3–6 on one
+  4×L40S node and refuses a non-empty arm folder.
+- `farmshare_preflight_submit_static_validation.sh`: checks one arm against
+  the patched recipe, runs `sbatch --test-only`, then submits it, optionally
+  after another job.
+
+The vendored files were left unmodified.
+
 ## Caveat
 
 The code has no upstream commit, and the W&B runs record no git commit. So the

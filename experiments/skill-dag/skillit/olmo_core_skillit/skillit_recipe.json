@@ -53,7 +53,7 @@
     0.013571059505826969,
     0.01113463256808213
   ],
-  "initial_weights_source": "wandb:eduLLM/mixlaw-1/78a3a85b7a5304a426f71629de27b198 (LGB-min1pct source_mixture_config.target_ratio, matched static control for probe/deriv equal-start comparison)",
+  "initial_weights_source": "experiments/skill-dag/mixlaw/mixlaw_fit_lightgbm_chinchilla.json optimization.min1pct.weights (LGB-min1pct, the 1%-floor LightGBM optimum both Skill-It arms and the matched static rerun start from)",
   "training": {
     "model": "olmo2_370M",
     "sequence_length": 2048,

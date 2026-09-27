@@ -89,7 +89,6 @@ Only code on the path that produced the reported runs:
 | `production_contract/*` | Checkpoint ladder, task-loss callback, W&B artifacts | same |
 | `eval_task_loss_olmo_core.py` | The 20-label OLMES evaluator behind the reported bpb numbers | same |
 | `requirements-skillit-eval.txt` | Evaluator dependencies installed by the venv setup | same |
-| `SKILLIT.md` | Upstream description of the methodology | differs |
 | `farmshare/train_no_aws.sbatch`, `launch_no_aws.sh`, `setup_venv_no_aws.sh` | The launch path both jobs used | not upstream |
 | `farmshare/common.sh`, `config.env` | Shared settings those scripts source | differs |
 | `farmshare/README.md`, `HANDOFF.md` | Notes on the no-AWS launch path | differs / not upstream |
@@ -106,14 +105,13 @@ e112c2e42c57be4cc027d3552015b0071da84a69c86359a4e57c9d1617d1bb92  train_skillit_
 eb5c41b0dd41ecabaa18e3743240eb30d6440babd5c30f1abf9ca7bfde421590  skillit_controller.py
 34c2c58c84217830e43ac2b3d2b628e970840778d5079bae0a1d6518c2a9a9c2  skillit_loader.py
 f8d4c1b8792fa56bbbe0733d1f78942179fbd903dbfdd74cb34ba9e6ce94a186  skillit_math.py
-28506e7c3e15814c1dd0082c1c3c52dd228083fec83556616019504583b48f91  skillit_recipe.json
+feab875f9706860d0f61835f9e7d7326c079e56dac7e8d792ed5b6dc3ad0c8de  skillit_recipe.json
 c6d6a9d8292c5f48485e7ae170d913cf368cceccc4a8b6285c86ddbc4eaa7f18  production_contract/__init__.py
 67d8a787a45e5a1c9f0f2f7463363b994916e4469cadf12ddfc8e930cd5632af  production_contract/checkpoint.py
 f633179af942067f859b561056863ca54b2b32479d8bd082db3f0e1331f25283  production_contract/task_loss.py
 638770b96742800c5b75e1f7f13fb8e74b177a5ee5b0dac70ffaf98f909ece5b  production_contract/wandb_artifacts.py
 a1fcb8c52ee8f438f69d543ea92da39d1b6d5cebb0c5f6f4ec7d187ca5d1dd32  eval_task_loss_olmo_core.py
 6baa90c2da9186bba9dd047c8ec50fadec98a644de431b835028ecb614be4b95  requirements-skillit-eval.txt
-ea38b1a8b0d8fb0624a8791213c8cbddfee7acbef6550a9d29c297dd8445de8f  SKILLIT.md
 7eeabaa290b8cedcf4223953967cf550f424087529c0c1a5960d5e2da392bf88  farmshare/README.md
 21e1d681645f8370ddb6513480b749007b994bb2f55e7c65f19c7c3ea7e8c1e3  farmshare/HANDOFF.md
 f8580f58284d0e748a1cea1ef12cd2eab0199496f5477abf8bc00a0b084cd4e6  farmshare/common.sh
@@ -122,6 +120,29 @@ f387223dbf3eb6282b5295bfa1da8a7319a9784af574d961e0bee055dc6f42a3  farmshare/conf
 57fac534adc10cec4a0eef4bdc2c544f7e1638a8ce9df9b3ab6452dd34a413b6  farmshare/launch_no_aws.sh
 16f6e6b1e2d6a9e788b6cd257f01e2e18dbc327bf26ab7a8fd4f912d23b51f4e  farmshare/train_no_aws.sbatch
 ```
+
+## Edited after vendoring
+
+Two changes were made to the vendored bundle itself, both after the reported
+probe and derivative runs and neither touching training math:
+
+- **`SKILLIT.md` was deleted.** It was an upstream design doc for an 8×A100
+  platform profile that neither reported run used (see "What is included"
+  above, and "What is deliberately excluded" below). Its original hash was
+  `ea38b1a8b0d8fb0624a8791213c8cbddfee7acbef6550a9d29c297dd8445de8f`; the file
+  is recoverable from this repository's git history before this change.
+- **`skillit_recipe.json`'s `initial_weights_source` string was rewritten.**
+  It named the A100 RunPod LightGBM run
+  (`wandb:eduLLM/mixlaw-1/78a3a85b7a5304a426f71629de27b198`) that first
+  produced the LGB-min1pct weights; it now cites
+  `mixlaw_fit_lightgbm_chinchilla.json`'s `optimization.min1pct.weights`
+  instead, which is the weights' underlying source and needs no W&B access to
+  check. No code reads this field, but changing the file's bytes moves
+  `RECIPE_SHA256`. The recipe's original hash was
+  `28506e7c3e15814c1dd0082c1c3c52dd228083fec83556616019504583b48f91`, checked
+  in `skillit_math.py` and above, before this change; the byte-identical
+  original is recoverable the same way. Every other field in the recipe,
+  including `derivative_fit_source_sha256`, is untouched.
 
 ## What is deliberately excluded
 

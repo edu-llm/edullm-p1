@@ -29,9 +29,11 @@ git, not here.
   `total_steps(max_tokens) = max_tokens // GLOBAL_BATCH_TOKENS`.
 - **Hardware:** one FarmShare node, 4×L40S (`PRODUCTION_WORLD_SIZE = 4`).
 - **Rank microbatch:** 16,384 tokens (`ArmSpec.rank_microbatch_tokens` default) for
-  every arm. Arms that hold a second model in memory during training (BLADE, RHO-1,
-  Perplexity) may fall back to 8,192 or 4,096 if the smoke test needs it; none has
-  needed to yet (smoke tests have not run — GPU time is paused as of this writing).
+  every arm except BLADE. Arms that hold a second model in memory during training
+  (BLADE, RHO-1, Perplexity) may fall back to 8,192 or 4,096 if the smoke test needs
+  it; BLADE's 1-GPU smoke test OOM'd a 44 GiB L40S at 16,384 (both the proxy and the
+  dynamic reference, plus both optimizers, are resident during its K-update sync), so
+  it now uses 8,192. RHO-1 and Perplexity haven't needed to fall back yet.
 - **Permanent checkpoints:** step 0, every 125 steps, and the true final step,
   omitting the last 125-grid point when it falls within 125 steps of the final step.
 - **Evaluator:** the 20-label `*_rc_5shot_bpb` OLMES suite

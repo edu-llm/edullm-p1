@@ -10,14 +10,14 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `dd22d20f` (see below) |
+| Commit | `d294e419` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
 This directory is byte-identical to `.edullm/` at that commit. No file was
 edited here after vendoring.
 
-`dd22d20f` unifies every arm onto one code path: one entrypoint
+`d294e419` unifies every arm onto one code path: one entrypoint
 (`token_selection_entrypoint.py`), one train module
 (`TokenWeightedTrainModule`), and one hardware contract (FarmShare, 4×L40S).
 It replaces `53daffdf`, the commit the previous version of this directory
@@ -64,12 +64,23 @@ are:
   production launch leaves all of these unset and gets the same behavior as
   before.
 - `eval_task_loss_olmo_core.py`: the single-rank (`world_size=1`) task-loss
-  eval process group now uses `gloo`, not `nccl`. Confirmed on FarmShare: the
-  1-GPU smoke test hung indefinitely right after checkpoint unsharding, at
-  `dist.init_process_group(backend="nccl")` -- NCCL still probes IB/network
-  topology on init even at `world_size=1`, and that probe hung on the
-  single-GPU allocation. Production's real multi-rank eval (`world_size>1`,
-  `task_loss_nproc=4`) is unaffected.
+  eval process group now uses `gloo` with a file-based rendezvous, not
+  `nccl` with `env://`. Confirmed on FarmShare across two fixes: the 1-GPU
+  smoke test first hung at `dist.init_process_group(backend="nccl")` --
+  NCCL still probes IB/network topology on init even at `world_size=1`.
+  Switching to `gloo` didn't fix it either: `env://` makes rank 0 bind a
+  TCPStore server on a port that was only *probed* free a moment earlier
+  (bound, read, released) in `_default_single_rank_env()`, and FarmShare
+  doesn't let that bind-probe-release-rebind sequence proceed cleanly. A
+  file-based store has no port to race on and no other rank to wait for.
+  Production's real multi-rank eval (`world_size>1`, `task_loss_nproc=4`,
+  `env://` under torchrun) is unaffected by either change.
+- `token_selection_370m/arms.py`: BLADE's `rank_microbatch_tokens` drops
+  from the 16,384 default to 8,192. Confirmed on FarmShare: BLADE's step-0
+  pre_train sync OOM'd a 44 GiB L40S (39.47 GiB already in use, short by
+  6.12 GiB) -- it holds the proxy, the dynamic reference, and both their
+  optimizers resident during the K-update sync, exactly the case the
+  original design called out as needing a fallback.
 
 ## Kept runs: what code they ran
 
@@ -79,7 +90,7 @@ the two random-control seeds (`random-control-regmix10b-v1`,
 (`rel-ema-exp-10b-scratch-v1`). All three ran `53daffdf` (the previous
 commit), on FarmShare 4×L40S, through the RunPod-wrapper entrypoint that
 `token_selection_entrypoint.py` has since absorbed. The random-selection and
-REL-EMA code paths are unchanged in `dd22d20f`: no rank term was added to the
+REL-EMA code paths are unchanged in `d294e419`: no rank term was added to the
 mask seed, and the EMA update is untouched. This is protected by a golden
 test (`tests/test_token_selection_370m.py`) that checks the per-microbatch
 weight derivation, `EMAHistory`'s update sequence, and `ema_alpha` against

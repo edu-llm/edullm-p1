@@ -17,6 +17,6 @@ reference:
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: dd22d20f
+  revision: d294e419
 wandb_project: token-selection
 status: rerun-under-unified-commit

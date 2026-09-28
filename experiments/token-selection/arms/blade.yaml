@@ -12,7 +12,10 @@ run_id: blade-regmix10b
 keep_fraction: 0.6
 init_seed: 6198
 data_seed: 42
-rank_microbatch_tokens: 16384
+# 16Ki (the default every other arm uses) OOMs a 44 GiB L40S here: BLADE
+# holds the proxy, the dynamic reference, and both optimizers resident at
+# once during its K-update sync. Confirmed by a FarmShare smoke test.
+rank_microbatch_tokens: 8192
 max_tokens: 9900000000
 total_steps: 2360
 checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250, 1375, 1500, 1625, 1750, 1875, 2000, 2125, 2360]  # omit 2250
@@ -28,6 +31,6 @@ reference: dynamic  # reset from the proxy at every sync step; see blade.py
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: dd22d20f
+  revision: d294e419
 wandb_project: token-selection
 status: rerun-under-unified-commit

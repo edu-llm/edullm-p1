@@ -126,6 +126,11 @@ ARM_SPECS: dict[str, ArmSpec] = {
         "blade-regmix10b",
         keep_fraction=0.6,
         requires_refhq_stream=True,
+        # BLADE holds both the proxy and the dynamic reference resident (plus
+        # both optimizers) during its K-update sync; confirmed by a FarmShare
+        # smoke test that 16Ki OOMs a 44 GiB L40S (39.47 GiB already in use,
+        # short by 6.12 GiB for the lm_head logits of one more microbatch).
+        rank_microbatch_tokens=8_192,
     ),
     "random-control": ArmSpec(
         "random-control",

@@ -21,7 +21,6 @@ from token_selection_370m.arms import ARM_SPECS  # noqa: E402
 # section) but aren't in the reported-arm table under the same run_id-derived name;
 # map YAML stem -> ARM_SPECS key explicitly so a rename on either side is caught.
 YAML_TO_SPEC_KEY = {
-    "hq-reference": "hq-reference",
     "instruct-reference": "instruct-reference",
     "full-loss-control": "full-loss-control",
     "random-control": "random-control",

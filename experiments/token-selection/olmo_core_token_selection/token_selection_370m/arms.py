@@ -26,15 +26,16 @@ Method = Literal[
 REGMIX = "pretrain/regmix-10b"
 # BLADE's L_val stream, and the Instruct reference arm's own training corpus.
 REFHQ_INSTRUCT = "pretrain/refhq-instruct"
-# The HQ reference arm's own training corpus.
-REFHQ_5P5B = "pretrain/refhq-regmix-5p5b"
 
-# Symbolic reference contracts, resolved to a local, materialized .pt file by
-# farmshare/stage_local.py once the reference arm below has produced the
+# Symbolic reference contract, resolved to a local, materialized .pt file by
+# farmshare/stage_local.py once instruct-reference has produced the
 # checkpoint. Nothing here is an S3 URI.
 INSTRUCT_REFERENCE_CONTRACT = "instruct-reference-370m/checkpoints/step940"
-HQ_REFERENCE_CONTRACT = "hq-reference-370m/checkpoints/average-1000-1125-1315"
-HQ_REFERENCE_AVERAGED_STEPS = (1000, 1125, 1315)
+# Symbolic contract for the offline per-instance reference-loss table (see
+# token_selection_370m/reference_scores.py), resolved to a local directory by
+# farmshare/score_reference.py once it has scored the whole RegMix corpus
+# against the checkpoint above. RHO-1 and Perplexity both read it.
+REFERENCE_SCORES_CONTRACT = "instruct-reference-370m-step940/regmix-10b-v1"
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class ArmSpec:
     max_tokens: Optional[int] = 9_900_000_000
     wandb_project_override: Optional[str] = None
     reference_contract: Optional[str] = None
+    reference_scores_contract: Optional[str] = None
     ema_seed: Optional[Literal["zero"]] = None
     ema_tau: Optional[float] = None
     requires_refhq_stream: bool = False
@@ -60,17 +62,9 @@ class ArmSpec:
 
 
 ARM_SPECS: dict[str, ArmSpec] = {
-    # ---- References (trained in this study; no other trainer produces them) ----
+    # ---- Reference (trained in this study; no other trainer produces it) ----
     # Same "full" method / stock-equivalent loss as the full-loss control, just
     # on a different corpus and for a different step count.
-    "hq-reference": ArmSpec(
-        "hq-reference",
-        "full",
-        REFHQ_5P5B,
-        "hq-reference-370m",
-        keep_fraction=1.0,
-        max_tokens=None,  # one whole-stream epoch of refhq-regmix-5p5b; see recipe.py
-    ),
     "instruct-reference": ArmSpec(
         "instruct-reference",
         "full",
@@ -94,12 +88,13 @@ ARM_SPECS: dict[str, ArmSpec] = {
         "rho-1-regmix10b",
         keep_fraction=0.6,
         reference_contract=INSTRUCT_REFERENCE_CONTRACT,
+        reference_scores_contract=REFERENCE_SCORES_CONTRACT,
     ),
     "rel-ema-exp": ArmSpec(
         "rel-ema-exp",
         "rel_ema",
         REGMIX,
-        "rel-ema-exp-10b-scratch-v1",
+        "rel-ema-exp-regmix10b",
         keep_fraction=0.6,
         ema_seed="zero",
         ema_tau=300.0,
@@ -110,7 +105,8 @@ ARM_SPECS: dict[str, ArmSpec] = {
         REGMIX,
         "perplexity-regmix10b",
         keep_fraction=0.6,
-        reference_contract=HQ_REFERENCE_CONTRACT,
+        reference_contract=INSTRUCT_REFERENCE_CONTRACT,
+        reference_scores_contract=REFERENCE_SCORES_CONTRACT,
     ),
     "attention": ArmSpec(
         "attention",
@@ -136,7 +132,7 @@ ARM_SPECS: dict[str, ArmSpec] = {
         "random-control",
         "random",
         REGMIX,
-        "random-control-regmix10b-v1",
+        "random-control-regmix10b",
         keep_fraction=0.6,
         init_seed=6198,
         data_seed=42,
@@ -145,7 +141,7 @@ ARM_SPECS: dict[str, ArmSpec] = {
         "random-control-seed69",
         "random",
         REGMIX,
-        "random-control-regmix10b-seed69-v1",
+        "random-control-seed69-regmix10b",
         keep_fraction=0.6,
         init_seed=12345,
         data_seed=69,

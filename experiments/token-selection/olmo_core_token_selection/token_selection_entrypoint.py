@@ -28,6 +28,7 @@ from token_selection_370m.arms import ARM_SPECS, REFHQ_INSTRUCT, get_arm  # noqa
 from token_selection_370m.recipe import (  # noqa: E402
     build_trainer,
     immutable_corpus_binding,
+    reference_digest,
     scientific_identity,
     total_steps,
     write_identity,
@@ -106,6 +107,76 @@ def resolve_reference_path(contract: Optional[str]) -> Optional[str]:
     if not path.is_file():
         raise RuntimeError(f"materialized reference is missing: {path}")
     return str(path)
+
+
+def resolve_reference_scores(contract: Optional[str]) -> tuple[Optional[str], Optional[dict]]:
+    """Resolve a symbolic reference-scores contract to its table directory and manifest.
+
+    Unlike ``resolve_reference_path`` (one flat .pt file), this points at a
+    directory (see ``token_selection_370m/reference_scores.py``): a memmap
+    plus a manifest binding it to the exact reference checkpoint and corpus it
+    was scored from. The manifest is returned too, so the caller can fold its
+    corpus binding and completeness into identity checks without a second
+    resolve.
+    """
+    if contract is None:
+        return None, None
+    record = _manifest().get("reference_scores", {}).get(contract)
+    if record is None:
+        raise RuntimeError(
+            f"local manifest has no materialized reference-score table for {contract!r}"
+        )
+    from token_selection_370m.reference_scores import read_manifest
+
+    root = Path(record)
+    manifest = read_manifest(root)
+    if not manifest.get("complete"):
+        raise RuntimeError(f"reference-score table for {contract!r} is not complete: {root}")
+    return str(root), manifest
+
+
+def runtime_environment() -> dict[str, object]:
+    """Facts worth recording for the record but not part of the resume-blocking identity.
+
+    A torch/CUDA/driver bump between a run and its resume shouldn't refuse the
+    resume the way a change to the scientific identity itself does -- see
+    ``recipe.write_identity``.
+    """
+    import subprocess
+    import sys
+
+    import torch
+
+    info: dict[str, object] = {
+        "torch_version": torch.__version__,
+        "cuda_version": torch.version.cuda,
+        "python_version": sys.version.split()[0],
+    }
+    try:
+        info["gpu_name"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    except Exception:
+        info["gpu_name"] = None
+    try:
+        info["nvidia_driver_version"] = (
+            subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+            .decode()
+            .strip()
+            .splitlines()[0]
+        )
+    except Exception:
+        info["nvidia_driver_version"] = None
+    try:
+        freeze = subprocess.check_output(
+            [sys.executable, "-m", "pip", "freeze"], stderr=subprocess.DEVNULL, timeout=60
+        )
+        info["pip_freeze_sha256"] = __import__("hashlib").sha256(freeze).hexdigest()
+    except Exception:
+        info["pip_freeze_sha256"] = None
+    return info
 
 
 def git_commit() -> Optional[str]:
@@ -249,6 +320,9 @@ def main() -> None:
     if max_tokens <= 0:
         raise SystemExit("reference corpus manifest must declare a positive row/token count")
     reference_path = resolve_reference_path(arm.reference_contract)
+    reference_scores_path, reference_scores_manifest = resolve_reference_scores(
+        arm.reference_scores_contract
+    )
 
     refhq_corpus = None
     if arm.requires_refhq_stream:
@@ -271,6 +345,7 @@ def main() -> None:
         ),
         max_tokens=max_tokens,
         reference_path=reference_path,
+        reference_scores_manifest=reference_scores_manifest,
         git_commit=commit,
     )
     print(
@@ -317,6 +392,7 @@ def main() -> None:
         torch_imported = __import__("torch")
         torch_imported.set_float32_matmul_precision("high")
         seed_all(6198)
+        environment = runtime_environment()
         trainer = build_trainer(
             arm,
             corpus,
@@ -327,11 +403,15 @@ def main() -> None:
             progress_dir=progress_dir,
             task_loss_script=task_loss_script,
             reference_path=reference_path,
+            reference_scores_path=reference_scores_path,
+            reference_scores_reference_sha256=reference_digest(reference_path),
+            reference_scores_corpus_binding=identity["dataset_binding"],
             resume=args.resume,
             production=not args.local,
             git_commit=commit,
+            environment=environment,
         )
-        write_identity(save_folder, progress_dir, identity)
+        write_identity(save_folder, progress_dir, identity, environment=environment)
         if resume_checkpoint is not None:
             trainer.load_checkpoint(
                 resume_checkpoint,

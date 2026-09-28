@@ -60,11 +60,23 @@ def test_task_loss_callback_uploads_only_the_final_checkpoint(
         eval_script=tmp_path / "eval.py",
         interval=125,
     )
-    callback.trainer = type("Trainer", (), {"callbacks": {}})()
+    flushes: list[str] = []
+    callback.trainer = type(
+        "Trainer",
+        (),
+        {
+            "callbacks": {},
+            "_log_metrics": lambda self: flushes.append("log"),
+            "_join_bookkeeping_ops": lambda self: flushes.append("join"),
+        },
+    )()
     callback._maybe_finalize(125)
     callback._maybe_finalize(250)
 
     assert uploads == [(125, False), (250, True)]
+    # E4: every finalize flushes W&B (on every rank) before the eval logs at a
+    # fixed step, so no buffered train point from just before it gets dropped.
+    assert flushes == ["log", "join", "log", "join"]
 
 
 def test_task_loss_callback_skips_already_durable_result_on_resume(
@@ -202,6 +214,65 @@ def test_finalize_skips_nonfinal_checkpoint_artifact(
     assert artifact_types[3:] == ["model", "eval", "metrics", "eval"]
     assert not (tmp_path / "checkpoints" / "step125").exists()
     assert (tmp_path / "checkpoints" / "step250").is_dir()
+
+
+def test_finalize_keep_all_checkpoints_skips_pruning(tmp_path: Path) -> None:
+    """E7: these runs disable pruning entirely, so every ladder checkpoint
+    (with its optimizer state) survives, at the cost of ~1.3 TB total."""
+    for step in (125, 250):
+        checkpoint_dir = tmp_path / "checkpoints" / f"step{step}"
+        checkpoint_dir.mkdir(parents=True)
+        (checkpoint_dir / "state.pt").write_bytes(b"state")
+        checkpoint.finalize_permanent_checkpoint(
+            arm="probe",
+            checkpoint_dir=checkpoint_dir,
+            step=step,
+            run_name="unit",
+            task_loss_dir=tmp_path / "task-loss",
+            task_loss_enabled=False,
+            progress_dir=tmp_path / "progress",
+            wandb_run=None,
+            production=False,
+            upload_checkpoint=False,
+            keep_all_checkpoints=True,
+        )
+
+    assert (tmp_path / "checkpoints" / "step125").is_dir()
+    assert (tmp_path / "checkpoints" / "step250").is_dir()
+
+
+def test_task_loss_callback_already_durable_keep_all_checkpoints_skips_pruning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    progress_dir = tmp_path / "progress"
+    results_dir = progress_dir / "task_loss"
+    results_dir.mkdir(parents=True)
+    (results_dir / "step250_task_loss.json").write_text(
+        json.dumps({"task_loss_bpb": _labels()}), encoding="utf-8"
+    )
+    checkpoint.write_last_durable_step(progress_dir, 250)
+    save_folder = tmp_path / "checkpoints"
+    old = save_folder / "step125"
+    old.mkdir(parents=True)
+    (old / "state.pt").write_bytes(b"state")
+    durable = save_folder / "step250"
+    durable.mkdir(parents=True)
+    (durable / "state.pt").write_bytes(b"state")
+
+    monkeypatch.setattr(task_loss, "_HAS_OLMO_CORE", True)
+    callback = task_loss.TaskLossEvalCallback(
+        total_steps=250,
+        save_folder=save_folder,
+        run_name="unit",
+        results_dir=results_dir,
+        eval_script=tmp_path / "eval.py",
+        interval=125,
+        progress_dir=progress_dir,
+        keep_all_checkpoints=True,
+    )
+
+    assert callback._already_durable(250) is True
+    assert old.is_dir()
 
 
 def test_prune_keeps_latest_durable_and_newer_retry_candidate(tmp_path: Path) -> None:

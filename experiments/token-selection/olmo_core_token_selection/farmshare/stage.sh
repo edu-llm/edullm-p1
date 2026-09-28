@@ -3,9 +3,8 @@
 #
 # No download and no AWS: STAGE_MODE=corpora (the default) just verifies the
 # pinned source files exist and records their sizes. STAGE_MODE=references
-# additionally materializes and averages the reference checkpoints trained by
-# the hq-reference/instruct-reference arms; run it only after those two arms
-# have finished.
+# additionally materializes the reference checkpoint trained by the
+# instruct-reference arm; run it only after that arm has finished.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

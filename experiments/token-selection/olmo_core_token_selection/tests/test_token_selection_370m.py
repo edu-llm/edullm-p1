@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import contextlib
+import hashlib
 import json
 import math
 import sys
@@ -18,10 +19,11 @@ if str(EDULLM_ROOT) not in sys.path:
     sys.path.insert(0, str(EDULLM_ROOT))
 
 import token_selection_370m.selection as selection_module  # noqa: E402
+from token_selection_370m import reference_scores as reference_scores_module  # noqa: E402
 from token_selection_370m.arms import (  # noqa: E402
     ARM_SPECS,
-    HQ_REFERENCE_CONTRACT,
     INSTRUCT_REFERENCE_CONTRACT,
+    REFERENCE_SCORES_CONTRACT,
     REFHQ_INSTRUCT,
 )
 from token_selection_370m.blade import (  # noqa: E402
@@ -43,18 +45,28 @@ from token_selection_370m.recipe import (  # noqa: E402
     WARMUP_STEPS,
     Z_LOSS,
     immutable_corpus_binding,
+    reference_digest,
     scientific_identity,
     total_steps,
+    write_identity,
 )
+from token_selection_370m.reference_scores import ReferenceScoreTable  # noqa: E402
 from token_selection_370m.selection import (  # noqa: E402
     EMAHistory,
-    WeightShadow,
     attention_received_from_qk,
     capture_last_attention,
     ema_alpha,
     normalize_and_align_attention_scores,
+    per_instance_tiebreak,
+    per_row_middle,
+    per_row_topk,
     selection_weights,
     uniform_attention_normalizer,
+)
+from token_selection_370m.train_module import (  # noqa: E402
+    TokenSelectionConfig,
+    TokenSelectionState,
+    TokenWeightedTrainModule,
 )
 
 
@@ -62,7 +74,6 @@ def test_exact_approved_arm_family_and_wandb_routing() -> None:
     assert tuple(
         (name, spec.method, spec.dataset_id, spec.keep_fraction) for name, spec in ARM_SPECS.items()
     ) == (
-        ("hq-reference", "full", "pretrain/refhq-regmix-5p5b", 1.0),
         ("instruct-reference", "full", "pretrain/refhq-instruct", 1.0),
         ("full-loss-control", "full", "pretrain/regmix-10b", 1.0),
         ("rho-1", "rho_excess", "pretrain/regmix-10b", 0.6),
@@ -75,7 +86,16 @@ def test_exact_approved_arm_family_and_wandb_routing() -> None:
     )
     assert all(spec.wandb_project == "token-selection" for spec in ARM_SPECS.values())
     assert ARM_SPECS["rho-1"].reference_contract == INSTRUCT_REFERENCE_CONTRACT
-    assert ARM_SPECS["perplexity"].reference_contract == HQ_REFERENCE_CONTRACT
+    assert ARM_SPECS["perplexity"].reference_contract == INSTRUCT_REFERENCE_CONTRACT
+    # Both read the offline per-instance table (reference_scores.py), not a
+    # resident model.
+    assert ARM_SPECS["rho-1"].reference_scores_contract == REFERENCE_SCORES_CONTRACT
+    assert ARM_SPECS["perplexity"].reference_scores_contract == REFERENCE_SCORES_CONTRACT
+    assert all(
+        spec.reference_scores_contract is None
+        for name, spec in ARM_SPECS.items()
+        if name not in ("rho-1", "perplexity")
+    )
     assert ARM_SPECS["blade"].requires_refhq_stream is True
     # Every arm runs 4xL40S; only the two random-control seeds differ in seed.
     assert ARM_SPECS["random-control"].init_seed == 6198
@@ -98,12 +118,20 @@ def test_one_recipe_constants_and_2360_step_budget() -> None:
     assert Z_LOSS == 1e-5
     assert PRODUCTION_WORLD_SIZE == 4
     assert total_steps(9_900_000_000) == 2360
-    # The two reference arms use their whole corpus as the budget (Corpus.rows,
-    # via arm.max_tokens=None), not the fixed 9.9e9 the other arms share.
-    assert ARM_SPECS["hq-reference"].max_tokens is None
+    # The reference arm uses its whole corpus as the budget (Corpus.rows, via
+    # arm.max_tokens=None), not the fixed 9.9e9 the other arms share.
     assert ARM_SPECS["instruct-reference"].max_tokens is None
-    assert total_steps(5_517_296_144) == 1315
     assert total_steps(3_942_810_012) == 940
+    # total_steps floors (2360, not 2361); build_trainer's max_duration must
+    # use Duration.steps(total_steps(...)), not Duration.tokens(max_tokens)
+    # (which the trainer runs as ceil(tokens/batch) -- one step past every
+    # ladder/eval/BLADE-schedule/FLOP computation that uses this floor).
+    recipe_source = (EDULLM_ROOT / "token_selection_370m" / "recipe.py").read_text(
+        encoding="utf-8"
+    )
+    assert "max_duration=Duration.steps(steps)" in recipe_source
+    assert "Duration.tokens(max_tokens)" not in recipe_source
+    assert "main_loader.total_batches" in recipe_source  # the no-wrap guard
 
 
 def test_custom_module_backpropagates_differentiable_total_loss() -> None:
@@ -113,178 +141,15 @@ def test_custom_module_backpropagates_differentiable_total_loss() -> None:
 
 
 def test_weight_swaps_reshard_fsdp_before_restoring_parameters() -> None:
+    # WeightShadow (the online reference-scoring path) is gone: rho_excess
+    # and middle_ppl now read an offline table (reference_scores.py) instead
+    # of keeping a resident reference model. Only EMAHistory.swap_to still
+    # needs to reshard.
     source = (EDULLM_ROOT / "token_selection_370m" / "selection.py").read_text(encoding="utf-8")
-    assert source.count("_reshard(model)") == 2
+    assert "class WeightShadow" not in source
+    assert source.count("_reshard(model)") == 1
     assert "owner.unshard()" in source
     assert "owner.reshard()" in source
-
-
-def test_weight_shadow_matches_reference_outputs_and_rho_masks() -> None:
-    training = Tiny()
-    training.weight.data.copy_(torch.tensor([1.0, -2.0]))
-    reference = Tiny()
-    reference_state = {"weight": torch.tensor([3.0, 5.0], dtype=torch.float64)}
-    reference.load_state_dict(reference_state)
-    original = training.weight.detach().clone()
-    inputs = torch.tensor([[2.0, -1.0]])
-    targets = torch.tensor([[4.0, -2.0]])
-
-    expected_reference_output = reference(inputs)
-    expected_reference_loss = (expected_reference_output - targets).square()
-    current_loss = (training(inputs) - targets).square()
-    expected_mask = selection_weights(
-        "rho_excess",
-        valid=torch.ones_like(current_loss, dtype=torch.bool),
-        keep_fraction=0.5,
-        step=0,
-        seed=42,
-        current=current_loss,
-        reference=expected_reference_loss,
-    )
-
-    shadow = WeightShadow.from_state_dict(training, reference_state)
-    assert torch.equal(training.weight, original)
-    assert shadow.weights["weight"].shape == training.weight.shape
-    assert shadow.weights["weight"].device == training.weight.device
-    assert shadow.weights["weight"].dtype == training.weight.dtype
-    with torch.no_grad(), shadow.swap_to(training):
-        actual_reference_output = training(inputs)
-    actual_reference_loss = (actual_reference_output - targets).square()
-    actual_mask = selection_weights(
-        "rho_excess",
-        valid=torch.ones_like(current_loss, dtype=torch.bool),
-        keep_fraction=0.5,
-        step=0,
-        seed=42,
-        current=current_loss,
-        reference=actual_reference_loss,
-    )
-
-    assert torch.equal(actual_reference_output, expected_reference_output)
-    assert torch.equal(actual_reference_loss, expected_reference_loss)
-    assert torch.equal(actual_mask, expected_mask)
-    assert torch.equal(training.weight, original)
-
-
-def test_weight_shadow_repeatedly_restores_training_parameters_and_gradients() -> None:
-    training = Tiny()
-    training.weight.data.copy_(torch.tensor([1.25, -2.5]))
-    original = training.weight.detach().clone()
-    shadow = WeightShadow.from_state_dict(
-        training,
-        {"weight": torch.tensor([3.0, 5.0])},
-    )
-
-    for _ in range(5):
-        with torch.no_grad(), shadow.swap_to(training):
-            assert torch.equal(training.weight, torch.tensor([3.0, 5.0]))
-        assert torch.equal(training.weight, original)
-
-    with pytest.raises(RuntimeError, match="scoring failed"):
-        with shadow.swap_to(training):
-            raise RuntimeError("scoring failed")
-    assert torch.equal(training.weight, original)
-
-    training(torch.tensor([[2.0, -4.0]])).sum().backward()
-    assert torch.equal(training.weight.grad, torch.tensor([2.0, -4.0]))
-    assert all(
-        not weight.requires_grad and weight.grad is None for weight in shadow.weights.values()
-    )
-    assert torch.equal(training.weight, original)
-
-
-def test_weight_shadow_hot_path_uses_only_local_copies(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    training = Tiny()
-    training.weight.data.copy_(torch.tensor([1.0, 2.0]))
-    writes = 0
-    original_write = selection_module._write
-
-    def count_write(parameter, value):
-        nonlocal writes
-        writes += 1
-        original_write(parameter, value)
-
-    monkeypatch.setattr(selection_module, "_write", count_write)
-    shadow = WeightShadow.from_state_dict(
-        training,
-        {"weight": torch.tensor([3.0, 5.0])},
-    )
-    assert writes == 1
-
-    def forbidden(*_args, **_kwargs):
-        raise AssertionError("hot path attempted CPU or full-tensor materialization")
-
-    monkeypatch.setattr(selection_module, "_write", forbidden)
-    monkeypatch.setattr(selection_module, "_snapshot", forbidden)
-    reference_storage = shadow.weights["weight"].data_ptr()
-    for _ in range(3):
-        with shadow.swap_to(training):
-            assert torch.equal(training.weight, torch.tensor([3.0, 5.0]))
-        assert torch.equal(training.weight, torch.tensor([1.0, 2.0]))
-        assert shadow.weights["weight"].data_ptr() == reference_storage
-
-
-def test_reference_microbatches_share_one_weight_swap(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    training = Tiny()
-    training.weight.data.copy_(torch.tensor([1.0, 2.0]))
-    shadow = WeightShadow.from_state_dict(
-        training,
-        {"weight": torch.tensor([3.0, 5.0])},
-    )
-    original_swap = shadow.swap_to
-    swaps = 0
-
-    @contextlib.contextmanager
-    def counted_swap(model):
-        nonlocal swaps
-        swaps += 1
-        with original_swap(model) as swapped:
-            yield swapped
-
-    monkeypatch.setattr(shadow, "swap_to", counted_swap)
-    inputs = [
-        torch.tensor([[1.0, 2.0]]),
-        torch.tensor([[4.0, 7.0]]),
-        torch.tensor([[3.0, 6.0]]),
-    ]
-    with torch.no_grad(), shadow.swap_to(training):
-        scores = [training(value) for value in inputs]
-
-    assert swaps == 1
-    assert torch.equal(scores[0], torch.tensor([[3.0, 10.0]]))
-    assert torch.equal(scores[1], torch.tensor([[12.0, 35.0]]))
-    assert torch.equal(scores[2], torch.tensor([[9.0, 30.0]]))
-    assert torch.equal(training.weight, torch.tensor([1.0, 2.0]))
-    assert training.training
-
-
-def test_train_module_batches_reference_scoring_structurally() -> None:
-    source = (EDULLM_ROOT / "token_selection_370m" / "train_module.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    score_many = next(
-        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "_score_many"
-    )
-    swaps = [
-        node
-        for node in ast.walk(score_many)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "swap_to"
-    ]
-    assert len(swaps) == 1
-    assert any(
-        isinstance(child, ast.For)
-        for with_node in ast.walk(score_many)
-        if isinstance(with_node, ast.With)
-        for statement in with_node.body
-        for child in ast.walk(statement)
-    )
-    assert "self._score_many(state.reference, scoring_batches)" in source
-    assert "self._score(state.reference" not in source
 
 
 def test_weight_accounting_synchronizes_once_per_batch() -> None:
@@ -293,7 +158,18 @@ def test_weight_accounting_synchronizes_once_per_batch() -> None:
     assert source.count("observed_weight.item()") == 1
 
 
-def test_weight_shadow_restores_local_fsdp_parameter_after_forward(tmp_path: Path) -> None:
+def test_all_token_ce_feeds_skip_step_optimizer_not_the_kept_subset() -> None:
+    """E3: a discontinuity in the *kept* set (a BLADE resync, REL-EMA's
+    growing alpha) must not by itself look like a loss spike to
+    SkipStepOptimizer, so it watches all-token CE, not the selection's own
+    (much smaller, policy-dependent) kept-token CE."""
+    source = (EDULLM_ROOT / "token_selection_370m" / "train_module.py").read_text(encoding="utf-8")
+    assert 'self.record_metric(\n            "CE loss (all tokens)", all_token_ce_batch' in source
+    assert "self.optim.latest_loss = all_token_ce_batch" in source
+    assert "self.optim.latest_loss = ce_batch" not in source
+
+
+def test_ema_history_restores_local_fsdp_parameter_after_forward(tmp_path: Path) -> None:
     if not dist.is_available():
         pytest.skip("torch.distributed is unavailable")
     if dist.is_initialized():
@@ -319,14 +195,6 @@ def test_weight_shadow_restores_local_fsdp_parameter_after_forward(tmp_path: Pat
 
         fully_shard(training, mesh=init_device_mesh("cpu", (1,)))
         original_shard = training.weight.to_local().detach().clone()
-        shadow = WeightShadow.from_state_dict(training, reference_state)
-        with torch.no_grad(), shadow.swap_to(training):
-            actual = training(inputs)
-
-        assert torch.equal(actual, expected)
-        assert torch.equal(training.weight.to_local(), original_shard)
-        assert shadow.weights["weight"].device == training.weight.to_local().device
-        assert shadow.weights["weight"].shape == training.weight.to_local().shape
 
         ema = EMAHistory(training, seed=reference_state)
         with torch.no_grad(), ema.swap_to(training):
@@ -335,6 +203,144 @@ def test_weight_shadow_restores_local_fsdp_parameter_after_forward(tmp_path: Pat
         assert torch.equal(training.weight.to_local(), original_shard)
     finally:
         dist.destroy_process_group()
+
+
+def test_reference_score_table_gathers_by_global_instance_index(tmp_path: Path) -> None:
+    """The A1 consumer side: build a tiny table, then read it back by index."""
+    rows, sequence_length = 5, 4
+    table = torch.arange(rows * sequence_length, dtype=torch.float32).reshape(rows, sequence_length)
+    root = tmp_path / "table"
+    root.mkdir()
+    import numpy as np
+
+    array = np.memmap(
+        reference_scores_module.table_file(root), mode="w+", dtype=np.float32, shape=(rows, sequence_length)
+    )
+    array[:] = table.numpy()
+    array.flush()
+    corpus_binding = {"dataset_id": "pretrain/regmix-10b", "version": "v1"}
+    reference_scores_module.write_manifest(
+        root,
+        {
+            "schema_version": reference_scores_module.MANIFEST_SCHEMA_VERSION,
+            "algorithm": reference_scores_module.ALGORITHM,
+            "complete": True,
+            "reference_sha256": "deadbeef",
+            "corpus_binding": corpus_binding,
+            "sequence_length": sequence_length,
+            "rows": rows,
+            "dtype": "float32",
+        },
+    )
+
+    loaded = ReferenceScoreTable(
+        root, expected_reference_sha256="deadbeef", expected_corpus_binding=corpus_binding
+    )
+    gathered = loaded.gather(torch.tensor([3, 0, 3]), device=torch.device("cpu"))
+    assert torch.equal(gathered, table[[3, 0, 3]])
+
+    with pytest.raises(ValueError, match="different reference"):
+        ReferenceScoreTable(
+            root, expected_reference_sha256="wrong", expected_corpus_binding=corpus_binding
+        )
+    with pytest.raises(ValueError, match="different corpus"):
+        ReferenceScoreTable(
+            root,
+            expected_reference_sha256="deadbeef",
+            expected_corpus_binding={**corpus_binding, "version": "v2"},
+        )
+
+
+def test_reference_score_table_fails_closed_when_not_complete(tmp_path: Path) -> None:
+    root = tmp_path / "table"
+    root.mkdir()
+    reference_scores_module.write_manifest(
+        root,
+        {
+            "schema_version": reference_scores_module.MANIFEST_SCHEMA_VERSION,
+            "algorithm": reference_scores_module.ALGORITHM,
+            "complete": False,
+            "reference_sha256": "deadbeef",
+            "corpus_binding": {},
+            "sequence_length": 4,
+            "rows": 1,
+            "dtype": "float32",
+        },
+    )
+    with pytest.raises(ValueError, match="not complete"):
+        ReferenceScoreTable(root, expected_reference_sha256="deadbeef", expected_corpus_binding={})
+
+
+def test_token_selection_state_opens_reference_table_for_rho_and_middle_ppl(tmp_path: Path) -> None:
+    rows, sequence_length = 2, 4
+    root = tmp_path / "table"
+    root.mkdir()
+    import numpy as np
+
+    array = np.memmap(
+        reference_scores_module.table_file(root), mode="w+", dtype=np.float32, shape=(rows, sequence_length)
+    )
+    array[:] = 0.0
+    array.flush()
+    corpus_binding = {"dataset_id": "pretrain/regmix-10b", "version": "v1"}
+    reference_scores_module.write_manifest(
+        root,
+        {
+            "schema_version": reference_scores_module.MANIFEST_SCHEMA_VERSION,
+            "algorithm": reference_scores_module.ALGORITHM,
+            "complete": True,
+            "reference_sha256": "abc",
+            "corpus_binding": corpus_binding,
+            "sequence_length": sequence_length,
+            "rows": rows,
+            "dtype": "float32",
+        },
+    )
+
+    for method in ("rho_excess", "middle_ppl"):
+        config = TokenSelectionConfig(
+            method=method,
+            keep_fraction=0.6,
+            total_steps=10,
+            reference_scores_path=str(root),
+            reference_scores_reference_sha256="abc",
+            reference_scores_corpus_binding=corpus_binding,
+        )
+        state = TokenSelectionState(config, Tiny())
+        assert state.reference_table is not None
+
+    # A reference-scoring method with no table configured fails closed at
+    # construction, not at first use.
+    with pytest.raises(ValueError, match="requires a reference-scores table"):
+        TokenSelectionState(
+            TokenSelectionConfig(method="rho_excess", keep_fraction=0.6, total_steps=10),
+            Tiny(),
+        )
+
+    # Non-reference-scoring methods never touch a table.
+    full_state = TokenSelectionState(
+        TokenSelectionConfig(method="full", keep_fraction=1.0, total_steps=10), Tiny()
+    )
+    assert full_state.reference_table is None
+
+
+def test_batch_index_dry_run_zeros_and_real_step_requires_index() -> None:
+    """A1: Trainer.fit's dry-run mock batch has no 'index', so use zeros
+    there; every real step must carry one, since it's the table's lookup key."""
+    zeros = TokenWeightedTrainModule._batch_index({}, rows=3, dry_run=True)
+    assert torch.equal(zeros, torch.zeros(3, dtype=torch.int64))
+
+    with pytest.raises(RuntimeError, match="global instance index"):
+        TokenWeightedTrainModule._batch_index({}, rows=3, dry_run=False)
+
+    supplied = torch.tensor([7, 8, 9])
+    assert torch.equal(
+        TokenWeightedTrainModule._batch_index({"index": supplied}, rows=3, dry_run=False), supplied
+    )
+    # A real "index" always wins, even in a dry run.
+    assert torch.equal(
+        TokenWeightedTrainModule._batch_index({"index": supplied}, rows=3, dry_run=True), supplied
+    )
 
 
 def test_attention_capture_hooks_compiled_block_boundary() -> None:
@@ -363,14 +369,15 @@ def test_attention_capture_hooks_compiled_block_boundary() -> None:
 
 def test_method_polarities_and_per_sequence_selection() -> None:
     valid = torch.ones(2, 4, dtype=torch.bool)
+    index = torch.tensor([0, 1])
     current = torch.tensor([[4.0, 3.0, 2.0, 1.0], [1.0, 2.0, 3.0, 4.0]])
     reference = torch.ones_like(current)
     rho = selection_weights(
         "rho_excess",
         valid=valid,
         keep_fraction=0.5,
-        step=0,
         seed=42,
+        index=index,
         current=current,
         reference=reference,
     )
@@ -382,8 +389,8 @@ def test_method_polarities_and_per_sequence_selection() -> None:
         "rel_ema",
         valid=valid,
         keep_fraction=0.5,
-        step=0,
         seed=42,
+        index=index,
         current=current,
         history=reference * 3,
     )
@@ -393,27 +400,43 @@ def test_method_polarities_and_per_sequence_selection() -> None:
     # batch["token_weight"], read before selection_weights() is ever called.
     with pytest.raises(ValueError, match="unsupported"):
         selection_weights(
-            "blade", valid=valid, keep_fraction=0.5, step=500, seed=42, current=current,
+            "blade", valid=valid, keep_fraction=0.5, seed=42, index=index, current=current,
             reference=reference * 3,
         )
 
 
-def test_middle_ppl_drops_easy_and_hard_and_random_is_resumable() -> None:
+def test_middle_ppl_drops_easy_and_hard_and_random_is_index_deterministic() -> None:
     valid = torch.ones(1, 10, dtype=torch.bool)
     middle = selection_weights(
         "middle_ppl",
         valid=valid,
         keep_fraction=0.6,
-        step=0,
         seed=42,
+        index=torch.tensor([0]),
         reference=torch.arange(10.0).unsqueeze(0),
     )
     assert middle.bool().tolist() == [
         [False, False, True, True, True, True, True, True, False, False]
     ]
-    first = selection_weights("random", valid=valid, keep_fraction=0.6, step=125, seed=42)
-    resumed = selection_weights("random", valid=valid, keep_fraction=0.6, step=125, seed=42)
+    # A2: the mask depends only on (seed, index), never on world size, rank,
+    # step, or microbatch position -- calling with the same index twice must
+    # give the identical mask, and a different index must (almost certainly)
+    # give a different one.
+    first = selection_weights(
+        "random", valid=valid, keep_fraction=0.6, seed=42, index=torch.tensor([125])
+    )
+    resumed = selection_weights(
+        "random", valid=valid, keep_fraction=0.6, seed=42, index=torch.tensor([125])
+    )
     assert torch.equal(first, resumed)
+    different_index = selection_weights(
+        "random", valid=valid, keep_fraction=0.6, seed=42, index=torch.tensor([126])
+    )
+    assert not torch.equal(first, different_index)
+    different_seed = selection_weights(
+        "random", valid=valid, keep_fraction=0.6, seed=69, index=torch.tensor([125])
+    )
+    assert not torch.equal(first, different_seed)
 
 
 class Tiny(nn.Module):
@@ -447,6 +470,170 @@ def test_relative_ema_variants_and_resume_state() -> None:
     with seeded.swap_to(model):
         assert torch.equal(model.weight, torch.tensor([3.0, 5.0]))
     assert torch.equal(model.weight, torch.tensor([4.0, 4.0]))
+
+
+def _canonical_tensor_bytes(tensor: torch.Tensor) -> bytes:
+    """Canonicalize a tensor for hashing.
+
+    Cast to float64, move to CPU, force C-contiguous layout, and prefix with a
+    ``shape``/``dtype``/``order`` header (so two tensors that happen to share
+    raw bytes but differ in shape can never collide). ``.numpy().tobytes()``
+    on a C-contiguous CPU array is deterministic across runs/platforms in the
+    native (little-endian on every machine this project runs on) byte order.
+    """
+    arr = tensor.detach().to("cpu", dtype=torch.float64).contiguous()
+    header = f"shape={tuple(arr.shape)};dtype=float64;order=C;".encode("utf-8")
+    return header + arr.numpy().tobytes()
+
+
+def _sha256_of(*chunks: bytes) -> str:
+    digest = hashlib.sha256()
+    for chunk in chunks:
+        digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _random_mask_hash(*, data_seed: int) -> str:
+    """Exercise ``selection_weights("random", ...)`` the way ``train_module.py``
+    actually calls it post-A2: ``seed=config.seed`` (the arm's own
+    ``data_seed``, never combined with a microbatch offset), ``index`` the
+    batch's global instance ids. Includes a padded row, boundary indices (0,
+    1), a large instance id near the corpus's real size, and a row-order
+    permutation (to confirm the mask for a given index never depends on which
+    row it lands in)."""
+    valid = torch.ones(3, 12, dtype=torch.bool)
+    valid[2, -2:] = False  # a padded row, to exercise per_row_topk's validity handling
+    index_batches = [
+        torch.tensor([0, 1, 2], dtype=torch.int64),
+        torch.tensor([7, 1000, 4_885_155], dtype=torch.int64),
+        torch.tensor([2, 1, 0], dtype=torch.int64),
+    ]
+    masks = [
+        selection_weights("random", valid=valid, keep_fraction=0.6, seed=data_seed, index=index)
+        for index in index_batches
+    ]
+    return _sha256_of(_canonical_tensor_bytes(torch.stack(masks)))
+
+
+def test_random_selection_mask_matches_recorded_hash() -> None:
+    """Regression pin for the random-control masks' per-instance derivation (A2/E5).
+
+    Random-control and its seed-69 replicate are rerun under the unified
+    commit (they are no longer kept from an earlier commit), so this is a
+    plain regression guard on ``selection_weights("random", ...)`` and the
+    ``per_row_topk`` it calls -- not a cross-commit compatibility claim. It
+    exists so an accidental change to the per-instance derivation (the
+    ``per_instance_uniform``/``per_instance_tiebreak`` streams in
+    ``selection.py``) is caught immediately rather than only showing up as an
+    unexplained shift in a real run's logged masks.
+
+    These hashes were recorded by running the exact procedure in
+    ``_random_mask_hash`` once and asserting the result reproduces on every
+    later run. If this test fails after an intentional change to the random
+    method's derivation, re-record the hash *and* re-record
+    ``perplexity``/``rho-1``-adjacent numbers that might have shared a
+    seed/index convention; don't just paper over the failure.
+    """
+    assert ARM_SPECS["random-control"].data_seed == 42
+    assert ARM_SPECS["random-control-seed69"].data_seed == 69
+    assert _random_mask_hash(data_seed=42) == (
+        "248e6fb7221b22054884e7ef3a2868cc8572045b50b69f67cec14617e57831cd"
+    )
+    assert _random_mask_hash(data_seed=69) == (
+        "245592b3a2ef1cff08d64af385a6840f45b134e32d32403a7b802f9f4a69d24a"
+    )
+
+
+def test_per_instance_tiebreak_matches_recorded_hash() -> None:
+    """Regression pin for the shared tie-break stream every score-based method uses.
+
+    ``per_row_topk``/``per_row_middle`` break exact ties via this stream
+    (see ``selection.py``'s docstring for why: sort by score, then by this
+    per-instance uniform, via a stable sort over a random permutation).
+    BLADE's per-row selection (``_select_mask``) also calls this directly.
+    """
+    index = torch.tensor([0, 1, 4_885_155], dtype=torch.int64)
+    tb = per_instance_tiebreak(index, data_seed=42, length=8, device=torch.device("cpu"))
+    assert _sha256_of(_canonical_tensor_bytes(tb)) == (
+        "fcce154a8267157d68ee5ccc7914a89365811d19e53186a3910d397504938b6c"
+    )
+
+
+def test_tiebreak_is_index_deterministic_and_row_order_independent() -> None:
+    """All-tied scores: the tie-break stream alone decides which half is kept."""
+    valid = torch.ones(2, 6, dtype=torch.bool)
+    scores = torch.zeros(2, 6)
+    index = torch.tensor([3, 9])
+    tb = per_instance_tiebreak(index, data_seed=42, length=6, device=torch.device("cpu"))
+    mask_a = per_row_topk(scores, 0.5, valid, tiebreak=tb)
+    mask_b = per_row_topk(scores, 0.5, valid, tiebreak=tb)
+    assert torch.equal(mask_a, mask_b)
+
+    swapped_index = torch.tensor([9, 3])
+    tb_swapped = per_instance_tiebreak(
+        swapped_index, data_seed=42, length=6, device=torch.device("cpu")
+    )
+    mask_swapped = per_row_topk(scores, 0.5, valid, tiebreak=tb_swapped)
+    # Row 0 of mask_swapped (index 9) matches row 1 of mask_a (index 9), and
+    # vice versa: the mask for a given index doesn't depend on which row of
+    # the batch it lands in.
+    assert torch.equal(mask_a[0], mask_swapped[1])
+    assert torch.equal(mask_a[1], mask_swapped[0])
+
+    # No tiebreak (the legacy/default path): still a valid mask of the right
+    # size, just implementation-defined tie order.
+    untiebroken = per_row_topk(scores, 0.5, valid)
+    assert int(untiebroken.sum()) == 6  # round(0.5*6)=3 per row, 2 rows
+
+
+def test_ema_history_update_sequence_matches_recorded_hash() -> None:
+    """Regression pin for ``rel-ema-exp``'s ``EMAHistory`` update sequence and
+    ``ema_alpha`` schedule.
+
+    ``rel-ema-exp`` is rerun under the unified commit like every other arm;
+    this is a plain regression guard on ``EMAHistory``/``ema_alpha`` (both
+    untouched by the unification, the offline-scoring change, or the
+    per-instance mask change -- none of which this arm's method uses), not a
+    cross-commit compatibility claim.
+
+    This drives ``EMAHistory(model, seed=None)`` (the "zero" seed rel-ema-exp
+    actually uses) through 5 ``.update(model, alpha)`` calls with
+    ``alpha = ema_alpha(step, tau=300.0, constant=None)`` -- rel-ema-exp's own
+    ``ema_tau`` -- over a fixed, documented sequence of model weights, and
+    hashes the resulting sequence of shadow snapshots plus bias-correction
+    values. A separate hash covers the ``ema_alpha(t, tau=300.0, ...)``
+    schedule (``alpha(t) = 1 - exp(-t/300)`` per the README) at several ``t``.
+    """
+    assert ARM_SPECS["rel-ema-exp"].ema_seed == "zero"
+    assert ARM_SPECS["rel-ema-exp"].ema_tau == 300.0
+
+    model = Tiny()
+    ema = EMAHistory(model, seed=None)
+    shadow_snapshots = []
+    correction_snapshots = []
+    for step, value in enumerate([1.0, -2.0, 3.5, -0.25, 5.0]):
+        model.weight.data.copy_(torch.tensor([value, -value]))
+        alpha = ema_alpha(step, tau=300.0, constant=None)
+        ema.update(model, alpha)
+        shadow_snapshots.append(ema.shadow["weight"].clone())
+        correction_snapshots.append(ema.correction)
+    weights_history = torch.stack(shadow_snapshots)
+    corrections = torch.tensor(correction_snapshots, dtype=torch.float64)
+    ema_history_hash = _sha256_of(
+        _canonical_tensor_bytes(weights_history), _canonical_tensor_bytes(corrections)
+    )
+    assert ema_history_hash == (
+        "12b0da11585be86ef6362743162116fdad6fdb88fae6501d1a4ea1219879caad"
+    )
+
+    steps = (0, 1, 50, 150, 299, 300, 301, 600, 2360)
+    schedule = torch.tensor(
+        [ema_alpha(t, tau=300.0, constant=None) for t in steps], dtype=torch.float64
+    )
+    ema_alpha_schedule_hash = _sha256_of(_canonical_tensor_bytes(schedule))
+    assert ema_alpha_schedule_hash == (
+        "0f68bbc094d2e632910a9b3dc41fe5ba2f94c436736d2bca4e97c9c9a40791fd"
+    )
 
 
 def test_attention_received_matches_causal_definition() -> None:
@@ -514,7 +701,10 @@ class FakeBatchStream:
         self.cursor = cursor
 
     def next(self) -> dict:
-        batch = {"input_ids": torch.full((1, 2), self.cursor, dtype=torch.long)}
+        batch = {
+            "input_ids": torch.full((1, 2), self.cursor, dtype=torch.long),
+            "index": torch.tensor([self.cursor], dtype=torch.int64),
+        }
         self.cursor += 1
         return batch
 
@@ -579,6 +769,105 @@ def test_blade_new_reference_uses_given_lr_and_zero_decay_on_embeddings() -> Non
     assert all(g["lr"] == 5e-4 for g in callback.reference_optim.param_groups)
 
 
+def test_blade_reference_lr_is_floored_at_post_warmup() -> None:
+    """E1a: the step-0 sync must not train at LR 0.
+
+    A real ``CosWithWarmup`` schedule returns exactly 0.0 at step 0 (by
+    construction, during warmup). Reading the proxy's own scheduled LR
+    literally at the sync step -- the paper's "eta_w = eta_u" -- would leave
+    all 75 step-0 K-updates as no-ops, since AdamW at LR 0 changes nothing.
+    ``_reference_lr`` floors the queried step at ``reference_warmup_steps``,
+    so the step-0 sync reads the scheduler as if it were already past
+    warmup, while every later sync (already past warmup) is unaffected.
+    """
+    from olmo_core.optim import CosWithWarmup
+
+    warmup_steps = 24
+    scheduler = CosWithWarmup(warmup=warmup_steps, alpha_f=0.1)
+    peak_lr = 4e-4
+    total_steps = 2360
+
+    # Sanity: the raw schedule really does return 0 at step 0 and something
+    # positive once warmup has actually elapsed, confirming the bug this
+    # fix addresses is real.
+    assert scheduler.get_lr(peak_lr, 0, total_steps) == 0.0
+    assert scheduler.get_lr(peak_lr, warmup_steps, total_steps) == pytest.approx(peak_lr)
+
+    callback = BladeCallback(
+        total_steps=total_steps,
+        reference_factory=Tiny,
+        reference_train_stream=FakeStream(0),  # type: ignore[arg-type]
+        refhq_stream=FakeStream(0),  # type: ignore[arg-type]
+        reference_scheduler=scheduler,
+        reference_initial_lr=peak_lr,
+        reference_warmup_steps=warmup_steps,
+    )
+
+    # Step 0: floored at the post-warmup LR, not the raw (zero) schedule value.
+    assert callback._reference_lr(0) == pytest.approx(peak_lr)
+    # A later sync (already well past warmup) is unaffected by the floor.
+    assert callback._reference_lr(400) == scheduler.get_lr(peak_lr, 400, total_steps)
+    assert callback._reference_lr(400) < peak_lr  # cosine has decayed by then
+
+
+def test_blade_scores_reference_under_bf16_params_without_mutating_it() -> None:
+    """E1d: the scoring forward borrows bf16-cast weights via functional_call;
+    the reference's own (real, fp32) parameters, which the K-updates' AdamW
+    trains, must never be mutated by this."""
+    observed_dtypes = []
+
+    class Recorder(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.weight = nn.Parameter(torch.ones(2))
+
+        def forward(self, ids, **_kwargs):
+            observed_dtypes.append(self.weight.dtype)
+            return types.SimpleNamespace(ce_loss=ids.float())
+
+    callback = _blade_callback()
+    callback.reference = Recorder()
+    assert callback.reference.weight.dtype == torch.float32
+
+    ids = torch.zeros(1, 2, dtype=torch.long)
+    labels = torch.zeros(1, 2, dtype=torch.long)
+    callback._score_reference_bf16(ids, labels, {})
+
+    assert observed_dtypes == [torch.bfloat16]
+    assert callback.reference.weight.dtype == torch.float32
+
+
+def test_blade_sync_parity_flags_a_real_divergence(monkeypatch) -> None:
+    """E1d's post-sync check: if the two paths disagree, log a clear warning
+    rather than silently accepting a corrupted selection signal."""
+    callback = _blade_callback()
+    callback.trainer = types.SimpleNamespace(
+        train_module=types.SimpleNamespace(label_ignore_index=-100)
+    )
+    labels = torch.tensor([[1, 2, 3]])
+    monkeypatch.setattr(
+        callback,
+        "_proxy_and_reference_ce",
+        lambda batch: (labels, torch.tensor([[1.0, 1.0, 1.0]]), torch.tensor([[1.0, 1.0, 5.0]])),
+    )
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        selection_module.logging.Logger,
+        "warning",
+        lambda self, msg, *args: warnings.append(msg % args if args else msg),
+        raising=False,
+    )
+    import token_selection_370m.blade as blade_module
+
+    monkeypatch.setattr(
+        blade_module.log, "warning", lambda msg, *args: warnings.append(msg % args)
+    )
+
+    callback._log_sync_parity(0, {"input_ids": labels})
+
+    assert any("below the 99.9%" in message for message in warnings)
+
+
 def test_blade_backward_mean_ce_masks_the_train_term_and_leaves_val_unmasked(monkeypatch) -> None:
     callback = _blade_callback()
     callback._new_reference(lr=4e-4)
@@ -616,7 +905,11 @@ def test_blade_backward_mean_ce_masks_the_train_term_and_leaves_val_unmasked(mon
     assert all(call[2] == float(weighted.sum()) for call in calls)
 
 
-def test_blade_select_mask_is_exact_top_k_even_with_ties() -> None:
+def test_blade_select_mask_is_per_row_with_tiebreak() -> None:
+    """E1c: BLADE's selection is per_row_topk, the same unit and round()
+    formula every other arm uses -- not the paper's pooled ceil(gamma|B|)
+    over the whole batch. Ties are broken by the shared per-instance stream,
+    keyed on this arm's data_seed and the batch's global index."""
     callback = _blade_callback()
     callback.trainer = types.SimpleNamespace(
         train_module=types.SimpleNamespace(label_ignore_index=-100)
@@ -624,11 +917,14 @@ def test_blade_select_mask_is_exact_top_k_even_with_ties() -> None:
     labels = torch.tensor([[10, 11, 12, 13, 14]])
     proxy_ce = torch.tensor([[5.0, 5.0, 5.0, 5.0, 1.0]])
     reference_ce = torch.zeros_like(proxy_ce)  # every excess score ties at 5.0 except one
+    index = torch.tensor([0])
 
-    mask = callback._select_mask(labels, proxy_ce, reference_ce)
+    mask = callback._select_mask(labels, proxy_ce, reference_ce, index)
 
-    # gamma=0.6 of 5 valid tokens -> ceil(3.0) = 3, exactly, despite the tie.
+    # round(0.6*5)=3 per row, exactly per_row_topk's formula.
     assert int(mask.sum()) == 3
+    # Same index -> same tie-break -> same mask, deterministically.
+    assert torch.equal(mask, callback._select_mask(labels, proxy_ce, reference_ce, index))
 
 
 def test_blade_selection_scoring_microbatches_full_rank_batch(monkeypatch) -> None:
@@ -669,15 +965,15 @@ def test_blade_pre_step_writes_token_weight_not_labels(monkeypatch) -> None:
         "_proxy_and_reference_ce",
         lambda batch: (labels, proxy_ce, reference_ce),
     )
-    batch = {"input_ids": labels.clone()}
+    batch = {"input_ids": labels.clone(), "index": torch.tensor([0])}
 
     callback.pre_step(batch)
 
-    # ceil(0.6*4) = 3 tokens, by proxy-reference (4-3=1, 3-3=0, 2-3=-1, 1-3=-2):
-    # positions 0,1,2 beat position 3. Written as a weight, never touching
-    # "labels".
+    # round(0.6*4) = 2 tokens (per_row_topk's formula, per row), by
+    # proxy-reference (4-3=1, 3-3=0, 2-3=-1, 1-3=-2): positions 0,1 beat
+    # positions 2,3. Written as a weight, never touching "labels".
     assert "labels" not in batch
-    assert batch["token_weight"].bool().tolist() == [[True, True, True, False]]
+    assert batch["token_weight"].bool().tolist() == [[True, True, False, False]]
 
 
 def test_blade_pre_step_raises_without_a_reference() -> None:
@@ -705,6 +1001,7 @@ def test_blade_perform_sync_first_sync_has_no_outgoing_reference_to_score(monkey
         lambda *, lr: (sync_calls.append(lr), callback._new_reference(lr=lr))[-1],
     )
     monkeypatch.setattr(callback, "_run_k_updates", lambda *a, **k: None)
+    monkeypatch.setattr(callback, "_log_sync_parity", lambda *a, **k: None)
 
     callback._perform_sync(0)
 
@@ -712,7 +1009,13 @@ def test_blade_perform_sync_first_sync_has_no_outgoing_reference_to_score(monkey
     # uses alpha=1 (every RegMix token counts), matching the paper's
     # from-scratch-with-no-warmup first episode.
     assert scored == []
-    assert sync_calls == [4e-4]  # the default (constant) test schedule
+    # E1a: the reference LR is floored at its post-warmup value, so even a
+    # step-0 sync (where the proxy's own scheduler is still in warmup) trains
+    # at a real LR, not 0. The default test schedule/warmup (_ConstantSchedule,
+    # reference_warmup_steps=0) already returns the constant 4e-4 either way;
+    # see test_blade_reference_lr_is_floored_at_post_warmup for the case that
+    # actually exercises the floor against a real warmup schedule.
+    assert sync_calls == [4e-4]
     assert callback.last_sync == 0
     assert callback.reference is not None
 
@@ -735,6 +1038,7 @@ def test_blade_perform_sync_scores_before_overwriting_the_outgoing_reference(mon
     monkeypatch.setattr(callback, "_score_regmix_mask", score)
     monkeypatch.setattr(callback, "_sync_from_proxy", sync_from_proxy)
     monkeypatch.setattr(callback, "_run_k_updates", lambda *a, **k: None)
+    monkeypatch.setattr(callback, "_log_sync_parity", lambda *a, **k: None)
 
     callback._perform_sync(400)
 
@@ -808,7 +1112,7 @@ def test_blade_pre_step_fallback_reruns_a_pending_sync_on_resume(monkeypatch) ->
         ),
     )
 
-    callback.pre_step({"input_ids": torch.tensor([[1]])})
+    callback.pre_step({"input_ids": torch.tensor([[1]]), "index": torch.tensor([0])})
 
     assert events == [400]
 
@@ -943,12 +1247,14 @@ def test_identity_pins_reference_provenance(tmp_path: Path) -> None:
         rows=9_900_000_000,
     )
     binding = immutable_corpus_binding(arm.dataset_id, corpus)
+    manifest = {"algorithm": "reference-token-ce-v1", "complete": True, "reference_sha256": "a" * 64}
     identity = scientific_identity(
         arm,
         dataset_binding=binding,
         refhq_binding=None,
         max_tokens=9_900_000_000,
         reference_path=str(reference),
+        reference_scores_manifest=manifest,
     )
     assert identity["reference_contract"] == arm.reference_contract
     assert identity["reference_contract"] == INSTRUCT_REFERENCE_CONTRACT
@@ -959,6 +1265,21 @@ def test_identity_pins_reference_provenance(tmp_path: Path) -> None:
     assert identity["init_seed"] == arm.init_seed
     assert identity["data_seed"] == arm.data_seed
     assert identity["git_commit"] is None
+    # A1: the offline reference-scores table is pinned by contract name and by
+    # a manifest digest, so a resume refuses a changed table.
+    assert identity["reference_scores_contract"] == arm.reference_scores_contract
+    assert identity["reference_scores_contract"] == REFERENCE_SCORES_CONTRACT
+    assert len(identity["reference_scores_sha256"]) == 64
+
+    with pytest.raises(ValueError, match="reference-scores manifest"):
+        scientific_identity(
+            arm,
+            dataset_binding=binding,
+            refhq_binding=None,
+            max_tokens=9_900_000_000,
+            reference_path=str(reference),
+            reference_scores_manifest=None,
+        )
 
 
 def test_immutable_bindings_fail_closed_for_latest_and_missing_blade_refhq() -> None:
@@ -1021,6 +1342,13 @@ def test_production_recipe_statically_assembles_public_olmo_apis() -> None:
     # must be no functional pointer to a runpod/ path or module.
     assert "runpod/" not in source and "runpod." not in source and "import runpod" not in source
     assert "s3://" not in source
+    # E2: exact step count, not ceil(tokens/batch), with a no-wrap guard.
+    assert "max_duration=Duration.steps(steps)" in source
+    assert "steps > main_loader.total_batches" in source
+    # E7: every ladder checkpoint stays on disk for these runs.
+    assert "keep_all_checkpoints=True" in source
+    # E1a: BLADE's reference LR floor needs the proxy's own warmup length.
+    assert "reference_warmup_steps=WARMUP_STEPS" in source
 
 
 def test_packaged_evaluator_labels_match_production_contract() -> None:
@@ -1038,12 +1366,120 @@ def test_packaged_evaluator_labels_match_production_contract() -> None:
 
     assert labels == TASK_LOSS_RAW_LABELS
     assert '"--device-eval-batch-size", type=int, default=1' in evaluator_source
+    # E6: both sides build the same class, so any missing/unexpected key is a
+    # real bug -- no more tolerating up to 5% missing keys.
+    assert 'model.load_state_dict(payload["model"], strict=True)' in evaluator_source
+    assert "strict=False" not in evaluator_source
     # There is no RunPod image or Dockerfile anymore: every run's requirements
     # are installed by farmshare/setup_venv.sh directly.
     requirements = (EDULLM_ROOT / "requirements-token-selection-eval.txt").read_text(
         encoding="utf-8"
     )
     assert "transformers==4.57.6" in requirements
+
+
+def test_write_identity_keeps_environment_out_of_the_resume_fingerprint(tmp_path: Path) -> None:
+    """E8: torch/CUDA/driver/GPU/pip facts are recorded for the record, but
+    never fold into the resume-blocking fingerprint -- a driver or dependency
+    bump between a run and its resume shouldn't refuse the resume the way a
+    real scientific-identity change does."""
+    from production_contract.checkpoint import assert_resume_fingerprint
+
+    save_folder = tmp_path / "save"
+    progress_dir = tmp_path / "progress"
+    save_folder.mkdir()
+    identity = {"arm": "rho-1", "seed": 42}
+    environment = {"torch_version": "2.9.0", "gpu_name": "L40S"}
+
+    write_identity(save_folder, progress_dir, identity, environment=environment)
+
+    fingerprint_text = (save_folder / "run_fingerprint.json").read_text(encoding="utf-8")
+    assert "torch_version" not in fingerprint_text
+    assert "L40S" not in fingerprint_text
+
+    record = json.loads((progress_dir / "run_identity.json").read_text(encoding="utf-8"))
+    assert record["environment"] == environment
+
+    # A resume checks only the fingerprint; a changed environment must never
+    # be able to make this raise.
+    assert_resume_fingerprint(save_folder, identity)
+
+
+def test_runtime_environment_reports_facts_and_tolerates_probe_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """E8: torch/CUDA/python facts are read directly; nvidia-smi and pip
+    freeze are best-effort (missing on a laptop, or on a node without a GPU)
+    and must never raise out of this function."""
+    import subprocess
+
+    import token_selection_entrypoint as entrypoint
+
+    def failing_check_output(*_args, **_kwargs):
+        raise FileNotFoundError("nvidia-smi not found")
+
+    monkeypatch.setattr(subprocess, "check_output", failing_check_output)
+
+    info = entrypoint.runtime_environment()
+
+    assert set(info) == {
+        "torch_version",
+        "cuda_version",
+        "python_version",
+        "gpu_name",
+        "nvidia_driver_version",
+        "pip_freeze_sha256",
+    }
+    assert info["nvidia_driver_version"] is None
+    assert info["pip_freeze_sha256"] is None
+    assert isinstance(info["torch_version"], str)
+
+
+def test_resolve_reference_scores_fails_closed_on_missing_or_incomplete_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A1: the entrypoint refuses to launch rho-1/perplexity against a table
+    that isn't there, or that a crashed/killed scoring job never finished."""
+    import token_selection_entrypoint as entrypoint
+
+    incomplete_root = tmp_path / "reference-scores" / "incomplete"
+    incomplete_root.mkdir(parents=True)
+    reference_scores_module.write_manifest(
+        incomplete_root,
+        {
+            "schema_version": reference_scores_module.MANIFEST_SCHEMA_VERSION,
+            "algorithm": reference_scores_module.ALGORITHM,
+            "complete": False,
+            "reference_sha256": "deadbeef",
+            "corpus_binding": {},
+            "sequence_length": 4,
+            "rows": 1,
+            "dtype": "float32",
+        },
+    )
+    manifest_path = tmp_path / "ready.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "family": "token-selection",
+                "corpora": {},
+                "reference_scores": {"present-but-incomplete": str(incomplete_root)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EDULLM_INPUT_MANIFEST", str(manifest_path))
+
+    # An arm with no reference-scores contract (e.g. "attention") never
+    # touches the manifest at all.
+    assert entrypoint.resolve_reference_scores(None) == (None, None)
+
+    with pytest.raises(RuntimeError, match="not complete"):
+        entrypoint.resolve_reference_scores("present-but-incomplete")
+
+    with pytest.raises(RuntimeError, match="no materialized reference-score table"):
+        entrypoint.resolve_reference_scores("missing-entirely")
 
 
 def test_entrypoint_builds_and_fits_production_trainer(
@@ -1083,7 +1519,12 @@ def test_entrypoint_builds_and_fits_production_trainer(
     monkeypatch.setitem(sys.modules, "olmo_core.utils", fake_utils)
     monkeypatch.setattr(entrypoint, "resolve_corpus", lambda **kwargs: Corpus())
     monkeypatch.setattr(entrypoint, "build_trainer", fake_build)
-    monkeypatch.setattr(entrypoint, "write_identity", lambda *args: events.append("identity"))
+    monkeypatch.setattr(
+        entrypoint, "write_identity", lambda *args, **kwargs: events.append("identity")
+    )
+    # E8: a real environment probe (nvidia-smi, pip freeze) is exercised by
+    # runtime_environment's own unit coverage, not by this wiring test.
+    monkeypatch.setattr(entrypoint, "runtime_environment", lambda: {"fake": "env"})
     monkeypatch.setattr(
         entrypoint,
         "assert_production_runtime",

@@ -14,10 +14,14 @@ checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 940]  # omit 875 (65 steps 
 frozen_reference:
   step: 940
   contract: instruct-reference-370m/checkpoints/step940
-  consumers: [rho-1, blade]
+  # rho-1 and perplexity both read this checkpoint (perplexity migrated off
+  # the retired HQ reference). BLADE reads the refhq-instruct *corpus* as its
+  # L_val stream, not this checkpoint -- it syncs its own dynamic reference
+  # from the proxy, independent of this arm.
+  consumers: [rho-1, perplexity]
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: 97a19bb8
+  revision: 3ffb5175
 wandb_project: token-selection
 status: trained-in-this-study

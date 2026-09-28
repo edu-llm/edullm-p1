@@ -7,8 +7,36 @@ import math
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, Optional
 
+import numpy as np
 import torch
 from torch import Tensor, nn
+
+# Two independent per-instance random streams, namespaced so the "random"
+# method's own selection scores never correlate with the tie-break stream
+# every score-based method uses. Values are arbitrary; only their distinctness
+# matters.
+_RANDOM_MASK_TAG = 0x5A1E5
+_TIEBREAK_TAG = 0x71EBAA
+
+
+def _per_instance_uniform(
+    index: Tensor, *, data_seed: int, tag: int, length: int, device: torch.device
+) -> Tensor:
+    """Deterministic float32 U[0,1) draws, one row of ``length`` per instance id.
+
+    Depends only on ``(tag, data_seed, instance index)`` -- not on world size,
+    rank, microbatch composition, or where the instance lands in a batch. Two
+    ArmSpecs with different ``data_seed``s never draw the same stream, and a
+    single arm's stream never repeats across instances.
+    """
+    rows = index.shape[0]
+    out = np.empty((rows, length), dtype=np.float32)
+    for row, idx in enumerate(index.detach().to("cpu", dtype=torch.int64).tolist()):
+        rng = np.random.Generator(
+            np.random.PCG64(np.random.SeedSequence([tag, int(data_seed), int(idx)]))
+        )
+        out[row] = rng.random(length, dtype=np.float32)
+    return torch.from_numpy(out).to(device)
 
 
 def _local(tensor: Tensor) -> Tensor:
@@ -54,14 +82,35 @@ def _reshard(model: nn.Module) -> None:
             module.reshard()
 
 
-def per_row_topk(scores: Tensor, fraction: float, valid: Tensor) -> Tensor:
+def _tiebroken_order(values: Tensor, tiebreak: Optional[Tensor], *, descending: bool) -> Tensor:
+    """Argsort ``values`` along the last dim, breaking exact ties via ``tiebreak``.
+
+    Shuffles by a random permutation (``tiebreak.argsort()``), then takes a
+    *stable* sort of the shuffled values: a stable sort preserves the relative
+    order of non-tied elements exactly, while tied elements keep the random
+    relative order the permutation gave them. With ``tiebreak=None``, falls
+    back to a plain (implementation-defined tie order) argsort.
+    """
+    if tiebreak is None:
+        return values.argsort(dim=-1, descending=descending)
+    perm = tiebreak.argsort(dim=-1)
+    shuffled = values.gather(-1, perm)
+    shuffled_order = shuffled.argsort(dim=-1, descending=descending, stable=True)
+    return perm.gather(-1, shuffled_order)
+
+
+def per_row_topk(
+    scores: Tensor, fraction: float, valid: Tensor, *, tiebreak: Optional[Tensor] = None
+) -> Tensor:
     fraction = min(max(float(fraction), 1e-8), 1.0)
     shape = scores.shape
     values = scores.reshape(-1, shape[-1]).masked_fill(~valid.reshape(-1, shape[-1]), -torch.inf)
     validity = valid.reshape_as(values)
     count = validity.sum(-1)
     keep_count = torch.minimum(torch.clamp((count.float() * fraction).round().long(), min=1), count)
-    order = values.argsort(dim=-1, descending=True)
+    order = _tiebroken_order(
+        values, None if tiebreak is None else tiebreak.reshape_as(values), descending=True
+    )
     ranks = torch.empty_like(order)
     ranks.scatter_(
         1,
@@ -71,7 +120,9 @@ def per_row_topk(scores: Tensor, fraction: float, valid: Tensor) -> Tensor:
     return ((ranks < keep_count[:, None]) & validity).reshape(shape)
 
 
-def per_row_middle(scores: Tensor, fraction: float, valid: Tensor) -> Tensor:
+def per_row_middle(
+    scores: Tensor, fraction: float, valid: Tensor, *, tiebreak: Optional[Tensor] = None
+) -> Tensor:
     fraction = min(max(float(fraction), 1e-8), 1.0)
     shape = scores.shape
     values = scores.reshape(-1, shape[-1]).masked_fill(~valid.reshape(-1, shape[-1]), torch.inf)
@@ -79,7 +130,9 @@ def per_row_middle(scores: Tensor, fraction: float, valid: Tensor) -> Tensor:
     count = validity.sum(-1)
     keep_count = torch.minimum(torch.clamp((count.float() * fraction).round().long(), min=1), count)
     lower = (count - keep_count) // 2
-    order = values.argsort(dim=-1)
+    order = _tiebroken_order(
+        values, None if tiebreak is None else tiebreak.reshape_as(values), descending=False
+    )
     ranks = torch.empty_like(order)
     ranks.scatter_(
         1,
@@ -91,19 +144,37 @@ def per_row_middle(scores: Tensor, fraction: float, valid: Tensor) -> Tensor:
     )
 
 
+def per_instance_tiebreak(
+    index: Tensor, *, data_seed: int, length: int, device: torch.device
+) -> Tensor:
+    """The same per-instance tie-break stream ``selection_weights`` uses internally.
+
+    For callers that build masks directly via ``per_row_topk``/``per_row_middle``
+    instead of going through ``selection_weights`` (BLADE's per-row selection,
+    which has no ``method`` case in ``selection_weights`` -- see its docstring).
+    """
+    return _per_instance_uniform(index, data_seed=data_seed, tag=_TIEBREAK_TAG, length=length, device=device)
+
+
 def selection_weights(
     method: str,
     *,
     valid: Tensor,
     keep_fraction: float,
-    step: int,
     seed: int,
+    index: Tensor,
     current: Optional[Tensor] = None,
     history: Optional[Tensor] = None,
     reference: Optional[Tensor] = None,
     attention: Optional[Tensor] = None,
 ) -> Tensor:
     """Return float weights; all reported methods reduce to a deterministic 0/1 mask.
+
+    ``index`` is the batch's global instance id (``batch["index"]``, shape
+    ``(rows,)``): every per-instance random stream (the ``random`` method's
+    own scores, and every method's tie-break) is keyed on it together with
+    ``seed`` (the arm's ``data_seed``), so a mask depends only on which
+    instances are in the batch, never on world size, rank, or microbatch size.
 
     ``blade`` is not handled here: BLADE's own token weights are computed by
     ``BladeCallback`` (proxy-vs-outgoing-reference excess loss over the whole
@@ -112,108 +183,34 @@ def selection_weights(
     """
     if method == "full":
         return valid.float()
+    length = valid.shape[-1]
+    tiebreak = _per_instance_uniform(
+        index, data_seed=seed, tag=_TIEBREAK_TAG, length=length, device=valid.device
+    )
     if method == "random":
-        generator = torch.Generator(device=valid.device)
-        generator.manual_seed(int(seed) + int(step) * 1_000_003)
-        scores = torch.rand(valid.shape, device=valid.device, generator=generator)
-        mask = per_row_topk(scores, keep_fraction, valid)
+        scores = _per_instance_uniform(
+            index, data_seed=seed, tag=_RANDOM_MASK_TAG, length=length, device=valid.device
+        )
+        mask = per_row_topk(scores, keep_fraction, valid, tiebreak=tiebreak)
     elif method == "rho_excess":
         if current is None or reference is None:
             raise ValueError("RHO-1 requires current and reference losses")
-        mask = per_row_topk(current - reference, keep_fraction, valid)
+        mask = per_row_topk(current - reference, keep_fraction, valid, tiebreak=tiebreak)
     elif method == "rel_ema":
         if current is None or history is None:
             raise ValueError("relative EMA requires current and history losses")
-        mask = per_row_topk(current - history, keep_fraction, valid)
+        mask = per_row_topk(current - history, keep_fraction, valid, tiebreak=tiebreak)
     elif method == "middle_ppl":
         if reference is None:
             raise ValueError("middle-PPL requires frozen reference losses")
-        mask = per_row_middle(reference, keep_fraction, valid)
+        mask = per_row_middle(reference, keep_fraction, valid, tiebreak=tiebreak)
     elif method == "attention_topk":
         if attention is None:
             raise ValueError("attention selection requires received-attention scores")
-        mask = per_row_topk(attention, keep_fraction, valid)
+        mask = per_row_topk(attention, keep_fraction, valid, tiebreak=tiebreak)
     else:
         raise ValueError(f"unsupported token-selection method {method!r}")
     return mask.float()
-
-
-class WeightShadow:
-    """Immutable rank-local weights temporarily swapped into a sharded training model."""
-
-    VERSION = 1
-
-    def __init__(self, weights: Mapping[str, Tensor]):
-        self.weights = {name: value.detach().clone() for name, value in weights.items()}
-        if not self.weights:
-            raise ValueError("a weight shadow cannot be empty")
-
-    @classmethod
-    def from_state_dict(cls, model: nn.Module, state: Mapping[str, Tensor]) -> "WeightShadow":
-        missing = [name for name, _ in model.named_parameters() if name not in state]
-        if missing:
-            raise KeyError(f"reference is missing model parameters: {missing[:8]}")
-        local_shards: dict[str, Tensor] = {}
-        with torch.no_grad():
-            for name, parameter in model.named_parameters():
-                destination = _local(parameter)
-                training_shard = destination.detach().clone()
-                try:
-                    _write(parameter, state[name])
-                    local_shards[name] = _local(parameter).detach().clone()
-                finally:
-                    _local(parameter).copy_(training_shard)
-        shadow = cls.__new__(cls)
-        shadow.weights = local_shards
-        return shadow
-
-    @contextlib.contextmanager
-    def swap_to(self, model: nn.Module) -> Iterator[nn.Module]:
-        saved: dict[str, Tensor] = {}
-        try:
-            with torch.no_grad():
-                for name, parameter in model.named_parameters():
-                    if name in self.weights:
-                        destination = _local(parameter)
-                        reference = self.weights[name]
-                        if (
-                            reference.shape != destination.shape
-                            or reference.device != destination.device
-                            or reference.dtype != destination.dtype
-                        ):
-                            raise RuntimeError(
-                                f"reference local shard for {name!r} no longer matches parameter: "
-                                f"reference={tuple(reference.shape)}/{reference.device}/{reference.dtype}, "
-                                f"parameter={tuple(destination.shape)}/{destination.device}/{destination.dtype}"
-                            )
-                        saved[name] = destination.detach().clone()
-                        destination.copy_(reference)
-            yield model
-        finally:
-            with torch.no_grad():
-                _reshard(model)
-                for name, parameter in model.named_parameters():
-                    if name in saved:
-                        _local(parameter).copy_(saved[name])
-
-    def state_dict(self) -> dict[str, Any]:
-        return {
-            "version": self.VERSION,
-            "weights": {name: value.detach().cpu() for name, value in self.weights.items()},
-        }
-
-    def load_state_dict(self, state: Mapping[str, Any]) -> None:
-        if state.get("version") != self.VERSION or not isinstance(state.get("weights"), Mapping):
-            raise ValueError("invalid frozen-reference state")
-        loaded: dict[str, Tensor] = {}
-        for name, value in state["weights"].items():
-            if not isinstance(value, Tensor):
-                continue
-            target = self.weights.get(str(name))
-            loaded[str(name)] = (
-                value.detach().to(target).clone() if target is not None else value.detach().clone()
-            )
-        self.weights = loaded
 
 
 class EMAHistory:

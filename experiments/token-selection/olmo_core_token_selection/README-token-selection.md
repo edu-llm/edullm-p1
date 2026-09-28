@@ -12,20 +12,19 @@ parameters/fp32 reductions, and compilation enabled.
 Every run trains on FarmShare, on one 4×L40S node, through
 `token_selection_entrypoint.py` (see `.edullm/farmshare/`). There is no
 RunPod path, no AWS/S3 code, and no separate submission platform anywhere in
-this tree: corpora are pinned local FarmShare directories, and the two
-reference checkpoints (`hq-reference`, `instruct-reference`) are trained by
+this tree: corpora are pinned local FarmShare directories, and the
+reference checkpoint (`instruct-reference`) is trained by
 this branch's own arms, not downloaded from anywhere.
 
 ## Arms
 
 | arm | method | keep | notes |
 |---|---|---:|---|
-| `hq-reference` | `full` | 100% | trains the HQ reference the `perplexity` arm scores against |
-| `instruct-reference` | `full` | 100% | trains the Instruct reference the `rho-1` arm scores against, and BLADE's L_val stream |
+| `instruct-reference` | `full` | 100% | trains the frozen Instruct reference `rho-1` and `perplexity` both score against, and BLADE's L_val stream |
 | `full-loss-control` | `full` | 100% | |
 | `rho-1` | `rho_excess` (top `L_curr - L_ref`) | 60% | frozen `instruct-reference` step 940 |
 | `rel-ema-exp` | `rel_ema` (top `L_curr - L_hist`) | 60% | zero-seeded bias-corrected EMA, `alpha(t) = 1 - exp(-t/300)` |
-| `perplexity` | `middle_ppl` (middle 60% by frozen loss) | 60% | frozen average of `hq-reference` steps 1000/1125/1315 |
+| `perplexity` | `middle_ppl` (middle 60% by frozen loss) | 60% | frozen `instruct-reference` step 940 |
 | `attention` | `attention_topk` (top position-normalized, target-aligned attention received) | 60% | |
 | `blade` | `blade` (top `L_proxy - L_ref`, selection-weighted reference update) | 60% | syncs at steps 0/400/800/1200/1600/2000, `tau=400`, `K=75`, `gamma=0.6`, `lambda=1.0`; second stream `pretrain/refhq-instruct` |
 | `random-control` | `random` | 60% | data seed 42, init seed 6198 |
@@ -49,11 +48,14 @@ builds it from the pinned directories in `farmshare/stage_local.py`'s
 `CORPUS_SOURCES`, verified against this repository's paper counterpart's
 `datasets/manifests/*/outputs.json`). Checkpoint identity binds the resolved
 version, dtype, row count, and SHA-256 of the ordered object-path list; BLADE
-binds its `refhq-instruct` stream independently. Reference checkpoints
-(`EDULLM_REFERENCE_PATH`) are materialized flat `.pt` files, bound by their
-own SHA-256 into the run identity: `rho-1` reads
-`instruct-reference`'s step 940, and `perplexity` reads the float32 average
-of `hq-reference`'s steps 1000, 1125, and 1315.
+binds its `refhq-instruct` stream independently. Reference checkpoints are
+materialized flat `.pt` files, resolved via `resolve_reference_path()` from
+the local manifest and bound by their own SHA-256 into the run identity:
+`rho-1` and `perplexity` both read `instruct-reference`'s step 940. Those two
+arms also read a second, offline artifact -- a per-instance reference-loss
+table computed once by `farmshare/score_reference.py` (see
+`token_selection_370m/reference_scores.py`) -- resolved via
+`resolve_reference_scores()` and bound the same way.
 
 Outputs stay on FarmShare scratch and synchronously upload to W&B; only the
 true final checkpoint uploads as a model artifact. A fresh run refuses a

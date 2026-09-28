@@ -10,12 +10,11 @@ Two modes, run in order:
                       on the same shared filesystem every training job runs
                       on, so ready.json just points at them directly.
 
-  --mode references   Materialize the HQ and Instruct reference checkpoints
-                      (trained by the hq-reference/instruct-reference arms
-                      in this same study) into flat .pt files, average the
-                      HQ ones, and add them to ready.json under their
-                      symbolic reference contract names. Run this only after
-                      those two arms' training has finished.
+  --mode references   Materialize the Instruct reference checkpoint (trained
+                      by the instruct-reference arm in this same study) into
+                      a flat .pt file and add it to ready.json under its
+                      symbolic reference contract name. Run this only after
+                      that arm's training has finished.
 
 Every path here is local; there is no boto3, no S3 URI, and no edullm_data
 import in this file or anywhere else in this tree.
@@ -34,10 +33,7 @@ if str(EDULLM_DIR) not in sys.path:
     sys.path.insert(0, str(EDULLM_DIR))
 
 from token_selection_370m.arms import (  # noqa: E402
-    HQ_REFERENCE_AVERAGED_STEPS,
-    HQ_REFERENCE_CONTRACT,
     INSTRUCT_REFERENCE_CONTRACT,
-    REFHQ_5P5B,
     REFHQ_INSTRUCT,
     REGMIX,
 )
@@ -50,19 +46,6 @@ CORPUS_SOURCES: dict[str, dict] = {
     REGMIX: {
         "version": "v1",
         "root": "/scratch/users/nzhao2/agent-runs/regmix-10b-20260725-124810/tokenized",
-        "files": [
-            "dclm/dclm.npy",
-            "arxiv/arxiv.npy",
-            "starcoder/starcoder.npy",
-            "pes2o/pes2o.npy",
-            "open-web-math/open-web-math.npy",
-            "algebraic-stack/algebraic-stack.npy",
-            "wiki/wiki.npy",
-        ],
-    },
-    REFHQ_5P5B: {
-        "version": "v1",
-        "root": "/scratch/users/nzhao2/refhq-regmix-5p5b-v1/tokenized",
         "files": [
             "dclm/dclm.npy",
             "arxiv/arxiv.npy",
@@ -149,39 +132,6 @@ def stage_corpora(manifest_path: Path) -> None:
     print(f"wrote {manifest_path}")
 
 
-def _average_checkpoints(materialized: list[Path], output: Path) -> None:
-    """Float32-average several materialized .pt checkpoints (HQ steps 1000/1125/1315)."""
-    import torch
-
-    def model_state(path: Path) -> dict:
-        payload = torch.load(path, map_location="cpu", weights_only=False)
-        state = payload.get("model") if isinstance(payload, dict) else None
-        if not isinstance(state, dict) or not state:
-            raise RuntimeError(f"materialized checkpoint has no model state: {path}")
-        return state
-
-    states = [model_state(path) for path in materialized]
-    keys = set(states[0])
-    if any(set(state) != keys for state in states[1:]):
-        raise RuntimeError("HQ reference checkpoints have different parameter keys")
-    averaged = {}
-    for key, first in states[0].items():
-        if first.is_floating_point():
-            accumulator = first.detach().to(torch.float32).clone()
-            for state in states[1:]:
-                other = state[key]
-                if other.shape != first.shape:
-                    raise RuntimeError(f"HQ reference shape mismatch for {key}")
-                accumulator.add_(other.detach().to(torch.float32))
-            averaged[key] = (accumulator / len(states)).to(first.dtype)
-        else:
-            averaged[key] = first.detach().clone()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = output.with_suffix(".pt.partial")
-    torch.save({"model": averaged, "steps": list(HQ_REFERENCE_AVERAGED_STEPS)}, temporary)
-    temporary.replace(output)
-
-
 def stage_references(manifest_path: Path, run_root: Path) -> None:
     from eval_task_loss_olmo_core import materialize_model_eval
 
@@ -195,17 +145,6 @@ def stage_references(manifest_path: Path, run_root: Path) -> None:
     instruct_flat = materialize_model_eval(instruct_checkpoint)
     payload["references"][INSTRUCT_REFERENCE_CONTRACT] = str(instruct_flat)
     print(f"materialized instruct reference: {instruct_flat}")
-
-    hq_materialized = []
-    for step in HQ_REFERENCE_AVERAGED_STEPS:
-        checkpoint = run_root / "hq-reference" / "checkpoints" / f"step{step}"
-        if not checkpoint.is_dir():
-            raise RuntimeError(f"hq-reference has not produced step{step} yet: {checkpoint}")
-        hq_materialized.append(materialize_model_eval(checkpoint))
-    hq_averaged = manifest_path.parent / "references" / "hq_reference_average_1000_1125_1315.pt"
-    _average_checkpoints(hq_materialized, hq_averaged)
-    payload["references"][HQ_REFERENCE_CONTRACT] = str(hq_averaged)
-    print(f"averaged HQ reference: {hq_averaged}")
 
     _write_manifest(manifest_path, payload)
     print(f"wrote {manifest_path}")

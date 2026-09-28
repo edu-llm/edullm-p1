@@ -14,9 +14,13 @@ reference:
   arm: instruct-reference
   step: 940
   contract: instruct-reference-370m/checkpoints/step940
+  # Offline per-instance table (see olmo_core_token_selection/token_selection_370m/
+  # reference_scores.py), not a resident model: scored once, on FarmShare's 1-GPU
+  # qos=normal lane, against the checkpoint above.
+  reference_scores_contract: instruct-reference-370m-step940/regmix-10b-v1
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: 97a19bb8
+  revision: 3ffb5175
 wandb_project: token-selection
 status: rerun-under-unified-commit

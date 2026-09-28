@@ -1,12 +1,11 @@
 # Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["random-control"]
 # Non-scientific baseline: masks a uniformly random 60% of valid tokens per row from
-# the loss. Kept run -- NOT rerun under the unified commit; ran commit 53daffdf, whose
-# random-selection code path is unchanged in the unification (protected by a golden
-# hash test in tests/test_token_selection_370m.py).
+# the loss, drawn per instance (SeedSequence([tag, data_seed, index])) so the mask
+# never depends on world size, rank, or microbatch composition.
 name: random-control
 method: random
 dataset_id: pretrain/regmix-10b
-run_id: random-control-regmix10b-v1
+run_id: random-control-regmix10b
 keep_fraction: 0.6
 init_seed: 6198
 data_seed: 42
@@ -18,7 +17,6 @@ reference: null
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: 53daffdf
+  revision: 3ffb5175
 wandb_project: token-selection
-status: kept-not-rerun
-wandb_run: fa841187ff07e9164da282efd353c217
+status: rerun-under-unified-commit

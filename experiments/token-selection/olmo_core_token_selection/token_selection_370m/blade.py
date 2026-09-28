@@ -16,7 +16,17 @@ LLM Training"), Sec. 2.2 / Algorithm 1 / App. A.1, C:
   matches the paper's "warm up the proxy, then sync at t=0" schedule collapsed
   to a from-scratch run with no warmup.
 - A fresh AdamW is created at every sync (no momentum carried across episodes),
-  at the proxy's own scheduled LR for that step, held constant through K.
+  at the proxy's own scheduled LR for that step (never below its post-warmup
+  value -- see ``_reference_lr``, which is where this departs from a literal
+  reading of eta_w = eta_u: the paper's eta_u is already-warmed-up when
+  training starts, since their proxy trains "a few steps" before selection
+  ever begins, while this from-scratch run's warmup and selection both start
+  at step 0), held constant through K.
+- Selection -- both the proxy's per-step top-gamma mask and the K-updates'
+  alpha mask -- is per row (``per_row_topk``), the same unit and exact keep
+  count as every other arm, not the paper's pooled top-gamma|B_cand| over the
+  whole candidate batch. This makes BLADE's keep rate identical to every other
+  arm's and removes its dependence on world size / rank batch size.
 """
 
 from __future__ import annotations
@@ -35,6 +45,8 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 
 log = logging.getLogger(__name__)
+
+from .selection import per_instance_tiebreak, per_row_topk
 
 try:  # OLMo's optional runtime dependencies are not available in pure unit-test hosts.
     from olmo_core.data.utils import get_labels, split_batch
@@ -192,6 +204,8 @@ class BladeCallback(Callback):
         schedule: BladeSchedule = BladeSchedule(),
         reference_scheduler: Any = _DEFAULT_SCHEDULE,
         reference_initial_lr: float = 4e-4,
+        reference_warmup_steps: int = 0,
+        data_seed: int = 42,
         max_grad_norm: float = 1.0,
         reference_microbatch_tokens: int = BLADE_REFERENCE_MICROBATCH_TOKENS,
         selection_microbatch_tokens: int = BLADE_SELECTION_MICROBATCH_TOKENS,
@@ -204,6 +218,15 @@ class BladeCallback(Callback):
         self.schedule = schedule
         self.reference_scheduler = reference_scheduler
         self.reference_initial_lr = float(reference_initial_lr)
+        # The proxy's own scheduler returns 0.0 during warmup (by construction,
+        # at step 0). The paper's eta_w = eta_u assumes eta_u is already
+        # warmed up, since their proxy pretrains before selection ever starts;
+        # this from-scratch run selects from step 0, so every sync (including
+        # the very first, at step 0) reads the scheduler as if it were at
+        # least at the end of the proxy's own warmup. Syncs after warmup ends
+        # are completely unaffected.
+        self.reference_warmup_steps = int(reference_warmup_steps)
+        self.data_seed = int(data_seed)
         self.max_grad_norm = float(max_grad_norm)
         self.reference_microbatch_tokens = int(reference_microbatch_tokens)
         if self.reference_microbatch_tokens <= 0:
@@ -263,6 +286,20 @@ class BladeCallback(Callback):
         ]
         self.reference_optim = torch.optim.AdamW(
             groups, lr=lr, betas=(0.9, 0.95), foreach=False
+        )
+
+    def _reference_lr(self, sync_step: int) -> float:
+        """The proxy's own scheduled LR at ``sync_step``, floored at its post-warmup value.
+
+        See the module docstring and the ``reference_warmup_steps`` constructor
+        note: this is what keeps the step-0 sync from training at LR 0.
+        """
+        return float(
+            self.reference_scheduler.get_lr(
+                self.reference_initial_lr,
+                max(int(sync_step), self.reference_warmup_steps),
+                self.total_steps,
+            )
         )
 
     def _sync_from_proxy(self, *, lr: float) -> None:
@@ -373,6 +410,44 @@ class BladeCallback(Callback):
         for parameter in self.reference.parameters():
             parameter.requires_grad_(False)
 
+    def _score_reference_bf16(
+        self, ids: Tensor, labels: Tensor, model_kwargs: dict[str, Any]
+    ) -> Any:
+        """Score ``self.reference`` under bf16 parameters, matching the proxy's storage.
+
+        The proxy is FSDP2-wrapped with ``param_dtype=bf16`` (its parameters
+        are physically bf16 at rest, not just autocast-downcast per op); this
+        reference is a plain unsharded fp32 module, so scoring it directly
+        leaves norm/embedding weights (which autocast does not touch) at full
+        fp32 precision the proxy never has, a systematic gap even right after
+        a sync when the two models' weights are otherwise identical. This
+        borrows bf16-cast weights for the forward via ``functional_call``
+        without mutating ``self.reference`` itself -- its real fp32
+        parameters are what the K-updates' AdamW trains, and *must* stay fp32
+        there (bf16 master weights would make many small AdamW updates round
+        away to nothing over the K-update loop).
+        """
+        import torch.func
+
+        assert self.reference is not None
+        bf16_params = {
+            name: value.to(torch.bfloat16) for name, value in self.reference.named_parameters()
+        }
+        buffers = dict(self.reference.named_buffers())
+        with _autocast(ids.device):
+            return torch.func.functional_call(
+                self.reference,
+                (bf16_params, buffers),
+                args=(ids,),
+                kwargs=dict(
+                    labels=labels,
+                    ignore_index=-100,
+                    loss_reduction="none",
+                    return_logits=False,
+                    **model_kwargs,
+                ),
+            )
+
     def _proxy_and_reference_ce_microbatch(
         self, batch: dict[str, Any]
     ) -> tuple[Tensor, Tensor, Tensor]:
@@ -397,14 +472,7 @@ class BladeCallback(Callback):
                 return_logits=False,
                 **model_kwargs,
             )
-            reference = self.reference(
-                ids,
-                labels=labels,
-                ignore_index=module.label_ignore_index,
-                loss_reduction="none",
-                return_logits=False,
-                **model_kwargs,
-            )
+            reference = self._score_reference_bf16(ids, labels, model_kwargs)
         module.model.train(was_training)
         module._model_mode = "train" if was_training else "eval"
         return labels, _output_ce(proxy, labels), _output_ce(reference, labels)
@@ -431,28 +499,62 @@ class BladeCallback(Callback):
             torch.cat(reference_ce, dim=0),
         )
 
-    def _select_mask(self, labels: Tensor, proxy_ce: Tensor, reference_ce: Tensor) -> Tensor:
-        """Exact top-``gamma`` mask by (proxy - reference) excess loss.
+    def _select_mask(
+        self, labels: Tensor, proxy_ce: Tensor, reference_ce: Tensor, index: Tensor
+    ) -> Tensor:
+        """Per-row top-``gamma`` mask by (proxy - reference) excess loss.
 
-        Uses ``topk`` indices rather than a ``>=`` threshold, so ties never
-        push the kept count above the exact budget.
+        Same unit and exact keep count (``round(gamma * valid_count)`` per
+        row) as every other arm's ``per_row_topk`` -- not the paper's pooled
+        top-``gamma|B_cand|`` over the whole candidate batch. See the module
+        docstring. Ties are broken by the same per-instance random stream
+        every other score-based arm uses, keyed on this arm's own
+        ``data_seed``.
         """
         valid = labels != self.trainer.train_module.label_ignore_index
-        selection_scores = proxy_ce - reference_ce
-        flat_scores = selection_scores[valid]
-        keep = max(1, int(torch.ceil(torch.tensor(self.schedule.gamma * flat_scores.numel()))))
-        keep = min(keep, flat_scores.numel())
-        _, top_indices = torch.topk(flat_scores, keep)
-        flat_mask = torch.zeros_like(flat_scores, dtype=torch.bool)
-        flat_mask[top_indices] = True
-        mask = torch.zeros_like(valid)
-        mask[valid] = flat_mask
-        return mask
+        scores = proxy_ce - reference_ce
+        tiebreak = per_instance_tiebreak(
+            index.to(scores.device),
+            data_seed=self.data_seed,
+            length=scores.shape[-1],
+            device=scores.device,
+        )
+        return per_row_topk(scores, self.schedule.gamma, valid, tiebreak=tiebreak)
 
     def _score_regmix_mask(self, batch: dict[str, Any]) -> Tensor:
         """Score one RegMix batch against the *current* (outgoing) reference."""
         labels, proxy_ce, reference_ce = self._proxy_and_reference_ce(batch)
-        return self._select_mask(labels, proxy_ce, reference_ce)
+        return self._select_mask(labels, proxy_ce, reference_ce, batch["index"])
+
+    def _log_sync_parity(self, sync_step: int, batch: dict[str, Any]) -> None:
+        """Score one batch through both paths right after a sync, when their weights
+        are identical, and log how well they agree.
+
+        This is the check for ``_score_reference_bf16``'s numerics actually matching
+        the proxy's: a large disagreement here, even though the two models are the
+        same weights at this instant, means every step's selection signal
+        (``proxy_ce - reference_ce``) carries a spurious precision-path gap on top
+        of the real training divergence it's supposed to measure.
+        """
+        labels, proxy_ce, reference_ce = self._proxy_and_reference_ce(batch)
+        valid = labels != self.trainer.train_module.label_ignore_index
+        diff = (proxy_ce - reference_ce)[valid]
+        max_abs_diff = float(diff.abs().max().item()) if diff.numel() else 0.0
+        agreement = float((diff.abs() < 1e-3).float().mean().item()) if diff.numel() else 1.0
+        log.info(
+            "BLADE sync %d parity: max|proxy-ref CE diff|=%.6g, agreement@1e-3=%.4f%%",
+            sync_step,
+            max_abs_diff,
+            100.0 * agreement,
+        )
+        if agreement < 0.999:
+            log.warning(
+                "BLADE sync %d parity is below the 99.9%% gate (%.4f%%); proxy and "
+                "reference scoring numerics may have diverged even though their "
+                "weights are identical right after this sync",
+                sync_step,
+                100.0 * agreement,
+            )
 
     def _perform_sync(self, sync_step: int) -> None:
         """Pre-score (unless this is the first-ever sync), sync, and run K updates.
@@ -471,10 +573,8 @@ class BladeCallback(Callback):
             if first_sync
             else [self._score_regmix_mask(batch) for batch in regmix_batches]
         )
-        lr = float(
-            self.reference_scheduler.get_lr(self.reference_initial_lr, sync_step, self.total_steps)
-        )
-        self._sync_from_proxy(lr=lr)
+        self._sync_from_proxy(lr=self._reference_lr(sync_step))
+        self._log_sync_parity(sync_step, regmix_batches[0])
         self._run_k_updates(regmix_batches, masks, trainer_step=sync_step)
         self.last_sync = sync_step
 
@@ -541,7 +641,7 @@ class BladeCallback(Callback):
                 "BLADE selection has no dynamic reference; resume state is incomplete"
             )
         labels, proxy_ce, ref_ce = self._proxy_and_reference_ce(batch)
-        mask = self._select_mask(labels, proxy_ce, ref_ce)
+        mask = self._select_mask(labels, proxy_ce, ref_ce, batch["index"])
         batch["token_weight"] = mask.float()
 
     def post_train_batch(self) -> None:

@@ -11,12 +11,19 @@ max_tokens: 9900000000
 total_steps: 2360
 checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250, 1375, 1500, 1625, 1750, 1875, 2000, 2125, 2360]  # omit 2250
 reference:
-  arm: hq-reference
-  averaged_steps: [1000, 1125, 1315]
-  contract: hq-reference-370m/checkpoints/average-1000-1125-1315
+  arm: instruct-reference
+  step: 940
+  contract: instruct-reference-370m/checkpoints/step940
+  # Offline per-instance table (see olmo_core_token_selection/token_selection_370m/
+  # reference_scores.py), not a resident model: scored once, on FarmShare's 1-GPU
+  # qos=normal lane, against the checkpoint above. Shared with rho-1.
+  reference_scores_contract: instruct-reference-370m-step940/regmix-10b-v1
+# Migrated off the retired HQ reference (averaged steps 1000/1125/1315); this arm now
+# scores against the same frozen Instruct reference rho-1 uses (final checkpoint, no
+# averaging).
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: 97a19bb8
+  revision: 3ffb5175
 wandb_project: token-selection
 status: rerun-under-unified-commit

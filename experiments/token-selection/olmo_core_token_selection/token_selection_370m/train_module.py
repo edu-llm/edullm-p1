@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
 import torch
@@ -19,33 +18,18 @@ from olmo_core.train import ReduceType
 from olmo_core.train.callbacks import Callback
 from olmo_core.train.train_module import TransformerTrainModule
 
+from .reference_scores import ReferenceScoreTable
 from .selection import (
     EMAHistory,
-    WeightShadow,
     aligned_normalized_attention_scores,
     capture_last_attention,
     ema_alpha,
     selection_weights,
 )
 
-
-def load_flat_weights(path: str | Path) -> dict[str, Tensor]:
-    source = Path(path)
-    if not source.is_file():
-        raise ValueError(f"reference must be a materialized local .pt file: {source}")
-    payload = torch.load(source, map_location="cpu", weights_only=False)
-    if isinstance(payload, Mapping):
-        for key in ("model", "state_dict", "model_state_dict"):
-            nested = payload.get(key)
-            if isinstance(nested, Mapping):
-                payload = nested
-                break
-    if not isinstance(payload, Mapping) or not payload:
-        raise ValueError(f"reference checkpoint does not contain a state dict: {source}")
-    weights = {str(name): value for name, value in payload.items() if isinstance(value, Tensor)}
-    if len(weights) != len(payload):
-        raise ValueError(f"reference state dict contains non-tensor values: {source}")
-    return weights
+# Methods that read a frozen reference's per-token loss (from the offline
+# table, not a resident model -- see reference_scores.py).
+_REFERENCE_SCORE_METHODS = frozenset({"rho_excess", "middle_ppl"})
 
 
 @dataclass(frozen=True)
@@ -54,7 +38,9 @@ class TokenSelectionConfig:
     keep_fraction: float
     total_steps: int
     seed: int = 42
-    reference_path: Optional[str] = None
+    reference_scores_path: Optional[str] = None
+    reference_scores_reference_sha256: Optional[str] = None
+    reference_scores_corpus_binding: Optional[Mapping[str, Any]] = None
     ema_seed: Optional[str] = None
     ema_alpha: Optional[float] = None
     ema_tau: Optional[float] = None
@@ -64,11 +50,15 @@ class TokenSelectionState:
     def __init__(self, config: TokenSelectionConfig, model) -> None:
         self.config = config
         self.completed_steps = 0
-        self.reference = (
-            WeightShadow.from_state_dict(model, load_flat_weights(config.reference_path))
-            if config.reference_path
-            else None
-        )
+        self.reference_table: Optional[ReferenceScoreTable] = None
+        if config.method in _REFERENCE_SCORE_METHODS:
+            if not config.reference_scores_path:
+                raise ValueError(f"{config.method} requires a reference-scores table")
+            self.reference_table = ReferenceScoreTable(
+                config.reference_scores_path,
+                expected_reference_sha256=config.reference_scores_reference_sha256,
+                expected_corpus_binding=config.reference_scores_corpus_binding or {},
+            )
         self.ema: Optional[EMAHistory] = None
         if config.method == "rel_ema":
             if config.ema_seed != "zero":
@@ -142,10 +132,10 @@ class TokenWeightedTrainModule(TransformerTrainModule):
 
     def _score_many(
         self,
-        shadow: WeightShadow | EMAHistory,
+        shadow: EMAHistory,
         batches: Sequence[tuple[Tensor, Tensor, dict[str, Any]]],
     ) -> list[Tensor]:
-        """Score every microbatch under a single reference-weight swap."""
+        """Score every microbatch under a single EMA-shadow weight swap."""
         losses: list[Tensor] = []
         with self._score_mode(), torch.no_grad(), shadow.swap_to(self.model):
             for ids, labels, kwargs in batches:
@@ -163,7 +153,7 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 self.model.reset_auxiliary_metrics()
         return losses
 
-    def _planned_weight(self, labels: Tensor, batch: Mapping[str, Any]) -> float:
+    def _planned_weight(self, labels: Tensor, batch: Mapping[str, Any], *, dry_run: bool = False) -> float:
         valid = self._valid(labels)
         provided = batch.get("token_weight")
         if provided is not None:
@@ -171,7 +161,7 @@ class TokenWeightedTrainModule(TransformerTrainModule):
             if weight.shape != labels.shape or (weight < 0).any():
                 raise ValueError("token_weight must be non-negative and match labels")
             return float((weight * valid).sum().item())
-        if self.selection_config.method == "full":
+        if self.selection_config.method == "full" or (dry_run and self.selection_config.method == "blade"):
             return float(valid.sum().item())
         count = valid.sum(-1)
         keep = torch.minimum(
@@ -182,12 +172,23 @@ class TokenWeightedTrainModule(TransformerTrainModule):
         )
         return float(keep.sum().item())
 
+    @staticmethod
+    def _batch_index(micro: Mapping[str, Any], *, rows: int, dry_run: bool) -> Tensor:
+        index = micro.get("index")
+        if index is not None:
+            return index
+        if not dry_run:
+            raise RuntimeError(
+                "token-selection batch is missing its global instance index ('index')"
+            )
+        return torch.zeros(rows, dtype=torch.int64)
+
     def train_batch(self, batch: dict[str, Any], dry_run: bool = False):
         self._set_model_mode("train")
         if "labels" not in batch:
             batch["labels"] = get_labels(batch, label_ignore_index=self.label_ignore_index)
         labels = batch["labels"]
-        divisor = self._planned_weight(labels, batch)
+        divisor = self._planned_weight(labels, batch, dry_run=dry_run)
         if divisor <= 0:
             raise RuntimeError("batch contains no weighted target tokens")
         sequence_length = batch["input_ids"].shape[1]
@@ -215,19 +216,26 @@ class TokenWeightedTrainModule(TransformerTrainModule):
         history_scores = (
             self._score_many(state.ema, scoring_batches) if state.ema is not None else None
         )
-        reference_scores = (
-            self._score_many(state.reference, scoring_batches)
-            if config.method in {"rho_excess", "middle_ppl"} and state.reference is not None
-            else None
-        )
-        if config.method in {"rho_excess", "middle_ppl"} and reference_scores is None:
-            raise RuntimeError(f"{config.method} is missing its frozen reference")
+        reference_scores: Optional[list[Tensor]] = None
+        if config.method in _REFERENCE_SCORE_METHODS:
+            if state.reference_table is None:
+                raise RuntimeError(f"{config.method} is missing its frozen reference-score table")
+            reference_scores = [
+                state.reference_table.gather(
+                    self._batch_index(micro, rows=int(micro["input_ids"].shape[0]), dry_run=dry_run),
+                    device=self.device,
+                )
+                for micro in micro_batches
+            ]
 
         ce_batch = torch.zeros((), device=self.device)
+        all_token_ce_batch = torch.zeros((), device=self.device)
         z_batch = (
             torch.zeros((), device=self.device) if self.z_loss_multiplier is not None else None
         )
         observed_weight = torch.zeros((), device=self.device)
+
+        total_valid_tokens = max(float(self._valid(labels).sum().item()), 1.0)
 
         for micro_index, (micro, ids, micro_labels, model_kwargs, valid) in enumerate(prepared):
             with self._train_microbatch_context(micro_index, len(micro_batches)):
@@ -264,13 +272,23 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 supplied = micro.get("token_weight")
                 if supplied is not None:
                     weights = supplied.to(self.device, dtype=torch.float32) * valid
+                elif dry_run and config.method == "blade":
+                    # BLADE always supplies token_weight on a real step (pre_step
+                    # sets it via the dynamic reference); Trainer.fit's own
+                    # dry-run mock batch never calls pre_step, so nothing sets it
+                    # here. selection_weights has no "blade" case (by design --
+                    # see its docstring), so fall back to the same weights a
+                    # "full" arm would use; the dry run never backprops anyway.
+                    weights = valid.float()
                 else:
                     weights = selection_weights(
                         config.method,
                         valid=valid,
                         keep_fraction=config.keep_fraction,
-                        step=state.completed_steps,
-                        seed=config.seed + micro_index,
+                        seed=config.seed,
+                        index=self._batch_index(
+                            micro, rows=int(ids.shape[0]), dry_run=dry_run
+                        ),
                         current=current,
                         history=history,
                         reference=reference,
@@ -279,6 +297,9 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 observed_weight += weights.sum()
                 ce_loss = (token_ce.float() * weights).sum() / divisor
                 loss = (token_loss.float() * weights).sum() / divisor
+                all_token_ce_batch += (
+                    (token_ce.float() * valid.float()).sum() / total_valid_tokens
+                ).detach()
                 if z_batch is not None:
                     token_z = self._loss_tensor(output, micro_labels, "z_loss")
                     z_loss = (token_z.float() * weights).sum() / divisor
@@ -301,10 +322,23 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 dist.all_reduce(ce_batch)
                 ce_batch.div_(self.world_size)
                 ce_batch.mul_(self._reduce_divide_factor)
+                all_token_ce_batch.div_(self._reduce_divide_factor)
+                dist.all_reduce(all_token_ce_batch)
+                all_token_ce_batch.div_(self.world_size)
+                all_token_ce_batch.mul_(self._reduce_divide_factor)
             self.record_ce_loss(ce_batch)
-            self.optim.latest_loss = ce_batch
+            # SkipStepAdamW's spike detector reads this every step; feed it the
+            # all-token CE, the same statistic stock OLMo training uses, not the
+            # kept-token CE -- a discontinuity in the kept set alone (BLADE's
+            # reference resync, REL-EMA's growing alpha) shouldn't be able to
+            # trigger a skip streak that doesn't reflect an actual optimization
+            # problem.
+            self.optim.latest_loss = all_token_ce_batch
         else:
             self.record_ce_loss(ce_batch, ReduceType.mean)
+        self.record_metric(
+            "CE loss (all tokens)", all_token_ce_batch, ReduceType.mean, namespace="train"
+        )
         self.record_metric(
             "selected token fraction",
             observed_weight / max(float(labels.numel()), 1.0),

@@ -1,11 +1,10 @@
 # Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["random-control-seed69"]
-# The seed-variance replicate of random-control. Kept run -- NOT rerun under the
-# unified commit; ran commit 53daffdf plus a hand seed-edit, confirmed against its
-# W&B run_identity.json artifact.
+# The seed-variance replicate of random-control: independent per-instance
+# derivation means seeds 42 and 69 never share a draw (see selection.py).
 name: random-control-seed69
 method: random
 dataset_id: pretrain/regmix-10b
-run_id: random-control-regmix10b-seed69-v1
+run_id: random-control-seed69-regmix10b
 keep_fraction: 0.6
 init_seed: 12345
 data_seed: 69
@@ -17,7 +16,6 @@ reference: null
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: 53daffdf
+  revision: 3ffb5175
 wandb_project: token-selection
-status: kept-not-rerun
-wandb_run: 123189f79a722b3481d06bc48b61fad9
+status: rerun-under-unified-commit

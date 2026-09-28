@@ -32,7 +32,7 @@ def total_steps(max_tokens: int) -> int:
     return int(max_tokens) // GLOBAL_BATCH_TOKENS
 
 
-def _reference_digest(path: Optional[str]) -> Optional[str]:
+def reference_digest(path: Optional[str]) -> Optional[str]:
     if path is None:
         return None
     source = Path(path)
@@ -64,6 +64,24 @@ def immutable_corpus_binding(dataset_id: str, corpus: Any) -> dict[str, Any]:
     }
 
 
+_reference_digest = reference_digest  # backward-compat alias; prefer the public name
+
+
+def _manifest_digest(payload: Optional[Mapping[str, Any]]) -> Optional[str]:
+    """sha256 of a canonical (sorted-key) JSON encoding of a small manifest dict.
+
+    Used for the reference-score table: hashing the whole 40 GB table on every
+    launch would be slow for no benefit, but the manifest already contains a
+    sha256 per written chunk, so hashing just the manifest still detects any
+    change to the underlying data.
+    """
+    if payload is None:
+        return None
+    return hashlib.sha256(
+        json.dumps(dict(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def scientific_identity(
     arm: ArmSpec,
     *,
@@ -71,6 +89,7 @@ def scientific_identity(
     refhq_binding: Optional[Mapping[str, Any]],
     max_tokens: int,
     reference_path: Optional[str],
+    reference_scores_manifest: Optional[Mapping[str, Any]] = None,
     git_commit: Optional[str] = None,
 ) -> dict[str, Any]:
     main_binding = dict(dataset_binding)
@@ -78,6 +97,10 @@ def scientific_identity(
         raise ValueError("resolved main corpus does not match the selected arm")
     if arm.requires_refhq_stream != (refhq_binding is not None):
         raise ValueError("BLADE RefHQ binding is missing or attached to a non-BLADE arm")
+    if (arm.reference_scores_contract is not None) != (reference_scores_manifest is not None):
+        raise ValueError(
+            "reference-scores manifest is missing or attached to an arm that doesn't use one"
+        )
     return {
         "arm": arm.name,
         "run_id": arm.run_id,
@@ -103,7 +126,9 @@ def scientific_identity(
         "ema_seed": arm.ema_seed,
         "ema_tau": arm.ema_tau,
         "reference_contract": arm.reference_contract,
-        "reference_sha256": _reference_digest(reference_path),
+        "reference_sha256": reference_digest(reference_path),
+        "reference_scores_contract": arm.reference_scores_contract,
+        "reference_scores_sha256": _manifest_digest(reference_scores_manifest),
         "wandb_project": arm.wandb_project,
         "checkpoint_contract": "schema-v3-unified-farmshare-4xl40s",
         "git_commit": git_commit,
@@ -216,9 +241,13 @@ def build_trainer(
     progress_dir: Path,
     task_loss_script: Path,
     reference_path: Optional[str] = None,
+    reference_scores_path: Optional[str] = None,
+    reference_scores_reference_sha256: Optional[str] = None,
+    reference_scores_corpus_binding: Optional[Mapping[str, Any]] = None,
     resume: bool = False,
     production: bool = True,
     git_commit: Optional[str] = None,
+    environment: Optional[Mapping[str, Any]] = None,
 ):
     from olmo_core.nn.transformer import TransformerConfig
     from olmo_core.train import Duration, LoadStrategy, TrainerConfig
@@ -246,7 +275,9 @@ def build_trainer(
         keep_fraction=arm.keep_fraction,
         total_steps=steps,
         seed=arm.data_seed,
-        reference_path=reference_path,
+        reference_scores_path=reference_scores_path,
+        reference_scores_reference_sha256=reference_scores_reference_sha256,
+        reference_scores_corpus_binding=reference_scores_corpus_binding,
         ema_seed=arm.ema_seed,
         ema_tau=arm.ema_tau,
     )
@@ -262,6 +293,11 @@ def build_trainer(
         seed=arm.data_seed,
         process_group=train_module.dp_process_group,
     )
+    if main_loader.total_batches is not None and steps > main_loader.total_batches:
+        raise ValueError(
+            f"{arm.name} would need {steps} steps but its corpus epoch is only "
+            f"{main_loader.total_batches} batches; max_tokens must not exceed one epoch"
+        )
     checkpoint_kwargs = checkpointer_kwargs_for_ladder(steps, 125, save_async=False)
     checkpoint_kwargs["pre_train_checkpoint"] = not resume
     # TaskLossEvalCallback finalizes in post_step, before CheckpointerCallback's
@@ -285,7 +321,13 @@ def build_trainer(
             load_strategy=LoadStrategy.if_available if resume else LoadStrategy.never,
             load_trainer_state=resume,
             load_optim_state=resume,
-            max_duration=Duration.tokens(max_tokens),
+            # Duration.tokens(max_tokens) would run ceil(max_tokens / batch)
+            # steps (2361, not 2360, for the 9.9e9-token budget) -- one step
+            # past every ladder/eval/BLADE-schedule/FLOP computation in this
+            # file, which all use total_steps()'s floor. Duration.steps make
+            # the trainer stop at exactly the step every other computation
+            # already assumes is the true final one.
+            max_duration=Duration.steps(steps),
         )
         .with_callback("checkpointer", CheckpointerCallback(**checkpoint_kwargs))
         .with_callback("gpu_monitor", GPUMemoryMonitorCallback())
@@ -304,6 +346,7 @@ def build_trainer(
                     "dataset_id": arm.dataset_id,
                     "max_tokens": max_tokens,
                     "git_commit": git_commit,
+                    "environment": dict(environment) if environment is not None else None,
                 },
             ),
         )
@@ -323,6 +366,12 @@ def build_trainer(
                 task_loss_nproc=PRODUCTION_WORLD_SIZE if production else None,
                 production=production,
                 wandb_mode=os.environ.get("WANDB_MODE", "online"),
+                # Every reported run keeps its full checkpoint ladder (roughly
+                # 1.3 TB total across all nine runs; scratch has room), so a
+                # checkpoint step can be re-evaluated later (a new eval suite,
+                # per-label analysis, a clean-subset contamination check)
+                # without rerunning training to reach it.
+                keep_all_checkpoints=True,
             ),
         )
     # TokenSelectionStateCallback (priority 3) must advance the EMA/step
@@ -368,6 +417,8 @@ def build_trainer(
                 refhq_stream=ResumableBatchStream(refhq_loader),
                 reference_scheduler=CosWithWarmup(warmup=WARMUP_STEPS, alpha_f=ALPHA_F),
                 reference_initial_lr=PEAK_LR,
+                reference_warmup_steps=WARMUP_STEPS,
+                data_seed=arm.data_seed,
                 reference_microbatch_tokens=arm.rank_microbatch_tokens,
                 selection_microbatch_tokens=arm.rank_microbatch_tokens,
             ),
@@ -393,11 +444,29 @@ def build_trainer(
     return trainer
 
 
-def write_identity(save_folder: Path, progress_dir: Path, identity: dict[str, Any]) -> None:
+def write_identity(
+    save_folder: Path,
+    progress_dir: Path,
+    identity: dict[str, Any],
+    *,
+    environment: Optional[Mapping[str, Any]] = None,
+) -> None:
+    """Write the resume-fingerprint identity, plus a record copy for the record.
+
+    ``environment`` (torch/CUDA/driver/GPU/pip-freeze facts, see
+    ``token_selection_entrypoint.runtime_environment``) is recorded in the
+    progress-dir copy only, *not* folded into ``identity`` or the
+    resume-blocking fingerprint at ``save_folder`` -- a driver or dependency
+    bump between a run and its resume shouldn't refuse the resume the way a
+    change to the scientific identity itself does.
+    """
     fingerprint = write_run_fingerprint(save_folder, identity)
     progress_dir.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = make_run_fingerprint(identity)
+    if environment is not None:
+        payload = {**payload, "environment": dict(environment)}
     (progress_dir / "run_identity.json").write_text(
-        json.dumps(make_run_fingerprint(identity), indent=2, sort_keys=True) + "\n",
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     if fingerprint.name != "run_fingerprint.json":

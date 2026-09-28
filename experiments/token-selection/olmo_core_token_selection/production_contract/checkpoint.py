@@ -286,6 +286,7 @@ def finalize_permanent_checkpoint(
     production: bool = False,
     upload_checkpoint: bool,
     run_evaluator: Optional[Callable[..., Any]] = None,
+    keep_all_checkpoints: bool = False,
 ) -> Optional[dict[str, Any]]:
     """Publish every evaluation and only an explicitly selected checkpoint."""
     from . import task_loss
@@ -369,5 +370,6 @@ def finalize_permanent_checkpoint(
             "fingerprint_schema_version": FINGERPRINT_SCHEMA_VERSION,
         },
     )
-    prune_superseded_checkpoints(checkpoint.parent, marker_dir)
+    if not keep_all_checkpoints:
+        prune_superseded_checkpoints(checkpoint.parent, marker_dir)
     return payload

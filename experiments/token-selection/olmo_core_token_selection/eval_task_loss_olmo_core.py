@@ -157,11 +157,10 @@ def load_model(checkpoint: Path, model: torch.nn.Module) -> int:
     if embedding is None or tuple(embedding.shape) != (EMBEDDING_SIZE, 1_024):
         shape = None if embedding is None else tuple(embedding.shape)
         raise EvaluatorContractError(f"unexpected embeddings.weight shape: {shape}")
-    missing, unexpected = model.load_state_dict(payload["model"], strict=False)
-    if unexpected:
-        LOG.warning("unexpected checkpoint keys (first 8): %s", unexpected[:8])
-    if len(missing) > max(4, int(0.05 * (len(payload["model"]) + len(missing)))):
-        raise EvaluatorContractError(f"too many missing model keys: {len(missing)}")
+    # Both sides build the exact same olmo2_370M class, so any missing or
+    # unexpected key is a real bug (a stale checkpoint format, a mismatched
+    # arch), not something to silently tolerate.
+    model.load_state_dict(payload["model"], strict=True)
     return int(payload["step"])
 
 

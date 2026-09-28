@@ -10,7 +10,7 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `97a19bb8` (see below) |
+| Commit | `3ffb5175` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
@@ -34,9 +34,11 @@ are:
   local manifest (`farmshare/stage_local.py`) bound to the pinned FarmShare
   directories verified against this repository's
   `datasets/manifests/*/outputs.json`.
-- **Two new arms, trained in this study rather than read from elsewhere:**
-  `hq-reference` and `instruct-reference`. `rho-1` and `perplexity` read
-  their frozen references from these arms' own checkpoints.
+- **One new arm, trained in this study rather than read from elsewhere:**
+  `instruct-reference`. `rho-1` and `perplexity` both read their reference
+  losses from it: the final checkpoint (step 940, no averaging), scored
+  offline once against the whole corpus (see A1 below). There is no HQ
+  reference arm or checkpoint anywhere in this history.
 - **`random-control-seed69`** is now an ArmSpec (it previously ran from an
   uncommitted hand edit; its seeds are confirmed against its W&B
   `run_identity.json` artifact).
@@ -93,20 +95,50 @@ are:
   `z_loss_multiplier` (it defaults to `None` upstream) -- the fix changes
   nothing about what BLADE optimizes, only restores the gradient.
 
-## Kept runs: what code they ran
+`3ffb5175` (on top of `90c2eb66`) reruns every arm under this one commit --
+nothing is kept from `53daffdf` -- and makes these further changes:
 
-Three runs are kept from before this unification and were **not** rerun:
-the two random-control seeds (`random-control-regmix10b-v1`,
-`random-control-regmix10b-seed69-v1`) and REL-EMA
-(`rel-ema-exp-10b-scratch-v1`). All three ran `53daffdf` (the previous
-commit), on FarmShare 4×L40S, through the RunPod-wrapper entrypoint that
-`token_selection_entrypoint.py` has since absorbed. The random-selection and
-REL-EMA code paths are unchanged in `d294e419`: no rank term was added to the
-mask seed, and the EMA update is untouched. This is protected by a golden
-test (`tests/test_token_selection_370m.py`) that checks the per-microbatch
-weight derivation, `EMAHistory`'s update sequence, and `ema_alpha` against
-hashes recorded from `53daffdf`, plus a GPU replay of each kept run's first
-few steps against its own W&B history before any rerun began.
+- **Offline reference scoring (`token_selection_370m/reference_scores.py`,
+  `farmshare/score_reference.py`).** The whole RegMix-10B corpus is scored
+  once against the frozen `instruct-reference` checkpoint (step 940), on the
+  1-GPU `qos=normal` lane, into a per-instance reference-CE table bound to
+  that checkpoint's sha256 and the exact corpus by a manifest. `rho-1` and
+  `perplexity` look up rows by `batch["index"]` instead of keeping a second
+  reference model resident during training.
+- **Per-instance random derivation and tie-breaking (`selection.py`).**
+  `random-control`'s mask, and every score-based method's tie-break
+  (including BLADE's), are drawn per corpus instance
+  (`SeedSequence([tag, data_seed, index])`) -- independent of world size,
+  rank, and microbatch composition, so seeds 42 and 69 never share a draw
+  and a 1-GPU smoke run draws the same masks production would.
+- **BLADE (`blade.py`):** the step-0 sync's reference LR is floored at its
+  post-warmup value (it was training at LR 0, since the proxy's own
+  scheduler is still in warmup at step 0); selection is now per row
+  (`round(0.6*count)`, matching every other arm) instead of a per-rank batch
+  threshold; the reference is scored under the same bf16-cast parameters the
+  proxy trains under (via `torch.func.functional_call`, without touching the
+  reference's own fp32 AdamW state), with a post-sync parity check logged
+  after every sync.
+- **Exact step count (`recipe.py`).** `Duration.steps(steps)`, not
+  `Duration.tokens(max_tokens)` -- the latter rounds up, running one step
+  past every ladder/eval/FLOP computation that assumes the floor.
+- **All-token CE.** `SkipStepOptimizer`'s spike detector now watches the
+  mean CE over all valid tokens, not the kept-token CE, so a discontinuity
+  in the kept set alone (a BLADE resync, REL-EMA's growing alpha) can't look
+  like a loss spike.
+- **W&B flush before eval (`task_loss.py`).** Every rank flushes buffered
+  train metrics before the eval logs at a fixed step; otherwise W&B silently
+  drops the few train points just before every eval.
+- **Strict eval loading (`eval_task_loss_olmo_core.py`).** `strict=True`,
+  not a 5%-missing-keys tolerance -- both sides build the same class, so a
+  missing or unexpected key is a real bug.
+- **Keep every checkpoint (`checkpoint.py`, `task_loss.py`).** Pruning is
+  disabled for these runs (`keep_all_checkpoints=True`), so every ladder
+  checkpoint and its optimizer state stays on disk for later re-evaluation.
+- **Environment recording.** torch/CUDA/driver/GPU and a pip-freeze hash are
+  written to `run_identity.json` and the W&B config, kept out of the
+  resume-blocking scientific identity so a driver bump can't refuse a
+  resume.
 
 ## What is included, and why
 
@@ -120,6 +152,7 @@ Only code that produced a reported result:
 | `token_selection_370m/recipe.py` | Model, optimizer, data recipe |
 | `token_selection_370m/train_module.py` | The one train module (mean over kept/weighted tokens) |
 | `token_selection_370m/blade.py` | BLADE's dynamic-reference sync, selection-weighted K-updates, and resume |
+| `token_selection_370m/reference_scores.py` | Schema and lookup for the offline per-instance reference-CE table |
 | `production_contract/checkpoint.py` | Permanent-checkpoint ladder and resume durability |
 | `production_contract/task_loss.py` | Task-loss eval callback fired on each permanent save |
 | `production_contract/wandb_artifacts.py` | W&B artifact upload |

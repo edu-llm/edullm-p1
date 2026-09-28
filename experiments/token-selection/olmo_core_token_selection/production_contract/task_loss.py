@@ -321,6 +321,7 @@ class TaskLossEvalCallback(Callback if _HAS_OLMO_CORE else object):  # type: ign
         production: bool = False,
         wandb_mode: Optional[str] = None,
         checkpoint_wait_seconds: int = 3600,
+        keep_all_checkpoints: bool = False,
     ) -> None:
         if not _HAS_OLMO_CORE:
             raise ImportError("olmo_core is required for TaskLossEvalCallback")
@@ -338,6 +339,7 @@ class TaskLossEvalCallback(Callback if _HAS_OLMO_CORE else object):  # type: ign
         self.production = bool(production)
         self.wandb_mode = wandb_mode
         self.checkpoint_wait_seconds = int(checkpoint_wait_seconds)
+        self.keep_all_checkpoints = bool(keep_all_checkpoints)
         self._completed: set[int] = set()
 
     @staticmethod
@@ -371,7 +373,8 @@ class TaskLossEvalCallback(Callback if _HAS_OLMO_CORE else object):  # type: ign
         if durable_step < int(step):
             return False
         validate_task_loss_result(self.results_dir / f"step{int(step)}_task_loss.json")
-        prune_superseded_checkpoints(self.save_folder, self.progress_dir)
+        if not self.keep_all_checkpoints:
+            prune_superseded_checkpoints(self.save_folder, self.progress_dir)
         return True
 
     def _latest_pending_checkpoint_step(self) -> Optional[int]:
@@ -412,6 +415,16 @@ class TaskLossEvalCallback(Callback if _HAS_OLMO_CORE else object):  # type: ign
         distributed = dist.is_available() and dist.is_initialized()
         if distributed:
             dist.barrier()
+        # The eval below logs to W&B at this exact step before the trainer's own
+        # buffered train-step metrics (for the few steps just before this one)
+        # have been flushed; W&B silently drops any later-arriving point whose
+        # step is behind what it's already seen. Flush first, on every rank
+        # (this mirrors BladeCallback._save_sync_checkpoint's same flush before
+        # its own checkpoint save), so no train point is lost around every eval.
+        trainer = getattr(self, "trainer", None)
+        if trainer is not None:
+            trainer._log_metrics()
+            trainer._join_bookkeeping_ops()
         failure: list[Optional[str]] = [None]
         if rank == 0:
             try:
@@ -435,6 +448,7 @@ class TaskLossEvalCallback(Callback if _HAS_OLMO_CORE else object):  # type: ign
                     wandb_mode=self.wandb_mode,
                     production=self.production,
                     upload_checkpoint=step == self.total_steps,
+                    keep_all_checkpoints=self.keep_all_checkpoints,
                 )
             except BaseException as exc:  # noqa: BLE001
                 failure[0] = f"{type(exc).__name__}: {exc}"

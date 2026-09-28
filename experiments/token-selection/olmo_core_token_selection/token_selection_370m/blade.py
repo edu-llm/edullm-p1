@@ -328,7 +328,10 @@ class BladeCallback(Callback):
                 return_logits=False,
                 **kwargs,
             )
-        ce = _output_ce(output, labels)
+        # output.ce_loss is detached by OLMo-core (logging only, see LMOutputWithLoss);
+        # backward needs the live output.loss instead. z_loss_multiplier is never in
+        # kwargs here, so output.loss is pure (undetached) CE, same value as ce_loss.
+        ce = output.loss.reshape_as(labels)
         return (ce.float() * weight.float()).sum() / divisor.to(ce.device)
 
     def _run_k_updates(

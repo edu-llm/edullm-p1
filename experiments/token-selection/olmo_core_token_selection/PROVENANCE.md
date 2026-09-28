@@ -10,7 +10,7 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `d294e419` (see below) |
+| Commit | `97a19bb8` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
@@ -81,6 +81,17 @@ are:
   6.12 GiB) -- it holds the proxy, the dynamic reference, and both their
   optimizers resident during the K-update sync, exactly the case the
   original design called out as needing a fallback.
+- `token_selection_370m/blade.py`: the K-update backward
+  (`_mean_ce_with_weight`) now backprops through `output.loss`, not
+  `output.ce_loss`. OLMo-core's LM head documents `ce_loss` as
+  logging-only and unconditionally `.detach()`-es it; once the OOM above
+  was fixed, the very first real K-update backward (this schedule's first
+  sync is at step 0, so nothing before this fix had ever exercised the
+  path end to end) failed with "element 0 of tensors does not require
+  grad and does not have a grad_fn". `output.loss` is the live tensor and
+  is numerically identical to `ce_loss` here, since this call never sets
+  `z_loss_multiplier` (it defaults to `None` upstream) -- the fix changes
+  nothing about what BLADE optimizes, only restores the gradient.
 
 ## Kept runs: what code they ran
 

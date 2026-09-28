@@ -7,8 +7,8 @@ FarmShare scratch layout only).
 Layout (holdout already done before tokenize):
   tokens/<source>/<domain>/{train,val}-NNNNN.u32le.bin
 
-Reuses split_npy_to_shards pattern from datasets/refhq/scripts/publish_refhq_edullm_data.py
-but does NOT carve val (doc-level 0.15% holdout already produced train/val memmaps).
+Reuses the split_npy_to_shards sharding pattern used elsewhere in this project's publish
+scripts but does NOT carve val (doc-level 0.15% holdout already produced train/val memmaps).
 
 Tokenizer dep: tokenizer/dolma2-bpe.
 """

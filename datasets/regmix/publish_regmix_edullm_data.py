@@ -33,7 +33,7 @@ def _align_shard_bytes(n: int) -> int:
 
 
 def build_manifest_from_tokenized(tokenized_root: Path) -> dict:
-    """Build a RefHQ-shaped tokenized manifest from per-domain *.json + on-disk sizes."""
+    """Build an outputs.json-style tokenized manifest from per-domain *.json + on-disk sizes."""
     domains: dict[str, dict] = {}
     total_tokens = 0
     for source_dir in sorted(p for p in tokenized_root.iterdir() if p.is_dir()):

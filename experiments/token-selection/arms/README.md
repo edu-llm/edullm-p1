@@ -45,21 +45,19 @@ git, not here.
 
 | id | method | corpus | keep | seeds (init/data) | reference | notes |
 |---|---|---:|---:|---|---|---|
-| [`hq-reference`](hq-reference.yaml) | `full` | `pretrain/refhq-regmix-5p5b` | 100% | 6198 / 42 | — | trains the frozen HQ reference the `perplexity` arm scores against; 1315 steps, one whole-stream epoch; averaged over steps 1000, 1125, 1315 |
-| [`instruct-reference`](instruct-reference.yaml) | `full` | `pretrain/refhq-instruct` | 100% | 6198 / 42 | — | trains the frozen Instruct reference the `rho-1` arm scores against, and BLADE's L_val stream; 940 steps, one whole-stream epoch of the train split; frozen at step 940 |
+| [`instruct-reference`](instruct-reference.yaml) | `full` | `pretrain/refhq-instruct` | 100% | 6198 / 42 | — | trains the frozen Instruct reference `rho-1` and `perplexity` score against offline, and BLADE's L_val stream; 940 steps, one whole-stream epoch of the train split; frozen at step 940 |
 | [`full-loss-control`](full-loss-control.yaml) | `full` | `pretrain/regmix-10b` | 100% | 6198 / 42 | — | 2360 steps |
-| [`random-control`](random-control.yaml) | `random` | `pretrain/regmix-10b` | 60% | 6198 / 42 | — | 2360 steps; kept run, ran commit `53daffdf` (pre-unification; behavior unchanged, protected by a golden hash test) |
-| [`random-control-seed69`](random-control-seed69.yaml) | `random` | `pretrain/regmix-10b` | 60% | 12345 / 69 | — | the seed-variance replicate; also a kept run on `53daffdf` |
-| [`rho-1`](rho-1.yaml) | `rho_excess` (top `L_curr − L_ref`) | `pretrain/regmix-10b` | 60% | 6198 / 42 | frozen `instruct-reference` step 940 | 2360 steps |
-| [`rel-ema-exp`](rel-ema-exp.yaml) | `rel_ema` (top `L_curr − L_hist`) | `pretrain/regmix-10b` | 60% | 6198 / 42 | zero-seeded bias-corrected EMA, `alpha(t) = 1 - exp(-t/300)` | 2360 steps; kept run on `53daffdf` |
-| [`perplexity`](perplexity.yaml) | `middle_ppl` (middle 60% by frozen loss) | `pretrain/regmix-10b` | 60% | 6198 / 42 | frozen average of `hq-reference` steps 1000/1125/1315 | 2360 steps |
+| [`random-control`](random-control.yaml) | `random` | `pretrain/regmix-10b` | 60% | 6198 / 42 | — | 2360 steps; mask drawn per corpus instance, independent of world size/rank/microbatch |
+| [`random-control-seed69`](random-control-seed69.yaml) | `random` | `pretrain/regmix-10b` | 60% | 12345 / 69 | — | the seed-variance replicate; independent draw from `random-control`, never overlapping it |
+| [`rho-1`](rho-1.yaml) | `rho_excess` (top `L_curr − L_ref`) | `pretrain/regmix-10b` | 60% | 6198 / 42 | frozen `instruct-reference` step 940, scored offline once into a per-instance table | 2360 steps |
+| [`rel-ema-exp`](rel-ema-exp.yaml) | `rel_ema` (top `L_curr − L_hist`) | `pretrain/regmix-10b` | 60% | 6198 / 42 | zero-seeded bias-corrected EMA, `alpha(t) = 1 - exp(-t/300)` | 2360 steps |
+| [`perplexity`](perplexity.yaml) | `middle_ppl` (middle 60% by frozen loss) | `pretrain/regmix-10b` | 60% | 6198 / 42 | frozen `instruct-reference` step 940, scored offline once into the same per-instance table `rho-1` reads | 2360 steps |
 | [`attention`](attention.yaml) | `attention_topk` (top position-normalized, target-aligned attention received) | `pretrain/regmix-10b` | 60% | 6198 / 42 | — | 2360 steps |
 | [`blade`](blade.yaml) | `blade` (top `L_proxy - L_ref`, selection-weighted reference update) | `pretrain/regmix-10b` | 60% | 6198 / 42 | dynamic, synced from the proxy at steps 0/400/800/1200/1600/2000 (`tau=400`, `K=75`); second stream `pretrain/refhq-instruct` | 2360 steps |
 
-`random-control`, `random-control-seed69` and `rel-ema-exp` are **kept** runs: they are
-not rerun under the unified commit. Their run ids, seeds and W&B ids are pinned in
-`../olmo_core_token_selection/PROVENANCE.md`. Every other arm (including both
-references) is trained under the unified commit.
+Every arm above, including the Instruct reference, is trained under the unified
+commit pinned in `../olmo_core_token_selection/PROVENANCE.md`; nothing is kept from an
+earlier commit.
 
 ## Methodology fixes since the confounded runs
 

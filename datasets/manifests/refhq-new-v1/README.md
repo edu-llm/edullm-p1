@@ -271,9 +271,11 @@ See the module docstring in `build_manifest.py` for the full algorithm and
 - `plan.json`'s `sources.hermes-3.gated: true` does not reflect current
   reality: `NousResearch/Hermes-3-Dataset` at the pinned revision downloaded
   without any `HF_TOKEN` on 2026-09-25 (both `list_repo_files` and
-  `hf_hub_download` succeeded unauthenticated). The `.hf_token` files under
-  `/scratch/users/nzhao2/refhq-new-v1/` and
-  `/scratch/users/nzhao2/refhq-regmix-5p5b-v1/` are both currently invalid
+  `hf_hub_download` succeeded unauthenticated). The `.hf_token` file under
+  `/scratch/users/nzhao2/refhq-new-v1/` is currently invalid
   (`401 Invalid user token` / expired OAuth claim) — harmless here since the
   repo isn't actually gated right now, but worth flagging since other
-  in-flight agent work may assume that token is live.
+  in-flight agent work may assume that token is live. (The HQ reference
+  corpus and its own scratch `.hf_token` have since been deleted entirely,
+  not merely left invalid; `submit_refhq_new.sh` no longer falls back to
+  that path.)

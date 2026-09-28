@@ -1,4 +1,4 @@
-"""Run Dolma tag + English pre-mix for refhq-new (mirrors refhq.process)."""
+"""Run Dolma tag + English pre-mix for refhq-new (mirrors the standard FarmShare Dolma pre-mix pattern)."""
 
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ def _require_dolma() -> str:
     if executable is None:
         raise RuntimeError(
             "dolma is not installed or not on PATH; install 'dolma[code]==1.1.2' "
-            "(same as RefHQ FarmShare venv)"
+            "(same as the standard FarmShare venv setup)"
         )
     return executable
 

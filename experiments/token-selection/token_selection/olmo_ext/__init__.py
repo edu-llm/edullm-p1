@@ -7,11 +7,12 @@ though the token-selection experiment's own code path
 (``olmo_core_token_selection/production_contract/``) no longer imports this
 package. The upstream package also carries the token-scoring machinery
 (``attention_score``, ``ema``, ``frozen_ref``, ``scorers``, ``metrics``,
-``train_module``) and a RefHQ DistCP->``.pt`` materializer
-(``refhq_materialize``), none of which anything in this repository imports
-anymore -- the materializer's only caller was
+``train_module``) and a legacy DistCP->``.pt`` reference-checkpoint materializer
+(``refhq_materialize``, named for the now-retired HQ reference corpus), none
+of which anything in this repository imports anymore -- the materializer's
+only caller was
 ``experiments/token-selection/reference/export_refhq_reference.py``, which is
-gone now that both references are trained in this study (see
+gone now that the (Instruct) reference is trained in this study (see
 ``../arms/README.md``).
 
 Every import site in this repository uses the submodule form

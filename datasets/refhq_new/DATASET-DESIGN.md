@@ -7,7 +7,9 @@
 **name:** `refhq-instruct` → `pretrain/refhq-instruct`  
 *(The FarmShare scratch layout keeps the `refhq-new` directory name; `refhq-new` was not
 usable as the dataset id itself, since `new` collides with a version-token convention.)*  
-(Sibling of `pretrain/refhq-regmix-5p5b`: same reference role, instruct mix instead of HQ web. No size suffix — realized size is whatever one pass yields.)
+(Originally designed alongside a since-retired HQ-filtered web-mix reference corpus
+(`pretrain/refhq-regmix-5p5b`); this one is instruct-sourced instead. No size suffix —
+realized size is whatever one pass yields.)
 
 **tokenizer:** HF `allenai/dolma2-tokenizer` → publish dep `tokenizer/dolma2-bpe` (EOS 100257). Already published; do not republish.
 

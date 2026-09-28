@@ -32,7 +32,7 @@ SEED="${SEED:-42}"
 STAGE_DIR="${STAGE_DIR:-${RUN_DIR}/publish-stage}"
 REFHQ_NEW_SCRIPTS="${REFHQ_NEW_SCRIPTS:-${RUN_DIR}/datasets/refhq_new/scripts}"
 SKIP_PUBLISH="${SKIP_PUBLISH:-0}"
-HF_TOKEN_SRC="${HF_TOKEN_SRC:-/scratch/users/${SUNET}/hq-reference-v1/.hf_token}"
+HF_TOKEN_SRC="${HF_TOKEN_SRC:-${HF_TOKEN:-$HOME/.cache/huggingface/token}}"
 
 # shellcheck source=lib.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
@@ -50,8 +50,7 @@ REFHQ_NEW_SCRIPTS="${RUN_DIR}/datasets/refhq_new/scripts"
 # gated, so download_hf_source.py wants a token; the repo itself is not gated).
 if [[ ! -f "${RUN_DIR}/.hf_token" ]]; then
   for cand in "${HF_TOKEN_SRC}" \
-    "/scratch/users/${SUNET}/hq-reference-v1/.hf_token" \
-    "/scratch/users/${SUNET}/refhq-regmix-5p5b-v1/.hf_token"
+    "$HOME/.cache/huggingface/token"
   do
     if [[ -n "${cand}" && -f "${cand}" ]]; then
       cp -a "${cand}" "${RUN_DIR}/.hf_token"

@@ -1,11 +1,11 @@
 # Benchmark contamination audit (matched-span, length-robust)
 
 This directory holds the code and results behind the paper's contamination
-audit of the three corpora used in the token-selection experiment. It
+audit of the corpora used in the token-selection experiment. It
 **replaces** an earlier verbatim-13-gram audit that lived at this path: that
 audit's own denominator (40,087 items) and per-corpus match counts (358 /
-438 / 1,472) did not match the numbers this paper's text now reports (40,582
-items; 957 / 1,180 / 2,432 for the training, HQ and Instruct corpora), and neither the scanner nor the eval-item index
+1,472) did not match the numbers this paper's text now reports (40,582
+items; 957 / 2,432 for the training and Instruct corpora), and neither the scanner nor the eval-item index
 that produced them had ever been committed here, so the discrepancy was not
 reproducible from this repo. This directory now vendors the code that
 produced the *current* numbers, so the join can be checked directly rather
@@ -47,10 +47,13 @@ docstring below. Summary, in contrast with the superseded audit:
 - **Matched-span word rate as the primary length-robust metric**, alongside
   the length-biased matched-*document* rate (a document is "matched" if any
   span in it hits) and a macro item-fraction rate averaged across benchmarks
-  (so a 10,000-item benchmark and a 300-item benchmark get equal say, matching
-  how the endpoint itself is weighted). `scan_corpus.py` unions all matched
-  word spans per document so the span rate is computable directly rather than
-  only the document-level upper bound.
+  (so a 10,000-item benchmark and a 300-item benchmark get equal say -- this
+  is a deliberately different weighting from the paper's own endpoint, which
+  is a macro over 20 (task, split) *labels*, not benchmarks: MMLU alone
+  supplies 8 of those 20, i.e. 40% of the endpoint's weight, against 1/10
+  here). `scan_corpus.py` unions all matched word spans per document so the
+  span rate is computable directly rather than only the document-level upper
+  bound.
 - **Provenance-tagged, loose index.** Every indexed n-gram records which
   field (`stem` or `gold`) it came from, so nested nothing needs a second
   scan -- the stem-only, gold-only and "any field" rates are all read off one
@@ -77,24 +80,10 @@ superseded audit's 40,087 used -- see
 | Corpus | Role | Path scanned (FarmShare scratch) | Docs scanned | Words scanned |
 | --- | --- | --- | --- | --- |
 | `regmix-10b` | 10B training corpus (`pretrain/regmix-10b` v1) | `regmix-10b-20260725-124810/trim/<domain>/<domain>-trimmed.json.gz`, one file per domain | 4,748,990 | 5,879,719,994 |
-| `refhq-regmix-5p5b-v1` | HQ reference corpus (Reference A) | `refhq-regmix-5p5b-v1/out/<domain>/`, one directory per domain | 3,265,570 | 3,214,596,137 |
-| `refhq-new-v1` | Instruct reference corpus (Reference B) | `refhq-new-v1/out/<source>/<category>/documents/`, `category` is the aggregation domain | 6,193,748 | 2,738,073,602 |
+| `refhq-new-v1` | Instruct reference corpus | `refhq-new-v1/out/<source>/<category>/documents/`, `category` is the aggregation domain | 6,193,748 | 2,738,073,602 |
 
-The HQ row is `refhq-regmix-5p5b-v1`, the build the HQ reference model trains on
-(both HQ and Instruct references are trained in this study; see
-[`../arms/README.md`](../arms/README.md)). The original audit scanned `hq-reference-v1`
-instead, an earlier, superseded 4B-budget build (3,367,856 docs, 2,298,753,521 words;
-1,010 items, 2.49%, stem rate 2.22%) whose raw downloads
-[`submit_refhq_regmix_5p5.sh`](../datasets/refhq/scripts/submit_refhq_regmix_5p5.sh)
-reused for every domain except DCLM (freshly sampled) when it built the trained
-corpus under the `regmix-5p5` budget. `hq-reference-v1` has since been deleted from
-scratch; its own build and reduced results are no longer kept, since the current
-`refhq-regmix-5p5b-v1` row above supersedes it. The 2026-09-24 rescan of
-`refhq-regmix-5p5b-v1` used the same `scan_corpus.py`, item index
-(`item_index_summary.json`) and `aggregate_by_domain.py`.
-
-All three share the domain set `{algebraic-stack, arxiv, dclm, open-web-math,
-pes2o, starcoder, wiki}` except `refhq-new-v1`, which is organized by
+`regmix-10b` uses the domain set `{algebraic-stack, arxiv, dclm, open-web-math,
+pes2o, starcoder, wiki}`; `refhq-new-v1` is organized by
 `{chat, code, general, math, science}` instead (its 23 source/category
 shards are listed in the reproduction commands below). Every path above is
 relative to `/scratch/users/nzhao2/` on FarmShare -- the actual location the
@@ -107,7 +96,7 @@ committed to this repo.
 
 ## Results
 
-From `results_regmix-10b.json`, `results_refhq-regmix-5p5b-v1.json`,
+From `results_regmix-10b.json`,
 `results_refhq-new-v1.json` -> `totals`. Percentages rounded to 2 decimal
 places except where the source table needs more precision to show a
 difference.
@@ -115,7 +104,6 @@ difference.
 | Corpus | Matched items (any field) | Item rate | Self-contained-stem rate | Matched-span word rate |
 | --- | --- | --- | --- | --- |
 | `regmix-10b` (training) | 957 / 40,582 | **2.36%** | **2.00%** | 1.095e-05 |
-| `refhq-regmix-5p5b-v1` (HQ reference) | 1,180 / 40,582 | **2.91%** | **2.43%** | 2.424e-05 |
 | `refhq-new-v1` (Instruct reference) | 2,432 / 40,582 | **5.99%** | **7.50%** | 2.195e-04 |
 
 "Item rate" is `distinct_items_any / n_items` (union of the stem and gold
@@ -131,16 +119,24 @@ field (54.4%), and its 15.93% stem rate supplies 1.59 of the 2.00 points of
 the macro stem rate (79.5%).
 
 Contamination in the training corpus is shared by every arm trained on it,
-although each arm's loss mask decides which contaminated tokens it trains on,
-which this audit does not measure. The Instruct reference corpus -- used to
-train RHO-1's frozen reference model and to update BLADE's dynamic reference --
-is
-matched by roughly **2.5x** more items than the training corpus (2,432 vs
-957). A reference model that has memorized more evaluation items would raise
-excess loss on those items and bias its arm toward *outperforming* the
-control; the paper's finding that RHO-1 and BLADE still underperform the
-full-loss control holds despite that bias, not because contamination is
-absent.
+but each arm's loss mask decides which contaminated tokens it actually trains
+on, and that mask depends on the method -- this audit does not measure it.
+The Instruct reference corpus -- used to train the frozen reference model
+`rho-1` and `perplexity` both score against -- is matched by roughly **2.5x**
+more items than the training corpus (2,432 vs 957). (BLADE does not use this
+frozen checkpoint: its dynamic reference is synced from its own proxy, and it
+reads the Instruct corpus directly as a second training stream, not as a
+reference for scoring.)
+
+Direction here is unmeasured, and the two arms that do use this reference
+would plausibly be pulled opposite ways by it, not the same way. If the
+reference has memorized an evaluation item, that item's reference loss is
+low. `rho_excess` keeps the tokens with the *largest* current-minus-reference
+gap, so a memorized item's low reference loss makes it more likely to be
+kept, not less. `middle_ppl` does the opposite: it drops the tokens with the
+*lowest* reference loss, so a memorized item is more likely to be excluded.
+Neither is measured, and no "outperform"/"underperform" bias should be
+assumed in either direction without an actual clean-subset comparison.
 
 ### `refhq-new-v1` (Instruct) per-benchmark, selected rows
 
@@ -173,21 +169,6 @@ here, out of 1,221 -- 60 CSQA stems fall under this pipeline's 8-word floor
 and are excluded rather than scored). The residual movement there is
 consistent with that item-count and floor correction rather than an
 exemplar effect, since CSQA has no per-subject exemplar block to strip.
-
-### Regmix and HQ-reference `csqa` / `mmlu`, for comparison
-
-| Corpus | `csqa` stem rate | `mmlu` stem rate | `mmlu` gold rate |
-| --- | --- | --- | --- |
-| `regmix-10b` | 0.52% | 1.85% | 1.03% |
-| `refhq-regmix-5p5b-v1` | 0.43% | 2.50% | 1.92% |
-| `refhq-new-v1` | 34.11% | 5.27% | 4.66% |
-
-The Instruct corpus's `csqa` rate is nearly two orders of magnitude above the
-training and HQ-reference corpora's (34.11% vs 0.52% / 0.43%); its `mmlu`
-rate is smaller in relative terms but still roughly 2-3x theirs (5.27% vs
-1.85% / 2.50%). CSQA and MMLU's dev/validation splits are both widely
-redistributed inside public instruction-tuning mixtures, which is exactly
-what this measures.
 
 ## Code map
 
@@ -238,7 +219,7 @@ dump regenerated with ai2-olmo.
 
 Not vendored, and why:
 
-- **The raw corpora** (`regmix-10b`, `refhq-regmix-5p5b-v1`, `refhq-new-v1`) --
+- **The raw corpora** (`regmix-10b`, `refhq-new-v1`) --
   tens of billions of words each, and not something a paper's code repo
   should carry. Their FarmShare paths are recorded above for provenance.
 - **`item_index.pkl`** (172 MB; see `item_index_summary.json` ->
@@ -362,12 +343,6 @@ for d in algebraic-stack arxiv dclm open-web-math pes2o starcoder wiki; do
     "/scratch/users/nzhao2/agent-runs/regmix-10b-20260725-124810/trim/$d/$d-trimmed.json.gz"
 done > regmix-10b.tsv
 
-# refhq-regmix-5p5b-v1: one line per domain, the corpus's per-domain directory
-# (scan_corpus.py reads every *.json.gz/*.jsonl.zstd shard inside, sorted).
-for d in algebraic-stack arxiv dclm open-web-math pes2o starcoder wiki; do
-  printf '%s\t0000\t%s\n' "$d" "/scratch/users/nzhao2/refhq-regmix-5p5b-v1/out/$d"
-done > refhq-regmix-5p5b-v1.tsv
-
 # refhq-new-v1: one line per (source, category) documents directory; category
 # is the aggregation domain, source becomes the shard id so several sources
 # can contribute to one category.
@@ -379,7 +354,7 @@ find /scratch/users/nzhao2/refhq-new-v1/out -maxdepth 3 -type d -name documents 
     done > refhq-new-v1.tsv
 
 # Scan each corpus (Slurm array, one task per task-list line).
-for corpus in regmix-10b refhq-regmix-5p5b-v1 refhq-new-v1; do
+for corpus in regmix-10b refhq-new-v1; do
   N=$(wc -l < "$corpus.tsv")
   CN_TASKLIST="$PWD/$corpus.tsv" CN_INDEX=/path/to/item_index.pkl \
     CN_OUT="/scratch/users/nzhao2/agent-runs/<run>/$corpus/hits" \
@@ -391,11 +366,6 @@ python "$CONTAM/aggregate_by_domain.py" \
   --hits /scratch/.../regmix-10b/hits --items "$CONTAM/eval_items.jsonl.gz" \
   --domains algebraic-stack,arxiv,dclm,open-web-math,pes2o,starcoder,wiki \
   --corpus-name regmix-10b --out "$CONTAM/results_regmix-10b.json"
-
-python "$CONTAM/aggregate_by_domain.py" \
-  --hits /scratch/.../refhq-regmix-5p5b-v1/hits --items "$CONTAM/eval_items.jsonl.gz" \
-  --domains algebraic-stack,arxiv,dclm,open-web-math,pes2o,starcoder,wiki \
-  --corpus-name refhq-regmix-5p5b-v1 --out "$CONTAM/results_refhq-regmix-5p5b-v1.json"
 
 python "$CONTAM/aggregate_by_domain.py" \
   --hits /scratch/.../refhq-new-v1/hits --items "$CONTAM/eval_items.jsonl.gz" \

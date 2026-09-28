@@ -10,14 +10,14 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `b1c905e3` (see below) |
+| Commit | `cc86ab96` (see below) |
 | Source path | `.edullm/` |
-| Copied on | 2026-09-27 |
+| Copied on | 2026-09-28 |
 
 This directory is byte-identical to `.edullm/` at that commit. No file was
 edited here after vendoring.
 
-`b1c905e3` unifies every arm onto one code path: one entrypoint
+`cc86ab96` unifies every arm onto one code path: one entrypoint
 (`token_selection_entrypoint.py`), one train module
 (`TokenWeightedTrainModule`), and one hardware contract (FarmShare, 4×L40S).
 It replaces `53daffdf`, the commit the previous version of this directory
@@ -57,6 +57,12 @@ are:
   its exact commit (`GIT_COMMIT`), which every run logs into its W&B config
   and `run_identity.json`, closing the previous version's `git_commit=None`
   gap.
+- `farmshare/{config.env,launch.sh,submit_from_laptop.sh}`: a smoke test can
+  now override `TRAIN_GPUS`, `TRAIN_PARTITION`/`TRAIN_QOS`, `EDULLM_LOCAL`
+  and `WANDB_MODE` to run one arm on the separate `qos=normal` 1-GPU cap with
+  offline W&B, instead of the production `qos=gpu` 4-GPU cap. Every
+  production launch leaves all of these unset and gets the same behavior as
+  before.
 
 ## Kept runs: what code they ran
 
@@ -66,7 +72,7 @@ the two random-control seeds (`random-control-regmix10b-v1`,
 (`rel-ema-exp-10b-scratch-v1`). All three ran `53daffdf` (the previous
 commit), on FarmShare 4×L40S, through the RunPod-wrapper entrypoint that
 `token_selection_entrypoint.py` has since absorbed. The random-selection and
-REL-EMA code paths are unchanged in `b1c905e3`: no rank term was added to the
+REL-EMA code paths are unchanged in `cc86ab96`: no rank term was added to the
 mask seed, and the EMA update is untouched. This is protected by a golden
 test (`tests/test_token_selection_370m.py`) that checks the per-microbatch
 weight derivation, `EMAHistory`'s update sequence, and `ema_alpha` against

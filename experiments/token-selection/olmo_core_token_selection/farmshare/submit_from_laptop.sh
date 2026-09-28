@@ -21,6 +21,14 @@ SKIP_TRAIN="${SKIP_TRAIN:-0}"
 STAGE_MODE="${STAGE_MODE:-corpora}"
 TS="$(date +%Y%m%d-%H%M%S)"
 RUN_DIR="${RUN_DIR:-/scratch/users/${SUNET}/agent-runs/${EXPERIMENT_SLUG}-${TS}}"
+# Every reported run submits on qos=gpu (the 4-GPU-per-user cap), matching
+# TRAIN_GPUS=4. A smoke test can override both, together with TRAIN_GPUS,
+# EDULLM_LOCAL and WANDB_MODE, to use the separate qos=normal 1-GPU cap
+# instead -- none of this is set automatically.
+TRAIN_PARTITION="${TRAIN_PARTITION:-gpu}"
+TRAIN_QOS="${TRAIN_QOS:-gpu}"
+EDULLM_LOCAL="${EDULLM_LOCAL:-}"
+WANDB_MODE="${WANDB_MODE:-}"
 
 export RUN_DIR LOCAL_REPO SOCK HOST
 export ARM RECOVERY_MODE
@@ -69,16 +77,22 @@ if [[ -n "${STAGE_JOB}" ]]; then
   DEP_FLAG="--dependency=afterok:${STAGE_JOB}"
 fi
 
-TRAIN_EXPORT="RUN_DIR='${RUN_DIR}',SCRIPTS_DIR='${RUN_DIR}/scripts',RECOVERY_MODE='${RECOVERY_MODE}'"
+TRAIN_EXPORT="RUN_DIR='${RUN_DIR}',SCRIPTS_DIR='${RUN_DIR}/scripts',RECOVERY_MODE='${RECOVERY_MODE}',TRAIN_GPUS='${TRAIN_GPUS}'"
 if [[ -n "${ARM}" ]]; then
   TRAIN_EXPORT+=",ARM='${ARM}'"
+fi
+if [[ -n "${EDULLM_LOCAL}" ]]; then
+  TRAIN_EXPORT+=",EDULLM_LOCAL='${EDULLM_LOCAL}'"
+fi
+if [[ -n "${WANDB_MODE}" ]]; then
+  TRAIN_EXPORT+=",WANDB_MODE='${WANDB_MODE}'"
 fi
 
 TRAIN_JOB="$(ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" bash -s <<EOF
 set -Eeuo pipefail
 JOB=\$(sbatch --parsable --exclude=wheat-01 ${DEP_FLAG} \
-  --partition=gpu \
-  --qos=gpu \
+  --partition=${TRAIN_PARTITION} \
+  --qos=${TRAIN_QOS} \
   --nodes=1 \
   --ntasks=1 \
   --gpus-per-node=${TRAIN_GPUS} \

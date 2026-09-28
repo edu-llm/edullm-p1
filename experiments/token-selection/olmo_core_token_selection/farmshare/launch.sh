@@ -84,7 +84,9 @@ esac
 source "${identity_file}"
 
 export EDULLM_INPUT_MANIFEST="${INPUT_MANIFEST}"
-export WANDB_MODE=online
+# Production never pre-sets WANDB_MODE, so this stays "online" there; a
+# smoke test can export WANDB_MODE=offline before invoking this script.
+export WANDB_MODE="${WANDB_MODE:-online}"
 
 # Every production launch runs at TRAIN_GPUS=4, matching recipe.py's
 # PRODUCTION_WORLD_SIZE exactly, so the entrypoint's topology assertion

@@ -358,7 +358,16 @@ def main() -> None:
                 raise EvaluatorContractError(f"timed out waiting for {evaluator_state}")
     torch.cuda.set_device(local_rank)
     if not dist.is_initialized():
-        dist.init_process_group(backend="nccl", timeout=timedelta(minutes=60))
+        # world_size=1 (any non-production --local run that doesn't set
+        # TASK_LOSS_NPROC/NPROC above 1) has no cross-rank collectives to do,
+        # but NCCL still probes IB/network topology on init and can hang for
+        # many minutes doing it on a single-GPU FarmShare allocation. Gloo
+        # skips that probe and initializes immediately; production's real
+        # multi-rank eval (world_size>1) keeps NCCL for the GPU-resident
+        # all_gather_object collective across ranks.
+        world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        backend = "nccl" if world_size > 1 else "gloo"
+        dist.init_process_group(backend=backend, timeout=timedelta(minutes=60))
     run(args.checkpoint, args.out, args.run_name, args.device_eval_batch_size)
 
 

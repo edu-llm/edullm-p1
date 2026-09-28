@@ -22,6 +22,6 @@ frozen_reference:
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: 3ffb5175
+  revision: 4f359c76
 wandb_project: token-selection
 status: trained-in-this-study

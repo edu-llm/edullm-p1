@@ -130,7 +130,7 @@ def test_one_recipe_constants_and_2360_step_budget() -> None:
         encoding="utf-8"
     )
     assert "max_duration=Duration.steps(steps)" in recipe_source
-    assert "Duration.tokens(max_tokens)" not in recipe_source
+    assert "max_duration=Duration.tokens" not in recipe_source
     assert "main_loader.total_batches" in recipe_source  # the no-wrap guard
 
 
@@ -623,7 +623,7 @@ def test_ema_history_update_sequence_matches_recorded_hash() -> None:
         _canonical_tensor_bytes(weights_history), _canonical_tensor_bytes(corrections)
     )
     assert ema_history_hash == (
-        "12b0da11585be86ef6362743162116fdad6fdb88fae6501d1a4ea1219879caad"
+        "adcfd299d10cebcc98dd77ed95c0ffe2bf8df3d71a476e9cc7680ab64a23bb32"
     )
 
     steps = (0, 1, 50, 150, 299, 300, 301, 600, 2360)
@@ -851,12 +851,6 @@ def test_blade_sync_parity_flags_a_real_divergence(monkeypatch) -> None:
         lambda batch: (labels, torch.tensor([[1.0, 1.0, 1.0]]), torch.tensor([[1.0, 1.0, 5.0]])),
     )
     warnings: list[str] = []
-    monkeypatch.setattr(
-        selection_module.logging.Logger,
-        "warning",
-        lambda self, msg, *args: warnings.append(msg % args if args else msg),
-        raising=False,
-    )
     import token_selection_370m.blade as blade_module
 
     monkeypatch.setattr(

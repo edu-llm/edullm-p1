@@ -10,14 +10,14 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `4ef27ed0` (see below) |
+| Commit | `dd22d20f` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
 This directory is byte-identical to `.edullm/` at that commit. No file was
 edited here after vendoring.
 
-`4ef27ed0` unifies every arm onto one code path: one entrypoint
+`dd22d20f` unifies every arm onto one code path: one entrypoint
 (`token_selection_entrypoint.py`), one train module
 (`TokenWeightedTrainModule`), and one hardware contract (FarmShare, 4×L40S).
 It replaces `53daffdf`, the commit the previous version of this directory
@@ -79,7 +79,7 @@ the two random-control seeds (`random-control-regmix10b-v1`,
 (`rel-ema-exp-10b-scratch-v1`). All three ran `53daffdf` (the previous
 commit), on FarmShare 4×L40S, through the RunPod-wrapper entrypoint that
 `token_selection_entrypoint.py` has since absorbed. The random-selection and
-REL-EMA code paths are unchanged in `4ef27ed0`: no rank term was added to the
+REL-EMA code paths are unchanged in `dd22d20f`: no rank term was added to the
 mask seed, and the EMA update is untouched. This is protected by a golden
 test (`tests/test_token_selection_370m.py`) that checks the per-microbatch
 weight derivation, `EMAHistory`'s update sequence, and `ema_alpha` against

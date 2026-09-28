@@ -370,13 +370,32 @@ def main() -> None:
         # TASK_LOSS_NPROC/NPROC above 1) has no cross-rank collectives to do,
         # but NCCL still probes IB/network topology on init and can hang for
         # many minutes doing it on a single-GPU FarmShare allocation. Gloo
-        # skips that probe and initializes immediately; production's real
-        # multi-rank eval (world_size>1) keeps NCCL for the GPU-resident
-        # all_gather_object collective across ranks.
+        # skips that probe; production's real multi-rank eval (world_size>1)
+        # keeps NCCL for the GPU-resident all_gather_object collective.
         world_size = int(os.environ.get("WORLD_SIZE", "1"))
         backend = "nccl" if world_size > 1 else "gloo"
-        LOG.info("init_process_group(backend=%s, world_size=%d)...", backend, world_size)
-        dist.init_process_group(backend=backend, timeout=timedelta(minutes=60))
+        if world_size > 1:
+            LOG.info("init_process_group(backend=%s, world_size=%d, env://)...", backend, world_size)
+            dist.init_process_group(backend=backend, timeout=timedelta(minutes=60))
+        else:
+            # env:// rendezvous makes rank 0 bind a TCPStore server on
+            # MASTER_PORT; that port was only *probed* free a moment earlier
+            # in _default_single_rank_env() (bound, read, and released), and
+            # on FarmShare that bind-probe-release-rebind sequence hangs
+            # rather than erroring on the actual rebind. A file-based store
+            # has no port to race on and needs no other rank to rendezvous
+            # with, matching how tests/test_token_selection_370m.py already
+            # inits a world_size=1 gloo group for its own FSDP fixture.
+            rendezvous_dir = Path(tempfile.mkdtemp(prefix="token-selection-rendezvous-"))
+            rendezvous_file = rendezvous_dir / "store"
+            LOG.info("init_process_group(backend=%s, world_size=1, file://%s)...", backend, rendezvous_file)
+            dist.init_process_group(
+                backend=backend,
+                init_method=f"file://{rendezvous_file}",
+                rank=0,
+                world_size=1,
+                timeout=timedelta(minutes=60),
+            )
         LOG.info("process group initialized")
     run(args.checkpoint, args.out, args.run_name, args.device_eval_batch_size)
 

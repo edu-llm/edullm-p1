@@ -248,25 +248,33 @@ def run(
 ) -> dict[str, Any]:
     if not dist.is_initialized():
         raise EvaluatorContractError("distributed process group is not initialized")
+    LOG.info("run(): preparing CLI environment...")
     prepare_cli_environment()
+    LOG.info("run(): checking suite...")
     require_suite()
     rank = dist.get_rank()
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     device = torch.device("cuda", local_rank)
+    LOG.info("run(): building model...")
     model = build_model()
+    LOG.info("run(): loading checkpoint into model...")
     step = load_model(checkpoint, model)
     model.to(device)
     config = build_eval_config(device_eval_batch_size)
+    LOG.info("run(): loading tokenizer...")
     if rank == 0:
         tokenizer = Tokenizer.from_train_config(config)
     dist.barrier()
     if rank != 0:
         tokenizer = Tokenizer.from_train_config(config)
     dist.barrier()
+    LOG.info("run(): warming inputs...")
     warm_inputs(config, tokenizer, device, device_eval_batch_size)
-    local_results = {
-        label: evaluate_label(
+    local_results: dict[str, float] = {}
+    for label in TASK_LABELS:
+        LOG.info("run(): evaluating label %s...", label)
+        local_results[label] = evaluate_label(
             model,
             config,
             tokenizer,
@@ -274,8 +282,7 @@ def run(
             label,
             device_eval_batch_size,
         )
-        for label in TASK_LABELS
-    }
+    LOG.info("run(): all labels evaluated locally; gathering...")
     gathered: list[dict[str, float] | None] = [None] * dist.get_world_size()
     dist.all_gather_object(gathered, local_results)
     labels: dict[str, float] = {}
@@ -357,6 +364,7 @@ def main() -> None:
             else:
                 raise EvaluatorContractError(f"timed out waiting for {evaluator_state}")
     torch.cuda.set_device(local_rank)
+    LOG.info("materialized checkpoint ready; entering process group init")
     if not dist.is_initialized():
         # world_size=1 (any non-production --local run that doesn't set
         # TASK_LOSS_NPROC/NPROC above 1) has no cross-rank collectives to do,
@@ -367,7 +375,9 @@ def main() -> None:
         # all_gather_object collective across ranks.
         world_size = int(os.environ.get("WORLD_SIZE", "1"))
         backend = "nccl" if world_size > 1 else "gloo"
+        LOG.info("init_process_group(backend=%s, world_size=%d)...", backend, world_size)
         dist.init_process_group(backend=backend, timeout=timedelta(minutes=60))
+        LOG.info("process group initialized")
     run(args.checkpoint, args.out, args.run_name, args.device_eval_batch_size)
 
 

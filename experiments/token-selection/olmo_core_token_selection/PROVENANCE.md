@@ -10,7 +10,7 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `4f359c76` (see below) |
+| Commit | `765ae838` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
@@ -95,7 +95,7 @@ are:
   `z_loss_multiplier` (it defaults to `None` upstream) -- the fix changes
   nothing about what BLADE optimizes, only restores the gradient.
 
-`4f359c76` (on top of `90c2eb66`) reruns every arm under this one commit --
+`765ae838` (on top of `90c2eb66`) reruns every arm under this one commit --
 nothing is kept from `53daffdf` -- and makes these further changes:
 
 - **Offline reference scoring (`token_selection_370m/reference_scores.py`,

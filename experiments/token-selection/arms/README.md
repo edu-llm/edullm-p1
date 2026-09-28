@@ -27,7 +27,8 @@ git, not here.
   grad norm clip `1.0`, HSDP bf16 parameters / fp32 reductions, compilation enabled.
 - **Global batch:** 4,194,304 tokens (`GLOBAL_BATCH_TOKENS` in `recipe.py`).
   `total_steps(max_tokens) = max_tokens // GLOBAL_BATCH_TOKENS`.
-- **Hardware:** one FarmShare node, 4×L40S (`PRODUCTION_WORLD_SIZE = 4`).
+- **Hardware:** one FarmShare node, 4×L40S (`PRODUCTION_WORLD_SIZE = 4`), for every
+  *reported* arm. `instruct-reference` is the one exception -- see its row below.
 - **Rank microbatch:** 16,384 tokens (`ArmSpec.rank_microbatch_tokens` default) for
   every arm except BLADE. Arms that hold a second model in memory during training
   (BLADE, RHO-1, Perplexity) may fall back to 8,192 or 4,096 if the smoke test needs
@@ -45,7 +46,7 @@ git, not here.
 
 | id | method | corpus | keep | seeds (init/data) | reference | notes |
 |---|---|---:|---:|---|---|---|
-| [`instruct-reference`](instruct-reference.yaml) | `full` | `pretrain/refhq-instruct` | 100% | 6198 / 42 | — | trains the frozen Instruct reference `rho-1` and `perplexity` score against offline, and BLADE's L_val stream; 940 steps, one whole-stream epoch of the train split; frozen at step 940 |
+| [`instruct-reference`](instruct-reference.yaml) | `full` | `pretrain/refhq-instruct` | 100% | 6198 / 42 | — | trains the frozen Instruct reference `rho-1` and `perplexity` score against offline, and BLADE's L_val stream; 940 steps, one whole-stream epoch of the train split; frozen at step 940; trained on FarmShare's 1-GPU `qos=normal` lane (not the 4×L40S contract above) while the 4-GPU lane was occupied by an unrelated study -- a hardware choice only, since its checkpoint identity is pinned by weight sha256, not world size (see `../olmo_core_token_selection/README-token-selection.md`) |
 | [`full-loss-control`](full-loss-control.yaml) | `full` | `pretrain/regmix-10b` | 100% | 6198 / 42 | — | 2360 steps |
 | [`random-control`](random-control.yaml) | `random` | `pretrain/regmix-10b` | 60% | 6198 / 42 | — | 2360 steps; mask drawn per corpus instance, independent of world size/rank/microbatch |
 | [`random-control-seed69`](random-control-seed69.yaml) | `random` | `pretrain/regmix-10b` | 60% | 12345 / 69 | — | the seed-variance replicate; independent draw from `random-control`, never overlapping it |

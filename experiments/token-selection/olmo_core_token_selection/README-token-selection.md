@@ -9,12 +9,28 @@ global batch 4,194,304 tokens. Optimization is SkipStepAdamW at peak LR
 24-step cosine warmup, `alpha_f=0.1`, Z-loss `1e-5`, grad norm 1.0, HSDP bf16
 parameters/fp32 reductions, and compilation enabled.
 
-Every run trains on FarmShare, on one 4×L40S node, through
-`token_selection_entrypoint.py` (see `.edullm/farmshare/`). There is no
-RunPod path, no AWS/S3 code, and no separate submission platform anywhere in
-this tree: corpora are pinned local FarmShare directories, and the
-reference checkpoint (`instruct-reference`) is trained by
-this branch's own arms, not downloaded from anywhere.
+Every run trains on FarmShare, through `token_selection_entrypoint.py` (see
+`.edullm/farmshare/`). There is no RunPod path, no AWS/S3 code, and no
+separate submission platform anywhere in this tree: corpora are pinned
+local FarmShare directories, and the reference checkpoint
+(`instruct-reference`) is trained by this branch's own arms, not
+downloaded from anywhere.
+
+Every *reported* arm runs on one 4×L40S node (`PRODUCTION_WORLD_SIZE = 4`).
+`instruct-reference` is the one exception: it ran on FarmShare's separate
+1-GPU `qos=normal` lane (`EDULLM_LOCAL=1`, `TRAIN_GPUS=1`), while the 4-GPU
+`qos=gpu` lane was occupied by an unrelated study sharing the same
+per-user quota. This is a training-hardware choice only, not a scientific
+one: `instruct-reference` isn't a reported comparison arm, its own
+checkpoint identity is pinned by weight sha256
+(`scientific_identity`/`reference_sha256`) rather than by anything
+world-size-dependent, and `GLOBAL_BATCH_TOKENS` (hence every optimizer
+step's data volume) is fixed independent of GPU count -- the data loader
+runs proportionally more gradient-accumulation microbatches per rank
+instead. The real synchronous task-loss eval and real (non-offline) W&B
+logging both still ran; only the world-size-4 topology assertion and the
+strict-online-upload fail-closed check were relaxed for this run, the same
+`EDULLM_LOCAL` path already used by this branch's own 1-GPU smoke tests.
 
 ## Arms
 

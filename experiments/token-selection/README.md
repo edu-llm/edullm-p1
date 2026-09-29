@@ -26,7 +26,7 @@
 | Train corpus                 | `pretrain/regmix-10b` **v1** — realized **10,004,807,041** tokens, flat shuffle; identical dataset for all seven arms |
 | Global batch / seq / LR      | 4,194,304 / 2048 / 4\times10^{-4} cosine (warmup 24, \alpha_f=0.1)                              |
 | Steps                        | 2360 = 9,898,557,440 tokens for every arm — 98.94% of one epoch (10,004,807,041 total), no wrap |
-| FLOPs / arm                  | **analytic**, 26.03-49.31\times10^{18} depending on arm - see [Cost and FLOPs](#cost-and-flops). The logged W&B throughput counter (2.63\times10^{19} for every arm) **excludes the scoring forward passes** and so understates every selection arm. |
+| FLOPs / arm                  | **analytic**, 26.03-56.11\times10^{18} depending on arm - see [Cost and FLOPs](#cost-and-flops). The logged W&B throughput counter (2.63\times10^{19} for every arm) **excludes the scoring forward passes** and so understates every selection arm. |
 | Keep rate (where applicable) | top / middle **60%** of valid target tokens per sequence, including BLADE (its selection and reference K-update masks are per-row too, the same unit as every other arm); **realized 0.599609** (1228 kept of 2047 valid target positions, logged over all 2048 positions) — see [Realized keep rate](#realized-keep-rate) |
 | Primary metric               | Macro mean CE bits-per-byte over the **20 (task, split) labels** of the OLMo ladder, covering 10 OLMES benchmarks. MMLU supplies 8 of the 20 (**40% of the macro weight**), and 7 of the 20 are **test** splits, so "validation macro bpb" is a misnomer. |
 
@@ -91,14 +91,14 @@ Domains labeled general / math / code / science / chat from metadata. dolma2 tok
 | Random control | 26.03 | 1.00x |
 | Attention top-k | 26.11 | 1.00x |
 | REL-EMA (exponential) | 34.71 | 1.33x |
-| rho-1 | 45.08 | 1.73x |
-| BLADE | 47.98 | 1.84x |
-| Middle-PPL | 34.80 | 1.34x |
+| rho-1 | 45.17 | 1.73x |
+| BLADE | 56.11 | 2.16x |
+| Middle-PPL | 45.17 | 1.73x |
 
-The rho-1 and BLADE totals include pretraining their reference models. Middle-PPL
-(reference: Instruct step 940) now scores against the same frozen Instruct reference
-`rho-1` already trains, so it no longer separately pretrains a reference and its total
-carries no reference-pretraining component here.
+The rho-1 and Middle-PPL totals each include the one-time offline scoring pass (8.77e18)
+and the pretraining of the frozen Instruct reference (10.37e18) they share; BLADE's total
+includes its per-step and per-sync scoring passes and its reference updates.
+`python flops.py` reproduces the table.
 
 See [`arms/README.md`](arms/README.md) for the current, unified contract every arm below
 will run under.
@@ -264,36 +264,42 @@ Forward+backward = **3x** forward. This model reproduces the logged W&B throughp
 counter to within **0.05%**, which is what licenses using it for the arms whose counter
 is incomplete.
 
-| Arm | In-run FLOPs (x10^18) | With reference pretraining (x10^18) | Relative to control |
+| Arm | In-run FLOPs (x10^18) | Total, with reference training and offline scoring (x10^18) | Total relative to control |
 | --- | --- | --- | --- |
 | **Control (full-CE)** | **26.03** | **26.03** | **1.00x** |
 | Random control | 26.03 | 26.03 | 1.00x |
 | Attention top-k | 26.11 | 26.11 | 1.00x |
 | REL-EMA (exponential) | 34.71 | 34.71 | 1.33x |
-| rho-1 | 34.71 | 45.08 | 1.73x |
-| BLADE | 39.71 | 47.98 | 1.84x |
-| Perplexity (Middle-PPL) | 34.80 | 34.80 | 1.34x |
+| rho-1 | 26.03 | 45.17 | 1.73x |
+| BLADE | 46.19 | 56.11 | 2.16x |
+| Perplexity (Middle-PPL) | 26.03 | 45.17 | 1.73x |
+
+`flops.py` reproduces every number here (`python flops.py`). It counts in units of one
+no-grad forward over one 4,194,304-token global batch.
 
 Reading the table: Attention top-k is nearly free (+0.3%) -- its only extra cost is a
 forward hook on the last transformer block that captures the Q/K inputs, recomputes Q
-and K, and forms QK^T for that one layer. Every arm that needs a second model's forward
-pass -- REL-EMA's EMA copy, rho-1's frozen reference, Middle-PPL's frozen reference --
-pays ~1.33-1.34x in-run; BLADE, which scores against both the proxy and its dynamic
-reference from step 0, pays 1.53x; and the arms that also had to *pretrain* their own
-reference pay up to **1.84x** end to end (BLADE) or **1.73x** (rho-1). Middle-PPL
-(reference: Instruct step 940) now scores against the same frozen Instruct reference
-`rho-1` already pretrains, so unlike the pre-unification confounded run summarized here,
-its total no longer carries a separate reference-pretraining component -- its 1.34x is
-in-run cost only. **The two most expensive arms remain two of the worst-performing
-ones** (BLADE 1.84x, rho-1 1.73x, against Attention's 1.00x), so token selection bought
-negative return on a large compute premium.
+and K, and forms QK^T for that one layer. REL-EMA pays a live extra forward pass on its
+EMA copy every step (1.33x). rho-1 and Middle-PPL no longer score during training: both
+read per-token reference losses from one table computed once, offline, by a single
+forward pass over the whole RegMix corpus (4,885,156 instances, 8.77e18 FLOPs) with the
+frozen Instruct step-940 reference, which itself cost 10.37e18 FLOPs to train (940 steps
+of forward+backward). The two arms share that pass and that reference but are each
+charged the full cost here (1.73x total, 1.00x in-run). BLADE scores every training
+batch against both the proxy and its dynamic reference (2 forwards per step for all 2360
+steps, 17.35e18), scores each reference-update batch at the five later syncs (2.76e18)
+and runs a parity check at every sync (0.04e18), for **46.19** in-run; its 6 syncs x 75
+reference updates then add the itemized cost below, for a total of **56.11**.
+**The two most expensive arms are BLADE (2.16x) and rho-1/Middle-PPL (1.73x), against
+Attention's 1.00x.**
 
-**BLADE's K-update overhead, itemized.** 5 syncs x 75 K-steps x 2 batches per step (one
-training-corpus batch and one Instruct-reference batch) = **750 full batches** of 4,194,304 tokens = **3,145,728,000 tokens** of
-forward+backward, on top of the 2360 training steps. At 2.6298e9 FLOPs/token that is
-8.27e18, which accounts for the **47.98 vs 39.71** total-column difference -- not the
-39.71 vs 34.71 in-run difference, which is BLADE's second per-step scoring pass over the
-1860 steps after step 500 (13.68e18 vs 8.68e18 for a single-scoring arm).
+**BLADE's K-update overhead, itemized.** 6 syncs (steps 0, 400, ..., 2000) x 75 K-steps
+x 2 batches per step (one training-corpus batch and one Instruct-corpus batch) = **900
+full batches** of 4,194,304 tokens = **3,774,873,600 tokens** of forward+backward, on top
+of the 2360 training steps. At 2.6298e9 FLOPs/token that is 9.93e18, which accounts for
+the **56.11 vs 46.19** total-versus-in-run difference. The in-run overhead (46.19 vs
+26.03) is the per-step and per-sync scoring passes: 2 x 2360 forwards per step, plus the
+pre-scoring and parity forwards above (20.16e18).
 
 ### Takeaways
 
@@ -314,9 +320,9 @@ forward+backward, on top of the 2360 training steps. At 2.6298e9 FLOPs/token tha
    Attention's +0.0091 bpb margin (two-sided p = 0.031) is of the same order as the
    0.0082 bpb difference between the two control seeds.
 4. **BLADE's extra machinery did not pay off** -- worse than simple rho-1 despite
-   3,145,728,000 extra tokens of K-update forward+backward (1.84x control FLOPs).
+   3,774,873,600 extra tokens of K-update forward+backward (2.16x control FLOPs in total).
 5. **Cost.** Token selection was the most expensive lever and the weakest scientific
-   return: up to **1.84x** the control's analytic FLOPs for a strictly worse result.
+   return: up to **2.16x** the control's analytic FLOPs for a strictly worse result.
 6. **Seed variance is the binding constraint.** The random control's two seeds differ by
    0.0082 bpb. rho-1's 0.0106 bpb deficit to full CE clears that by only 0.0024 bpb, and
    the Attention-vs-random gap (0.0091 bpb) is of the same order. Only the random control has a seed

@@ -228,6 +228,7 @@
   "Full-loss control": {
    "train_1e18": 26.031509533643245,
    "score_1e18": 0.0,
+   "offline_score_1e18": 0.0,
    "ref_1e18": 0.0,
    "run_total_1e18": 26.031509533643245,
    "grand_total_1e18": 26.031509533643245,
@@ -238,6 +239,7 @@
   "Random control": {
    "train_1e18": 26.031509533643245,
    "score_1e18": 0.0,
+   "offline_score_1e18": 0.0,
    "ref_1e18": 0.0,
    "run_total_1e18": 26.031509533643245,
    "grand_total_1e18": 26.031509533643245,
@@ -247,17 +249,19 @@
   },
   "RHO-1": {
    "train_1e18": 26.031509533643245,
-   "score_1e18": 8.677169844547748,
+   "score_1e18": 0.0,
+   "offline_score_1e18": 8.770302636948717,
    "ref_1e18": 10.368482610857901,
-   "run_total_1e18": 34.70867937819099,
-   "grand_total_1e18": 45.077161989048896,
-   "run_rel_control": 1.3333333333333333,
-   "total_rel_control": 1.731638418079096,
-   "note": "1 extra no-grad fwd/step (frozen Instruct ref) + Instruct ref pretraining"
+   "run_total_1e18": 26.031509533643245,
+   "grand_total_1e18": 45.17029478144986,
+   "run_rel_control": 1.0,
+   "total_rel_control": 1.7352161127295196,
+   "note": "no in-run scoring: reference losses come from one offline forward pass over the whole RegMix corpus (4,885,156 instances) with the frozen Instruct step-940 reference, plus that reference's 940-step pretraining; the pass and the reference are shared with Perplexity, and each arm is charged in full"
   },
   "Attention": {
    "train_1e18": 26.031509533643245,
    "score_1e18": 0.08303511812964352,
+   "offline_score_1e18": 0.0,
    "ref_1e18": 0.0,
    "run_total_1e18": 26.11454465177289,
    "grand_total_1e18": 26.11454465177289,
@@ -267,33 +271,36 @@
   },
   "BLADE": {
    "train_1e18": 26.031509533643245,
-   "score_1e18": 13.677572805812552,
-   "ref_1e18": 8.272725487386625,
-   "run_total_1e18": 39.7090823394558,
-   "grand_total_1e18": 47.98180782684242,
-   "run_rel_control": 1.5254237288135593,
-   "total_rel_control": 1.8432203389830508,
-   "note": "no selection <500; 2 extra no-grad fwd/step after; 5x75x2 full-batch ref fwd+bwd"
+   "score_1e18": 20.1560360541571,
+   "offline_score_1e18": 0.0,
+   "ref_1e18": 9.92727058486395,
+   "run_total_1e18": 46.187545587800344,
+   "grand_total_1e18": 56.11481617266429,
+   "run_rel_control": 1.7742937853107343,
+   "total_rel_control": 2.155649717514124,
+   "note": "selection from step 0: 2 no-grad fwd per step for all 2360 steps, plus 2 fwd for each of 75 reference-update batches at the 5 later syncs and 2 fwd parity check at each of 6 syncs (in-run); 6x75x2 full-batch ref fwd+bwd (reference column)"
   },
   "Perplexity (Middle-PPL)": {
    "train_1e18": 26.031509533643245,
-   "score_1e18": 8.770309257980543,
-   "ref_1e18": 0.0,
-   "run_total_1e18": 34.80181879162379,
-   "grand_total_1e18": 34.80181879162379,
-   "run_rel_control": 1.336911282330583,
-   "total_rel_control": 1.336911282330583,
-   "note": "offline mask precompute = 1 fwd over all 10,004,807,041 corpus tokens (precompute_middle_ppl_masks.py scores the whole corpus, not only the 9.90B trained); reference migrated to the frozen Instruct checkpoint (step 940) already pretrained for rho-1, so no separate reference-pretraining FLOPs are charged here (see experiments/token-selection/README.md)"
+   "score_1e18": 0.0,
+   "offline_score_1e18": 8.770302636948717,
+   "ref_1e18": 10.368482610857901,
+   "run_total_1e18": 26.031509533643245,
+   "grand_total_1e18": 45.17029478144986,
+   "run_rel_control": 1.0,
+   "total_rel_control": 1.7352161127295196,
+   "note": "no in-run scoring: same offline reference-loss pass and Instruct reference as RHO-1, each arm charged in full"
   },
   "REL-EMA": {
    "train_1e18": 26.031509533643245,
    "score_1e18": 8.677169844547748,
+   "offline_score_1e18": 0.0,
    "ref_1e18": 0.0,
    "run_total_1e18": 34.70867937819099,
    "grand_total_1e18": 34.70867937819099,
    "run_rel_control": 1.3333333333333333,
    "total_rel_control": 1.3333333333333333,
-   "note": "1 extra no-grad fwd/step (EMA shadow); no ref pretraining"
+   "note": "1 extra no-grad fwd/step on the EMA history model"
   }
  },
  "overlapping_pairs": [

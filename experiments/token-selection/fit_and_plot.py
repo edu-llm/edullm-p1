@@ -41,9 +41,11 @@ come from closed-form OLS and we keep the grid point with the lowest SSE.
     curve. The residuals are first inflated by ``sqrt(n / (n - p))`` with
     ``p = 3`` (the small-sample rescaling): OLS residuals are shrunk relative
     to the true errors by that factor, so resampling them raw understates the
-    spread. With 11 fit points the factor is 1.173 and with 22 it is 1.076, so
-    the intervals here are roughly 17% (single-run) and 8% (pooled random
-    control) wider than an unrescaled bootstrap would give.
+    spread. With 12 fit points the factor is 1.155 and with 24 it is 1.069, so
+    the intervals here are roughly 15% (single-run) and 7% (pooled random
+    control) wider than an unrescaled bootstrap would give. (Every run is
+    evaluated on {0, 125, ..., 2125, 2250, 2360}, so the fit window holds
+    the 12 steps 1000, 1125, ..., 2250, 2360.)
   * ``alpha`` is RE-ESTIMATED on every bootstrap draw ("alpha-free"), rather
     than being frozen at the point-estimate value.
   * The fitted final value is evaluated at each arm's OWN final logged step
@@ -64,7 +66,7 @@ boundary value and artificially shrink the spread.
 WHY ALPHA IS RE-ESTIMATED PER DRAW (ALPHA-FREE)
 -----------------------------------------------
 Freezing ``alpha`` at its point estimate treats a quantity that was estimated
-from the same 11 points as if it were known exactly, so it understates
+from the same 12 points as if it were known exactly, so it understates
 uncertainty. Re-estimating it per draw propagates that uncertainty. It is also
 the more conservative of the two variants: mean CI width is 0.01162 bpb
 alpha-free vs 0.00823 bpb alpha-fixed, so every interval reported here is the
@@ -93,6 +95,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -112,8 +115,12 @@ N_PARAMS = 3
 # Inflate the fit-window residuals by sqrt(n / (n - p)) before resampling.
 # OLS residuals are shrunk relative to the true errors by exactly this factor
 # on average, so resampling them unrescaled understates the spread -- badly
-# here, where n is 11 (22 for the pooled random control) against p = 3.
+# here, where n is 12 (24 for the pooled random control) against p = 3.
 RESCALE_RESIDUALS = True
+# Eval steps every run must have inside the fit window: the 125-step grid from
+# MIN_STEP through 2250 (kept: it is 110 steps before the final step) and the
+# final step 2360. fit_all() warns for any arm whose window differs.
+EXPECTED_FIT_STEPS = tuple(range(MIN_STEP, 2251, 125)) + (2360,)
 # Font scale, applied to the original (1.0x) sizes in each figure. Figure 2 has
 # room for the full 1.5. Figure 1 does not: its legend sits inside the axes and
 # widens toward the inset as the type grows, and once the last legend entry
@@ -318,10 +325,24 @@ def bootstrap_arm(
     }
 
 
+def _warn_if_unexpected_window(key: str, steps: np.ndarray) -> None:
+    """Flag a curve whose fit window is not the expected eval grid (incl. step 2250)."""
+    window = tuple(int(s) for s in steps[steps >= MIN_STEP])
+    if window != EXPECTED_FIT_STEPS:
+        missing = sorted(set(EXPECTED_FIT_STEPS) - set(window))
+        extra = sorted(set(window) - set(EXPECTED_FIT_STEPS))
+        print(
+            f"WARNING: {key}: fit window is not the expected eval grid "
+            f"(missing steps {missing}, unexpected steps {extra})",
+            file=sys.stderr,
+        )
+
+
 def fit_all(curves: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, dict]:
     results: dict[str, dict] = {}
     for key in ORDER:
         steps, loss = curves[key]
+        _warn_if_unexpected_window(key, steps)
         mask = steps >= MIN_STEP
         res = bootstrap_arm(steps[mask], loss[mask], float(steps[-1]))
         res.update(
@@ -340,6 +361,7 @@ def fit_all(curves: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, dict]
         if key not in curves:
             continue
         steps, loss = curves[key]
+        _warn_if_unexpected_window(key, steps)
         mask = steps >= MIN_STEP
         res = bootstrap_arm(steps[mask], loss[mask], float(steps[-1]))
         res.update(
@@ -692,7 +714,7 @@ METHOD_STRING = (
     "95% CI = 2.5/97.5 percentile of 10,000 i.i.d. residual bootstrap draws with "
     "alpha RE-ESTIMATED on every draw (alpha-free), numpy default_rng seed 0. "
     "Residuals are inflated by sqrt(n/(n-p)) with p=3 before resampling "
-    "(1.173 at n=11, 1.076 at n=22 for the pooled random control). No "
+    "(1.155 at n=12, 1.069 at n=24 for the pooled random control). No "
     "arm's profiled optimum sits on a grid boundary (largest 3.502 for REL-EMA, "
     "smallest 0.794 for BLADE). Alpha-free was chosen over alpha-fixed because it "
     "is the more conservative of the two (mean CI width 0.01162 vs 0.00823 bpb)."
@@ -712,7 +734,7 @@ def write_bootstrap_json(results: dict[str, dict]) -> None:
             "resample": "i.i.d. residual bootstrap on the fit-window residuals",
             "residual_rescaling": (
                 "residuals inflated by sqrt(n/(n-p)), p=3, before resampling; "
-                "1.173 at n=11 and 1.076 at n=22"
+                "1.155 at n=12 and 1.069 at n=24"
             ),
             "alpha_treatment": "re-estimated on every bootstrap draw (alpha-free)",
             "fitted_final_at": "each arm's own final logged step",

@@ -132,20 +132,21 @@ procedure. It is the matched protocol used for every number in this file.
    by 0.0181 bpb on average over steps 125-875 against 0.0047 bpb inside the window.
    Across fit windows starting at 500, 625, ..., 1500, rho-1's advantage over the two-run
    random control ranges from 0.0009 to 0.0076 bpb, and this window gives the largest.
-   Every arm was evaluated every 125 steps on `{0, 125, ..., 2125, 2360}`; there is no
-   step-2250 evaluation because it falls within 125 steps of the final step. So each run
-   has 11 fit points (1000, 1125, ..., 2125, 2360).
+   Every arm is evaluated every 125 steps on `{0, 125, ..., 2125, 2250, 2360}`; step 2250
+   is kept because it is 110 steps from the final step. So each run has 12 fit points
+   (1000, 1125, ..., 2250, 2360). `fit_and_plot.py` warns for any arm whose fit window is
+   not exactly this grid.
 3. **alpha search.** `alpha` is chosen by grid search over
    `np.linspace(0.05, 6.0, 1192)`, with `a` and `b` solved in closed form by least
    squares at each `alpha`. The bounds are wide enough that **no arm's fitted
    `alpha` sits on a boundary** (largest: REL-EMA at 3.502; smallest: BLADE at 0.794),
    so the exponent is data-determined rather than clipped.
 4. **Bootstrap.** 10,000 i.i.d. residual bootstrap draws: residuals from the point fit
-   are rescaled by `sqrt(n/(n-p))` with `p=3` (1.173 at `n=11`, 1.076 at `n=22`),
+   are rescaled by `sqrt(n/(n-p))` with `p=3` (1.155 at `n=12`, 1.069 at `n=24`),
    then resampled with replacement and added back to the fitted curve. OLS residuals
    are shrunk relative to the true errors by that factor on average, so resampling
    them raw understates the spread. Without the rescaling the single-run intervals
-   would be ~15% narrower, the two-run interval ~7% narrower, and the rho-1-vs-random
+   would be ~13% narrower, the two-run interval ~6% narrower, and the rho-1-vs-random
    p-value would read 0.029 rather than 0.048.
 5. **alpha re-estimated on every draw.** Each bootstrap replicate re-runs the full
    `alpha` grid search rather than holding `alpha` at its point estimate. This was
@@ -159,7 +160,7 @@ procedure. It is the matched protocol used for every number in this file.
 
 **The random control is fitted across two runs.** It was run at seeds 42 and 69. Rather
 than picking one, it is reported as a single **two-run fit**: one power law fitted by
-least squares to the union of both runs' fit-window points (11 each, 22 total), with
+least squares to the union of both runs' fit-window points (12 each, 24 total), with
 `alpha` profiled on the same grid and the same 10,000-draw residual bootstrap taken over
 the **pooled** residuals. Because the two runs are offset from one another, that offset
 enters the residual pool, so this arm's interval carries seed-to-seed spread as well as

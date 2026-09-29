@@ -4,9 +4,11 @@ Contract (every arm):
   * step 0 (pre-train / init snapshot)
   * every ``interval`` steps on the grid
   * always the true final step
-  * omit the last on-grid step when it falls within one interval of the final
-    (avoids a near-duplicate snapshot). Example for the shared 2360-step /
-    interval-125 main-run budget: ``{0, 125, …, 2125, 2360}`` — omit 2250.
+  * omit the last on-grid step when it falls within ``min(interval, 100)``
+    steps of the final (avoids a near-duplicate snapshot). Example for the
+    shared 2360-step / interval-125 main-run budget:
+    ``{0, 125, …, 2125, 2250, 2360}`` — 2250 is 110 steps from the end, so it
+    is kept. The 940-step reference still omits 875 (65 from the end).
   * ``max_checkpoints=None`` — keep every save permanently; no ephemeral prune.
 """
 
@@ -16,6 +18,7 @@ from typing import Any, Dict, List, Sequence
 
 
 DEFAULT_CHECKPOINT_INTERVAL = 125
+FINAL_GAP_FLOOR = 100
 
 
 def permanent_checkpoint_steps(
@@ -42,7 +45,7 @@ def permanent_checkpoint_steps(
     if (
         last_grid > 0
         and last_grid != int(total_steps)
-        and (int(total_steps) - last_grid) < int(interval)
+        and (int(total_steps) - last_grid) < min(int(interval), FINAL_GAP_FLOOR)
     ):
         steps.discard(last_grid)
     return sorted(steps)
@@ -85,6 +88,6 @@ def assert_ladder_example_2360(interval: int = DEFAULT_CHECKPOINT_INTERVAL) -> S
     """Sanity helper for the in-contract 9.9B/2360-step token-selection run."""
     steps = permanent_checkpoint_steps(2360, interval)
     assert 0 in steps and 2360 in steps
-    assert 2250 not in steps
+    assert 2250 in steps
     assert 2125 in steps
     return steps

@@ -31,6 +31,6 @@ reference: dynamic  # reset from the proxy at every sync step; see blade.py
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: cf4fdede
+  revision: 16764e1d
 wandb_project: token-selection
 status: rerun-under-unified-commit

@@ -1888,7 +1888,7 @@ def test_entrypoint_builds_and_fits_production_trainer(
         "assert_production_runtime",
         lambda expected_world_size: events.append(f"world:{expected_world_size}"),
     )
-    monkeypatch.setenv("EDULLM_DATASET_VERSION", "v1")
+    monkeypatch.delenv("EDULLM_DATASET_VERSION", raising=False)
     monkeypatch.setattr(
         sys,
         "argv",

@@ -10,7 +10,7 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `cf4fdede` (see below) |
+| Commit | `16764e1d` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
@@ -158,6 +158,15 @@ nothing is kept from `53daffdf` -- and makes these further changes:
   production global batch already is. Re-running the diagnostic against the
   same checkpoint under the new score: every bin lands between 56.8% and
   63.6% keep rate.
+
+`16764e1d` (on top of `cf4fdede`) makes one entrypoint change: it removes the
+`EDULLM_DATASET_VERSION` / `EDULLM_REFHQ_DATASET_VERSION` production pins.
+They were leftovers from the S3/edullm-data registry, where "latest" could
+move. Corpora now resolve from the local staged manifest, which has one
+version per corpus and whose file sizes and sha256 are verified at staging, so
+the pin protected nothing; nothing in `farmshare/` ever exported it, so a
+production launch failed at entrypoint startup. No 4-GPU production run had
+completed under `cf4fdede`, so every reported run uses `16764e1d`.
 
 ## What is included, and why
 

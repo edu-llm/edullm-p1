@@ -309,8 +309,6 @@ def main() -> None:
         )
 
     version = os.environ.get("EDULLM_DATASET_VERSION", "latest")
-    if not args.local and version in ("", "latest"):
-        raise SystemExit("production requires a pinned EDULLM_DATASET_VERSION")
     corpus = resolve_corpus(
         dataset_id=arm.dataset_id,
         version=version,
@@ -327,8 +325,6 @@ def main() -> None:
     refhq_corpus = None
     if arm.requires_refhq_stream:
         refhq_version = os.environ.get("EDULLM_REFHQ_DATASET_VERSION", "latest")
-        if not args.local and refhq_version in ("", "latest"):
-            raise SystemExit("production BLADE requires a pinned EDULLM_REFHQ_DATASET_VERSION")
         refhq_corpus = resolve_corpus(
             dataset_id=REFHQ_INSTRUCT,
             version=refhq_version,

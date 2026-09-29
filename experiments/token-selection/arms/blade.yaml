@@ -18,7 +18,7 @@ data_seed: 42
 rank_microbatch_tokens: 8192
 max_tokens: 9900000000
 total_steps: 2360
-checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250, 1375, 1500, 1625, 1750, 1875, 2000, 2125, 2360]  # omit 2250
+checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 875, 1000, 1125, 1250, 1375, 1500, 1625, 1750, 1875, 2000, 2125, 2250, 2360]
 requires_refhq_stream: true
 second_stream: pretrain/refhq-instruct  # L_val stream, and the reference's own train batches
 schedule:
@@ -31,6 +31,6 @@ reference: dynamic  # reset from the proxy at every sync step; see blade.py
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
-  revision: 16764e1d
+  revision: 64c28145
 wandb_project: token-selection
 status: rerun-under-unified-commit

@@ -36,7 +36,9 @@ git, not here.
   dynamic reference, plus both optimizers, are resident during its K-update sync), so
   it now uses 8,192. RHO-1 and Perplexity haven't needed to fall back yet.
 - **Permanent checkpoints:** step 0, every 125 steps, and the true final step,
-  omitting the last 125-grid point when it falls within 125 steps of the final step.
+  omitting the last 125-grid point when it falls within 100 steps of the final step. The
+  2360-step arms therefore keep step 2250 (110 steps from the end); the 940-step
+  reference omits step 875 (65 steps from the end).
 - **Evaluator:** the 20-label `*_rc_5shot_bpb` OLMES suite
   (`../olmo_core_token_selection/eval_task_loss_olmo_core.py`), run on every permanent
   checkpoint.
@@ -56,9 +58,11 @@ git, not here.
 | [`attention`](attention.yaml) | `attention_topk` (top target-aligned attention received, z-scored per position against the model's own immediately preceding step) | `pretrain/regmix-10b` | 60% | 6198 / 42 | — | 2360 steps |
 | [`blade`](blade.yaml) | `blade` (top `L_proxy - L_ref`, selection-weighted reference update) | `pretrain/regmix-10b` | 60% | 6198 / 42 | dynamic, synced from the proxy at steps 0/400/800/1200/1600/2000 (`tau=400`, `K=75`); second stream `pretrain/refhq-instruct` | 2360 steps |
 
-Every arm above, including the Instruct reference, is trained under the unified
-commit pinned in `../olmo_core_token_selection/PROVENANCE.md`; nothing is kept from an
-earlier commit.
+Every arm above except the Instruct reference is trained under the one commit pinned in
+`../olmo_core_token_selection/PROVENANCE.md`. The Instruct reference recorded the earlier
+commit `765ae838`; its method (full loss) and its checkpoint ladder are unchanged in every
+later commit, which differ only in the Attention scoring, the entrypoint's dataset-version
+check, and the 2360-step ladder. Nothing is kept from a pre-unification commit.
 
 ## Methodology fixes since the confounded runs
 

@@ -10,7 +10,7 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `16764e1d` (see below) |
+| Commit | `64c28145` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
@@ -165,8 +165,20 @@ They were leftovers from the S3/edullm-data registry, where "latest" could
 move. Corpora now resolve from the local staged manifest, which has one
 version per corpus and whose file sizes and sha256 are verified at staging, so
 the pin protected nothing; nothing in `farmshare/` ever exported it, so a
-production launch failed at entrypoint startup. No 4-GPU production run had
-completed under `cf4fdede`, so every reported run uses `16764e1d`.
+production launch failed at entrypoint startup.
+
+`64c28145` (on top of `16764e1d`) keeps the step-2250 checkpoint and eval for the
+2360-step arms. The ladder used to omit the last 125-grid point when it was under 125
+steps from the final step, which dropped step 2250 (110 from the end); the threshold is
+now `min(interval, 100)`. The 940-step reference still omits step 875, so its ladder is
+unchanged.
+
+Which commit each run recorded: the eight comparison arms all record `64c28145` (a
+first launch of `full-loss-control` under `16764e1d` was cancelled after about 290 steps
+and restarted from scratch so the ladder is identical for every arm). The
+`instruct-reference` run recorded `765ae838`, the commit the shared run directory held
+when it started. Its method (full loss) is untouched by every later commit, and its
+checkpoint ladder is unchanged by the ladder change above.
 
 ## What is included, and why
 

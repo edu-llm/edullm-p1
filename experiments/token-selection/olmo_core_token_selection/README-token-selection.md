@@ -88,7 +88,8 @@ config and its `run_identity.json`.
 ## Checkpoints, evaluator, resume, and artifacts
 
 The permanent ladder is step 0, every 125 steps, and the true final step,
-omitting the last grid point when it is less than 125 steps before final.
+omitting the last grid point when it is less than 100 steps before final (so
+2250 is kept for the 2360-step arms; the 940-step reference omits 875).
 The branch-local evaluator is self-contained: `.edullm/eval_task_loss_olmo_core.py`
 carries the exact 20 `*_rc_5shot_bpb` labels. Training pauses until the
 complete suite and awaited W&B uploads succeed. Partial evals and upload

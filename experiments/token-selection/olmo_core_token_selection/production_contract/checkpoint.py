@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
 DEFAULT_CHECKPOINT_INTERVAL = 125
+FINAL_GAP_FLOOR = 100
 RUN_FINGERPRINT_FILENAME = "run_fingerprint.json"
 LAST_DURABLE_STEP_FILENAME = "last_durable_step.json"
 FINGERPRINT_SCHEMA_VERSION = 2
@@ -33,7 +34,9 @@ def permanent_checkpoint_steps(total_steps: int, interval: int = 125) -> list[in
     """Return the permanent ladder: init, interval grid, and true final step.
 
     A last on-grid step strictly less than the final step is omitted when it is
-    less than one interval from the final step.
+    less than FINAL_GAP_FLOOR steps (or one interval, if that is smaller) from
+    the final step. For 2360 steps this keeps step 2250 (110 from the end); for
+    the 940-step reference it still omits step 875 (65 from the end).
     """
     total_steps = int(total_steps)
     interval = int(interval)
@@ -47,7 +50,7 @@ def permanent_checkpoint_steps(total_steps: int, interval: int = 125) -> list[in
     steps = {0, total_steps}
     last_grid = (total_steps // interval) * interval
     steps.update(range(interval, last_grid + 1, interval))
-    if 0 < last_grid < total_steps and total_steps - last_grid < interval:
+    if 0 < last_grid < total_steps and total_steps - last_grid < min(interval, FINAL_GAP_FLOOR):
         steps.discard(last_grid)
     return sorted(steps)
 

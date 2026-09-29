@@ -24,7 +24,12 @@ def test_permanent_ladder_and_checkpointer_contract() -> None:
     assert steps[0] == 0
     assert steps[-1] == 2360
     assert 2125 in steps
-    assert 2250 not in steps
+    assert 2250 in steps
+    reference = checkpoint.permanent_checkpoint_steps(940, 125)
+    assert 750 in reference
+    assert 875 not in reference
+    assert reference[-1] == 940
+    assert 2350 not in checkpoint.permanent_checkpoint_steps(2360, 50)
 
     kwargs = checkpoint.checkpointer_kwargs_for_ladder(2360, 125)
     assert kwargs["save_interval"] is None

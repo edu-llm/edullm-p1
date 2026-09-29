@@ -304,11 +304,14 @@ def attention_received_from_qk(
 ) -> Tensor:
     """Mean-head causal column mass: ``mean_h sum_{j>=i} A[j,i]``.
 
-    This raw score is structurally larger for earlier positions: under uniform
-    attention it equals ``H_L - H_i`` (the harmonic-number tail from position
-    ``i``), simply because an earlier key is reachable by more queries. See
-    ``uniform_attention_normalizer`` and ``aligned_normalized_attention_scores``,
-    which correct for this before the score is used for token selection.
+    This raw score carries a position effect pulling in two directions: an
+    earlier key is reachable by more queries (under uniform attention the score
+    is exactly ``H_L - H_i``, see ``uniform_attention_normalizer``), while a
+    trained model's recency-biased attention concentrates each query's mass on
+    nearby keys, which favors later ones. Neither shape is assumed here;
+    ``AttentionPositionBaseline`` measures the combined position effect of the
+    model actually being trained and removes it before the score is used for
+    token selection.
     """
     batch, length, heads, dim = query.shape
     if key.shape[2] != heads:
@@ -338,9 +341,15 @@ def uniform_attention_normalizer(
     This is the causal column mass position ``i`` would receive under uniform
     (non-informative) attention: it is reachable by queries ``j = i, ..., L-1``,
     and query ``j``'s causal row has ``j+1`` valid keys, so its uniform share of
-    attention on any one of them is ``1/(j+1)``. Dividing the raw score by this
-    removes the pure position effect, leaving only how much *more* attention a
-    token draws than its position alone would predict.
+    attention on any one of them is ``1/(j+1)``.
+
+    This is only the *cold-start prior* of ``AttentionPositionBaseline`` (used
+    before any real attention statistics exist, i.e. the first step of a fresh
+    run, whose freshly initialized model attends nearly uniformly). It is not a
+    valid position baseline for a trained model: real attention is
+    recency-biased, so a late key receives far more mass than this uniform
+    reachability count predicts, and dividing by it (which shrinks ~100x over a
+    2048-token row) turns the recency bias into a keep-the-tail heuristic.
     """
     key = (int(length), device, dtype)
     cached = _UNIFORM_ATTENTION_NORMALIZER_CACHE.get(key)
@@ -352,25 +361,218 @@ def uniform_attention_normalizer(
     return normalizer
 
 
-def normalize_and_align_attention_scores(raw: Tensor) -> Tensor:
-    """Position-normalize a raw ``(batch, length)`` column-mass score, then align it.
+# Floor on a position's log-mass standard deviation, so a degenerate position
+# (every observation identical) cannot produce an infinite z-score.
+_MIN_LOG_MASS_STD = 1e-6
+
+
+def align_log_attention_mass(raw: Tensor) -> Tensor:
+    """Log of a raw ``(batch, length)`` column-mass score, aligned to the label it gates.
 
     ``raw[i]`` is the causal column mass at *input* position ``i``. ``get_labels``
     shifts labels left by one, so the loss/label index ``t`` predicts input
     position ``t+1`` -- the score that should gate that loss term is therefore
-    the target token's own score, ``s_{t+1}``, not ``s_t``. This normalizes for
-    position (dividing by ``uniform_attention_normalizer``) and then applies
-    that one-position shift, padding the now-unused last column with ``-inf``
-    so ``per_row_topk`` never selects it (that column has no label anyway).
+    the target token's own score, ``s_{t+1}``, not ``s_t``. This takes the log
+    (column mass is a positive, multiplicative, heavy-tailed quantity; a ratio
+    to a baseline becomes a difference) and applies that one-position shift,
+    padding the now-unused last column with ``-inf`` so ``per_row_topk`` never
+    selects it (that column has no label anyway). The clamp only guards an
+    underflowed-to-zero softmax column before the log.
     """
-    normalizer = uniform_attention_normalizer(raw.shape[-1], raw.device, raw.dtype)
-    normalized = raw / normalizer
-    return torch.nn.functional.pad(normalized[:, 1:], (0, 1), value=-torch.inf)
+    tiny = torch.finfo(torch.float32).tiny
+    log_mass = raw.float().clamp(min=tiny).log()
+    return torch.nn.functional.pad(log_mass[..., 1:], (0, 1), value=-torch.inf)
 
 
-def aligned_normalized_attention_scores(capture: "AttentionCapture") -> Tensor:
-    """``normalize_and_align_attention_scores`` applied to a captured forward pass."""
-    return normalize_and_align_attention_scores(scores_from_capture(capture))
+def uniform_prior_log_mass(length: int, device: torch.device) -> Tensor:
+    """``align_log_attention_mass`` of the uniform-attention score, float64.
+
+    The cold-start position mean ``AttentionPositionBaseline`` uses before it
+    has observed any real attention. The unused last column is 0.
+    """
+    normalizer = uniform_attention_normalizer(length, device, torch.float64)
+    return torch.nn.functional.pad(normalizer[1:].log(), (0, 1), value=0.0)
+
+
+class AttentionPositionBaseline:
+    """Empirical per-position baseline for the ``attention_topk`` score.
+
+    The score for label position ``t`` of a row is a per-position z-score of
+    that row's target-aligned log attention mass ``x_t``
+    (``align_log_attention_mass``)::
+
+        score_t = (x_t - mean_t) / std_t
+
+    where ``mean_t``/``std_t`` are the mean and standard deviation of ``x_t``
+    at that same position ``t`` across the rows the model has recently
+    processed. Positions in a packed fixed-length row carry no content of
+    their own (documents are concatenated at arbitrary offsets), so these
+    statistics measure exactly the position effect of the model's *current*
+    attention -- query-count reachability, recency bias, and anything else --
+    without assuming its shape. What is left is per-token: how much more (or
+    less) attention a token draws than tokens at its position typically do
+    under this checkpoint. Dividing by ``std_t`` (not just centering) also
+    equalizes how spread out the score is at each position, so a position
+    whose mass is inherently noisier (the last few positions are sums over
+    only a handful of queries) is not systematically over- or under-kept by a
+    per-row top-k.
+
+    **Where the statistics come from.** Each training step, every rank adds
+    the valid tokens of each of its microbatches to ``pending`` (per-position
+    count, sum, and sum of squares of ``x``; ``observe``), the train module
+    all-reduces ``pending`` across the data-parallel group once per step
+    (``all_reduce_pending``), and ``TokenSelectionState.after_optimizer_step``
+    replaces the baseline with it (``commit``). A step is therefore scored
+    against the *immediately preceding* step's global batch, unblended with
+    any older history: no extra forward pass (the raw scores are already
+    computed for selection), a baseline identical on every rank and
+    independent of world size and microbatch size, and a one-step lag that is
+    immaterial (one optimizer step barely moves attention). Before the first
+    commit -- the first step of a fresh run, where the freshly initialized
+    model attends almost uniformly -- the baseline is the uniform-attention
+    prior (``uniform_prior_log_mass``, unit std), under which the score ranks
+    tokens exactly as the old ``raw / uniform_attention_normalizer`` score
+    did.
+
+    **Why not smooth over several steps.** An earlier version kept an EMA
+    over steps (a "how many steps of history" decay constant). A single step
+    already contributes every row of the production global batch (2048 rows
+    per position) to each position's estimate, so per-step sampling noise is
+    already small relative to the real position effect being measured (an
+    offline check against real attention statistics: a single step's std is
+    already ~0.008 in aligned-log-mass units, against a measured position
+    effect spanning roughly 1.7 units end to end); smoothing over more steps
+    reduced that already-small noise further but only by cutting how fast the
+    baseline could track a real shift in the model's attention -- a real
+    tunable cost for a barely-measurable benefit, and one more unmotivated
+    constant to defend. Using only the immediately preceding step avoids both:
+    no smoothing constant, and the baseline never lags a real change by more
+    than the one unavoidable step.
+
+    **Resume.** The moments are the only state; they are checkpointed through
+    ``TokenSelectionState.state_dict`` exactly like ``EMAHistory``, so a
+    resumed run scores its next step against the same baseline an
+    uninterrupted run would have. ``pending`` is per-step scratch, always
+    empty at a step boundary, and never saved.
+    """
+
+    VERSION = 2
+
+    def __init__(self) -> None:
+        # (3, length) float64 [count, sum x, sum x^2] from the immediately
+        # preceding step's global batch (replaced wholesale each commit, not
+        # blended with anything older).
+        self.moments: Optional[Tensor] = None
+        # (3, length) float64 raw moments observed during the current step.
+        self.pending: Optional[Tensor] = None
+
+    @property
+    def has_history(self) -> bool:
+        return self.moments is not None
+
+    @torch.no_grad()
+    def observe(self, log_mass: Tensor, valid: Tensor) -> None:
+        """Add one microbatch's valid, finite aligned log masses to ``pending``."""
+        length = log_mass.shape[-1]
+        values = log_mass.reshape(-1, length).double()
+        use = valid.reshape(-1, length).to(values.device) & torch.isfinite(values)
+        values = torch.where(use, values, torch.zeros_like(values))
+        stats = torch.stack(
+            [use.to(values.dtype).sum(0), values.sum(0), (values * values).sum(0)]
+        )
+        if self.pending is None:
+            self.pending = stats
+        elif self.pending.shape != stats.shape:
+            raise ValueError(
+                f"attention baseline length changed within a step: "
+                f"{tuple(self.pending.shape)} vs {tuple(stats.shape)}"
+            )
+        else:
+            self.pending.add_(stats.to(self.pending))
+
+    @torch.no_grad()
+    def all_reduce_pending(self, group: Any = None) -> None:
+        """Sum ``pending`` over the data-parallel group (no-op when not distributed).
+
+        Every rank must call this exactly once per training step, after its
+        last microbatch, so every rank commits the same global statistics.
+        """
+        if self.pending is None:
+            raise RuntimeError("attention baseline has no observations to reduce this step")
+        import torch.distributed as dist
+
+        if dist.is_available() and dist.is_initialized():
+            dist.all_reduce(self.pending, group=group)
+
+    @torch.no_grad()
+    def commit(self) -> None:
+        """Replace the baseline with this step's ``pending`` moments (no-op if nothing was observed).
+
+        Unblended: the previous step's moments are simply discarded, not
+        averaged in. See the class docstring for why.
+        """
+        if self.pending is None:
+            return
+        if self.moments is not None and self.moments.shape != self.pending.shape:
+            raise ValueError(
+                f"attention baseline length changed: {tuple(self.moments.shape)} vs "
+                f"{tuple(self.pending.shape)}"
+            )
+        self.moments = self.pending
+        self.pending = None
+
+    @torch.no_grad()
+    def position_statistics(self, length: int, device: torch.device) -> tuple[Tensor, Tensor]:
+        """Per-position ``(mean, std)`` of the aligned log mass, float64, shape ``(length,)``."""
+        if self.moments is None:
+            return (
+                uniform_prior_log_mass(length, device),
+                torch.ones(length, device=device, dtype=torch.float64),
+            )
+        if self.moments.shape[-1] != length:
+            raise ValueError(
+                f"attention baseline covers {self.moments.shape[-1]} positions, "
+                f"but the batch has {length}"
+            )
+        count, total, square = self.moments.to(device=device, dtype=torch.float64)
+        tiny = torch.finfo(torch.float64).tiny
+        observed = count > 0
+        safe_count = count.clamp(min=tiny)
+        # A position never observed (only ever the label-less last column in
+        # practice) falls back to the statistics pooled over all positions.
+        pooled_count = count.sum().clamp(min=tiny)
+        mean = torch.where(observed, total / safe_count, total.sum() / pooled_count)
+        second = torch.where(observed, square / safe_count, square.sum() / pooled_count)
+        std = (second - mean * mean).clamp(min=0.0).sqrt().clamp(min=_MIN_LOG_MASS_STD)
+        return mean, std
+
+    @torch.no_grad()
+    def score(self, log_mass: Tensor) -> Tensor:
+        """Per-position z-score of an aligned log mass; ``-inf`` columns stay ``-inf``."""
+        mean, std = self.position_statistics(log_mass.shape[-1], log_mass.device)
+        return ((log_mass.double() - mean) / std).float()
+
+    def state_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.VERSION,
+            "moments": None if self.moments is None else self.moments.detach().cpu(),
+        }
+
+    def load_state_dict(self, state: Mapping[str, Any]) -> None:
+        if state.get("version") != self.VERSION:
+            raise ValueError("unsupported attention-baseline state")
+        moments = state.get("moments")
+        if moments is not None:
+            if not isinstance(moments, Tensor) or moments.dim() != 2 or moments.shape[0] != 3:
+                raise ValueError("attention-baseline moments must be a (3, length) tensor")
+            moments = moments.detach().to(dtype=torch.float64).clone()
+        self.moments = moments
+        self.pending = None
+
+
+def aligned_log_attention_mass(capture: "AttentionCapture") -> Tensor:
+    """``align_log_attention_mass`` applied to a captured forward pass."""
+    return align_log_attention_mass(scores_from_capture(capture))
 
 
 @dataclass

@@ -10,7 +10,7 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `765ae838` (see below) |
+| Commit | `cf4fdede` (see below) |
 | Source path | `.edullm/` |
 | Copied on | 2026-09-28 |
 
@@ -95,7 +95,7 @@ are:
   `z_loss_multiplier` (it defaults to `None` upstream) -- the fix changes
   nothing about what BLADE optimizes, only restores the gradient.
 
-`765ae838` (on top of `90c2eb66`) reruns every arm under this one commit --
+`cf4fdede` (on top of `90c2eb66`) reruns every arm under this one commit --
 nothing is kept from `53daffdf` -- and makes these further changes:
 
 - **Offline reference scoring (`token_selection_370m/reference_scores.py`,
@@ -139,6 +139,25 @@ nothing is kept from `53daffdf` -- and makes these further changes:
   written to `run_identity.json` and the W&B config, kept out of the
   resume-blocking scientific identity so a driver bump can't refuse a
   resume.
+- **Attention's scoring formula replaced (`selection.py`).** A pre-production
+  diagnostic (`farmshare/attention_diagnostic.py`) run against a real trained
+  checkpoint found `attention_topk`'s existing fix (normalizing by the
+  *theoretical* uniform-attention expectation) still left the score almost
+  entirely position-confounded: keep rate ran from 1.9% at the start of a row
+  to 100% at the end. Root cause: real trained attention is recency-biased,
+  not uniform, so the theoretical normalizer's assumed ~117x drop in
+  attention mass from the first to the last position overcorrects against
+  the real ~5.4x drop. Replaced with `AttentionPositionBaseline`: each token
+  is z-scored against the mean/std of tokens at its own position from the
+  model's own immediately preceding training step (no extra forward pass --
+  the raw scores already exist for selection), falling back to the old
+  uniform-attention prior only on a fresh run's first step. No smoothing/EMA
+  constant across steps either: an offline sensitivity sweep found smoothing
+  over more than one step's statistics cut responsiveness to real attention
+  drift for a barely-measurable noise benefit, given how large the
+  production global batch already is. Re-running the diagnostic against the
+  same checkpoint under the new score: every bin lands between 56.8% and
+  63.6% keep rate.
 
 ## What is included, and why
 

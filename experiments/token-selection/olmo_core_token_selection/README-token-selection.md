@@ -41,7 +41,7 @@ strict-online-upload fail-closed check were relaxed for this run, the same
 | `rho-1` | `rho_excess` (top `L_curr - L_ref`) | 60% | frozen `instruct-reference` step 940 |
 | `rel-ema-exp` | `rel_ema` (top `L_curr - L_hist`) | 60% | zero-seeded bias-corrected EMA, `alpha(t) = 1 - exp(-t/300)` |
 | `perplexity` | `middle_ppl` (middle 60% by frozen loss) | 60% | frozen `instruct-reference` step 940 |
-| `attention` | `attention_topk` (top position-normalized, target-aligned attention received) | 60% | |
+| `attention` | `attention_topk` (top target-aligned log attention received, z-scored per position against the model's own recent attention) | 60% | per-position baseline: the immediately preceding step's own global-batch statistics (unblended, no smoothing constant), uniform-attention prior before the first step; checkpointed |
 | `blade` | `blade` (top `L_proxy - L_ref`, selection-weighted reference update) | 60% | syncs at steps 0/400/800/1200/1600/2000, `tau=400`, `K=75`, `gamma=0.6`, `lambda=1.0`; second stream `pretrain/refhq-instruct` |
 | `random-control` | `random` | 60% | data seed 42, init seed 6198 |
 | `random-control-seed69` | `random` | 60% | data seed 69, init seed 12345 (the seed-variance replicate) |

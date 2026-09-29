@@ -52,16 +52,18 @@ from token_selection_370m.recipe import (  # noqa: E402
 )
 from token_selection_370m.reference_scores import ReferenceScoreTable  # noqa: E402
 from token_selection_370m.selection import (  # noqa: E402
+    AttentionPositionBaseline,
     EMAHistory,
+    align_log_attention_mass,
     attention_received_from_qk,
     capture_last_attention,
     ema_alpha,
-    normalize_and_align_attention_scores,
     per_instance_tiebreak,
     per_row_middle,
     per_row_topk,
     selection_weights,
     uniform_attention_normalizer,
+    uniform_prior_log_mass,
 )
 from token_selection_370m.train_module import (  # noqa: E402
     TokenSelectionConfig,
@@ -651,36 +653,398 @@ def test_uniform_attention_normalizer_matches_the_raw_uniform_score() -> None:
     assert normalizer.tolist() == pytest.approx([11 / 6, 5 / 6, 1 / 3])
 
 
-def test_normalize_and_align_gives_all_ones_under_uniform_attention() -> None:
-    query = torch.zeros(1, 5, 1, 2)
-    key = torch.zeros_like(query)
-    raw = attention_received_from_qk(query, key)
-    normalized = raw / uniform_attention_normalizer(5, raw.device, raw.dtype)
-    assert normalized[0].tolist() == pytest.approx([1.0] * 5)
+def test_old_uniform_normalized_attention_scoring_is_gone() -> None:
+    # The raw / uniform_attention_normalizer score degenerates to a
+    # keep-the-tail heuristic on real (recency-biased) attention; nothing may
+    # keep importing it. uniform_attention_normalizer survives only as the
+    # cold-start prior.
+    assert not hasattr(selection_module, "normalize_and_align_attention_scores")
+    assert not hasattr(selection_module, "aligned_normalized_attention_scores")
 
 
-def test_normalize_and_align_shifts_a_spike_to_the_label_it_gates() -> None:
+def test_align_log_attention_mass_shifts_a_spike_to_the_label_it_gates() -> None:
     # A raw score with all its mass on position k=3 must, after the +1 target
     # shift, select the *label* index k-1=2 (label t predicts input t+1).
-    raw = torch.zeros(1, 5)
+    raw = torch.full((1, 5), 1e-3)
     raw[0, 3] = 1000.0
-    aligned = normalize_and_align_attention_scores(raw)
+    aligned = align_log_attention_mass(raw)
     assert aligned.shape == (1, 5)
     assert int(aligned[0].argmax()) == 2
+    assert aligned[0, 2] == pytest.approx(math.log(1000.0))
     # The last column has no label under get_labels' left shift and must never
-    # be selectable.
+    # be selectable -- and stays -inf through the baseline's standardization.
     assert aligned[0, -1] == -torch.inf
+    assert AttentionPositionBaseline().score(aligned)[0, -1] == -torch.inf
+    # An underflowed (exactly zero) column mass is clamped, not -inf/NaN.
+    assert torch.isfinite(align_log_attention_mass(torch.zeros(1, 3))[0, :-1]).all()
 
 
-def test_normalize_and_align_is_position_invariant_up_to_the_shift() -> None:
-    # A perfectly uniform raw score, once normalized, is flat; after the
-    # alignment shift it stays flat except for the -inf sentinel column.
-    length = 8
-    normalizer = uniform_attention_normalizer(length, torch.device("cpu"))
-    raw = normalizer.unsqueeze(0).clone()  # a raw score that is exactly uniform
-    aligned = normalize_and_align_attention_scores(raw)
-    assert aligned[0, :-1].tolist() == pytest.approx([1.0] * (length - 1))
-    assert aligned[0, -1] == -torch.inf
+def test_cold_start_prior_gives_flat_scores_under_uniform_attention() -> None:
+    # Before any statistics exist, the baseline is the uniform-attention
+    # prior: a model attending exactly uniformly scores 0 everywhere.
+    query = torch.zeros(1, 6, 1, 2)
+    raw = attention_received_from_qk(query, torch.zeros_like(query))
+    baseline = AttentionPositionBaseline()
+    assert not baseline.has_history
+    scores = baseline.score(align_log_attention_mass(raw))
+    assert scores[0, :-1].tolist() == pytest.approx([0.0] * 5, abs=1e-5)
+    assert scores[0, -1] == -torch.inf
+    prior = uniform_prior_log_mass(6, torch.device("cpu"))
+    assert prior[:-1].tolist() == pytest.approx(
+        uniform_attention_normalizer(6, torch.device("cpu"), torch.float64)[1:].log().tolist()
+    )
+
+
+def test_cold_start_prior_ranks_exactly_like_the_uniform_normalized_score() -> None:
+    # On the first step of a fresh run (no history) the new score orders every
+    # row's tokens exactly as the previous raw / uniform_attention_normalizer
+    # score did: log is monotone and the prior has unit std.
+    generator = torch.Generator().manual_seed(0)
+    raw = torch.rand(3, 16, generator=generator) + 0.05
+    valid = torch.ones(3, 16, dtype=torch.bool)
+    valid[:, -1] = False
+    normalizer = uniform_attention_normalizer(16, raw.device, raw.dtype)
+    legacy = torch.nn.functional.pad((raw / normalizer)[:, 1:], (0, 1), value=-torch.inf)
+    cold = AttentionPositionBaseline().score(align_log_attention_mass(raw))
+    assert torch.equal(
+        per_row_topk(legacy, 0.6, valid), per_row_topk(cold, 0.6, valid)
+    )
+    assert torch.equal(legacy[:, :-1].argsort(-1), cold[:, :-1].argsort(-1))
+
+
+def _moments_reference(values: torch.Tensor, valid: torch.Tensor):
+    """Per-position (count, mean, population std) over rows, float64, by brute force."""
+    values, valid = values.double(), valid & torch.isfinite(values)
+    count = valid.double().sum(0)
+    mean = torch.where(valid, values, 0.0).sum(0) / count
+    var = torch.where(valid, (values - mean) ** 2, 0.0).sum(0) / count
+    return count, mean, var.sqrt()
+
+
+def test_attention_baseline_matches_pooled_statistics_then_replaces_unblended() -> None:
+    generator = torch.Generator().manual_seed(1)
+    length = 6
+    step_a = torch.randn(10, length, generator=generator, dtype=torch.float64).float()
+    valid_a = torch.ones(10, length, dtype=torch.bool)
+    valid_a[:, -1] = False  # the label-less column
+    valid_a[0, 2] = False  # a masked label must not count
+    step_a[1, 3] = -torch.inf  # a non-finite value must not count either
+    valid_seen = valid_a & torch.isfinite(step_a)
+
+    baseline = AttentionPositionBaseline()
+    # Two microbatches of one step accumulate into the same pending moments.
+    baseline.observe(step_a[:4], valid_a[:4])
+    baseline.observe(step_a[4:], valid_a[4:])
+    assert not baseline.has_history  # nothing is used before commit
+    baseline.commit()
+    assert baseline.has_history and baseline.pending is None
+    mean, std = baseline.position_statistics(length, torch.device("cpu"))
+    _, ref_mean, ref_std = _moments_reference(step_a[:, :-1], valid_seen[:, :-1])
+    assert mean[:-1].tolist() == pytest.approx(ref_mean.tolist())
+    assert std[:-1].tolist() == pytest.approx(ref_std.tolist())
+    # The never-observed last column falls back to the pooled statistics.
+    pooled = step_a[valid_seen].double()
+    assert float(mean[-1]) == pytest.approx(float(pooled.mean()))
+    assert float(std[-1]) == pytest.approx(float(pooled.std(unbiased=False)))
+
+    # A second step: the baseline is replaced wholesale by the new step's own
+    # statistics, not blended with the first step's -- a resumed run scores
+    # its next step purely against what it just observed.
+    step_b = torch.randn(10, length, generator=generator, dtype=torch.float64).float() + 3.0
+    valid_b = torch.ones(10, length, dtype=torch.bool)
+    valid_b[:, -1] = False
+    baseline.observe(step_b, valid_b)
+    baseline.commit()
+    mean, std = baseline.position_statistics(length, torch.device("cpu"))
+    _, ref_mean_b, ref_std_b = _moments_reference(step_b[:, :-1], valid_b[:, :-1])
+    assert mean[:-1].tolist() == pytest.approx(ref_mean_b.tolist())
+    assert std[:-1].tolist() == pytest.approx(ref_std_b.tolist())
+
+
+def test_attention_baseline_scores_are_z_scores_per_position() -> None:
+    generator = torch.Generator().manual_seed(2)
+    length = 32
+    # Strongly position-dependent location *and* spread.
+    position = torch.arange(length, dtype=torch.float32)
+    values = torch.randn(400, length, generator=generator) * (0.1 + position / 8) - position
+    valid = torch.ones(400, length, dtype=torch.bool)
+    baseline = AttentionPositionBaseline()
+    baseline.observe(values, valid)
+    baseline.commit()
+    scores = baseline.score(values).double()
+    assert scores.mean(0).abs().max() < 1e-6
+    assert (scores.std(0, unbiased=False) - 1.0).abs().max() < 1e-6
+
+
+def test_attention_baseline_resume_is_bit_exact() -> None:
+    import io
+
+    generator = torch.Generator().manual_seed(3)
+    steps = [torch.randn(2, 4, 8, generator=generator) for _ in range(5)]
+    valid = torch.ones(4, 8, dtype=torch.bool)
+    probe = torch.randn(3, 8, generator=generator)
+
+    def run(baseline, microbatches):
+        for step in microbatches:
+            for micro in step:
+                baseline.observe(micro, valid)
+            baseline.commit()
+
+    uninterrupted = AttentionPositionBaseline()
+    run(uninterrupted, steps)
+
+    first = AttentionPositionBaseline()
+    run(first, steps[:2])
+    first.observe(steps[2][0], valid)  # per-step scratch is never saved
+    buffer = io.BytesIO()
+    torch.save(first.state_dict(), buffer)
+    buffer.seek(0)
+    resumed = AttentionPositionBaseline()
+    resumed.load_state_dict(torch.load(buffer))
+    assert resumed.pending is None
+    run(resumed, steps[2:])
+    assert torch.equal(resumed.moments, uninterrupted.moments)
+    assert torch.equal(resumed.score(probe), uninterrupted.score(probe))
+
+    # A step-0 checkpoint (no history yet) round-trips too.
+    empty = AttentionPositionBaseline()
+    empty.load_state_dict(AttentionPositionBaseline().state_dict())
+    assert not empty.has_history
+
+    state = uninterrupted.state_dict()
+    with pytest.raises(ValueError, match="unsupported"):
+        AttentionPositionBaseline().load_state_dict({**state, "version": 0})
+    with pytest.raises(ValueError, match="length"):
+        AttentionPositionBaseline().load_state_dict({**state, "moments": torch.zeros(2, 8)})
+    with pytest.raises(ValueError, match="positions"):
+        uninterrupted.score(torch.zeros(1, 9))
+
+
+def test_attention_baseline_all_reduces_pending_over_the_given_group(monkeypatch) -> None:
+    calls = []
+
+    def fake_all_reduce(tensor, group=None):
+        calls.append(group)
+        tensor.mul_(2)  # two ranks that happened to see identical data
+
+    monkeypatch.setattr(dist, "is_available", lambda: True)
+    monkeypatch.setattr(dist, "is_initialized", lambda: True)
+    monkeypatch.setattr(dist, "all_reduce", fake_all_reduce)
+    baseline = AttentionPositionBaseline()
+    values = torch.tensor([[1.0, 2.0, 3.0]])
+    baseline.observe(values, torch.ones(1, 3, dtype=torch.bool))
+    baseline.all_reduce_pending("dp-group")
+    assert calls == ["dp-group"]
+    assert baseline.pending[0].tolist() == [2.0, 2.0, 2.0]
+    baseline.commit()
+    mean, _ = baseline.position_statistics(3, torch.device("cpu"))
+    assert mean.tolist() == pytest.approx([1.0, 2.0, 3.0])  # reduction preserves the mean
+
+    with pytest.raises(RuntimeError, match="no observations"):
+        AttentionPositionBaseline().all_reduce_pending()
+
+
+def _recency_biased_attention(rows: int, length: int, *, seed: int):
+    """Synthetic last-layer q/k with trained-model-like recency bias plus content.
+
+    A 2-D rotary-style pair gives every query a logit ``8 cos(pi (j - i) / L)``
+    on key ``i`` -- decreasing with distance, so each query concentrates on
+    nearby keys, as real trained causal attention does -- and a third
+    dimension adds a per-token "salience" ``g_i`` every query attends to. The
+    salience is the genuine per-token signal a position-corrected score must
+    recover.
+    """
+    generator = torch.Generator().manual_seed(seed)
+    angle = math.pi / length * torch.arange(length, dtype=torch.float32)
+    salience = torch.randn(rows, length, generator=generator)
+    query = torch.zeros(rows, length, 2, 3)
+    key = torch.zeros(rows, length, 2, 3)
+    query[..., 0] = (8.0 * torch.cos(angle))[:, None]
+    query[..., 1] = (8.0 * torch.sin(angle))[:, None]
+    query[..., 2] = 1.0
+    key[..., 0] = torch.cos(angle)[:, None]
+    key[..., 1] = torch.sin(angle)[:, None]
+    key[..., 2] = salience[..., None]
+    return attention_received_from_qk(query, key, scale=1.0), salience
+
+
+def test_empirical_baseline_removes_recency_bias_the_uniform_normalizer_amplifies() -> None:
+    """Synthetic replica of farmshare/attention_diagnostic.py's failure and fix.
+
+    Same fixed rule as the diagnostic: 16 position bins, every bin's keep rate
+    in [0.3, 0.9]. Under recency-biased attention the old raw /
+    uniform-normalizer score keeps the tail and drops the head (the real
+    checkpoint's failure, reproduced), while the empirical baseline --
+    calibrated on rows disjoint from the scored ones, as the diagnostic and
+    training both do -- keeps every bin near keep_fraction *and* selects by
+    the per-token salience, not by position.
+    """
+    length, bins, keep = 256, 16, ARM_SPECS["attention"].keep_fraction
+    raw, salience = _recency_biased_attention(32, length, seed=0)
+    calibration, _ = _recency_biased_attention(64, length, seed=1)
+    valid = torch.ones(32, length, dtype=torch.bool)
+    valid[:, -1] = False  # get_labels' label-less last column
+
+    def bin_rates(mask):
+        width = length // bins
+        return [
+            float(mask[:, b * width : (b + 1) * width].sum() / valid[:, b * width : (b + 1) * width].sum())
+            for b in range(bins)
+        ]
+
+    normalizer = uniform_attention_normalizer(length, raw.device, raw.dtype)
+    legacy = torch.nn.functional.pad((raw / normalizer)[:, 1:], (0, 1), value=-torch.inf)
+    legacy_rates = bin_rates(per_row_topk(legacy, keep, valid))
+    assert legacy_rates[0] < 0.3 and legacy_rates[-1] > 0.9
+    assert legacy_rates[-1] - legacy_rates[0] > 0.5
+
+    baseline = AttentionPositionBaseline()
+    calibration_valid = torch.ones(64, length, dtype=torch.bool)
+    calibration_valid[:, -1] = False
+    for half in (slice(0, 32), slice(32, 64)):
+        baseline.observe(align_log_attention_mass(calibration[half]), calibration_valid[half])
+    baseline.commit()
+    scores = baseline.score(align_log_attention_mass(raw))
+    mask = per_row_topk(scores, keep, valid)
+    rates = bin_rates(mask)
+    assert all(0.45 <= rate <= 0.75 for rate in rates), rates
+
+    # Per-token, not positional: the score recovers the target token's own
+    # salience (label t is gated by input token t+1).
+    target_salience = torch.nn.functional.pad(salience[:, 1:], (0, 1))
+    correlation = torch.corrcoef(
+        torch.stack([scores[valid].double(), target_salience[valid].double()])
+    )[0, 1]
+    assert correlation > 0.9
+    assert target_salience[mask].mean() - target_salience[valid & ~mask].mean() > 1.0
+
+
+def test_token_selection_state_persists_attention_baseline() -> None:
+    config = TokenSelectionConfig(method="attention_topk", keep_fraction=0.6, total_steps=10)
+    state = TokenSelectionState(config, Tiny())
+    assert isinstance(state.attention_baseline, AttentionPositionBaseline)
+    assert state.ema is None
+    values = torch.randn(2, 4)
+    state.attention_baseline.observe(values, torch.ones(2, 4, dtype=torch.bool))
+    state.after_optimizer_step(Tiny())
+    assert state.attention_baseline.has_history and state.attention_baseline.pending is None
+    assert state.completed_steps == 1
+
+    saved = state.state_dict()
+    assert saved["version"] == 1 and saved["ema"] is None
+    restored = TokenSelectionState(config, Tiny())
+    restored.load_state_dict(saved)
+    assert restored.completed_steps == 1
+    assert torch.equal(restored.attention_baseline.moments, state.attention_baseline.moments)
+
+    # An attention arm fails closed on a state without its baseline (e.g. one
+    # written before the baseline existed) instead of silently restarting it.
+    legacy = {"version": 1, "completed_steps": 5, "ema": None}
+    with pytest.raises(ValueError, match="missing its position baseline"):
+        TokenSelectionState(config, Tiny()).load_state_dict(legacy)
+
+    # Every other arm: no baseline, still loads a state written before the key
+    # existed, and rejects a stray baseline.
+    full = TokenSelectionState(
+        TokenSelectionConfig(method="full", keep_fraction=1.0, total_steps=10), Tiny()
+    )
+    assert full.attention_baseline is None
+    assert full.state_dict()["attention_baseline"] is None
+    full.load_state_dict(legacy)
+    assert full.completed_steps == 5
+    with pytest.raises(ValueError, match="non-attention arm"):
+        full.load_state_dict(saved)
+
+
+def _function_node(tree: ast.AST, name: str) -> ast.FunctionDef:
+    return next(
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+
+
+def _calls_named(node: ast.AST, attribute: str) -> list[ast.Call]:
+    return [
+        call
+        for call in ast.walk(node)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, (ast.Attribute, ast.Name))
+        and (call.func.attr if isinstance(call.func, ast.Attribute) else call.func.id) == attribute
+    ]
+
+
+def test_train_batch_scores_before_observing_and_reduces_once_per_step() -> None:
+    source = (EDULLM_ROOT / "token_selection_370m" / "train_module.py").read_text(encoding="utf-8")
+    assert "normalize_and_align" not in source
+    assert "aligned_normalized_attention_scores" not in source
+    assert "uniform_attention_normalizer" not in source
+    tree = ast.parse(source)
+    train_batch = _function_node(tree, "train_batch")
+    microbatch_loop = next(
+        node
+        for node in ast.walk(train_batch)
+        if isinstance(node, ast.For) and "enumerate(prepared)" in ast.unparse(node.iter)
+    )
+
+    # Inside the microbatch loop: log mass from the capture, scored against
+    # the already-committed baseline, and only then observed -- and never in
+    # a dry run.
+    (mass_call,) = _calls_named(microbatch_loop, "aligned_log_attention_mass")
+    assert ast.unparse(mass_call) == "aligned_log_attention_mass(captured)"
+    (score_call,) = _calls_named(microbatch_loop, "score")
+    assert ast.unparse(score_call) == "baseline.score(log_mass)"
+    (observe_call,) = _calls_named(microbatch_loop, "observe")
+    assert ast.unparse(observe_call) == "baseline.observe(log_mass, valid)"
+    assert score_call.lineno < observe_call.lineno
+    guards = [
+        node
+        for node in ast.walk(microbatch_loop)
+        if isinstance(node, ast.If) and observe_call in list(ast.walk(node))
+    ]
+    assert any(ast.unparse(guard.test) == "not dry_run" for guard in guards)
+
+    # Exactly one all-reduce per step, after (outside) the microbatch loop,
+    # over the data-parallel group, and never in a dry run.
+    assert not _calls_named(microbatch_loop, "all_reduce_pending")
+    (reduce_call,) = _calls_named(train_batch, "all_reduce_pending")
+    assert ast.unparse(reduce_call) == (
+        "state.attention_baseline.all_reduce_pending(self.dp_process_group)"
+    )
+    assert reduce_call.lineno > microbatch_loop.end_lineno
+    reduce_guard = next(
+        node
+        for node in ast.walk(train_batch)
+        if isinstance(node, ast.If) and reduce_call in list(ast.walk(node))
+    )
+    assert ast.unparse(reduce_guard.test).startswith("not dry_run")
+
+    # The commit happens at the optimizer-step boundary the checkpointer sees.
+    after_step = _function_node(tree, "after_optimizer_step")
+    assert [ast.unparse(call) for call in _calls_named(after_step, "commit")] == [
+        "self.attention_baseline.commit()"
+    ]
+
+
+def test_attention_diagnostic_mirrors_the_train_time_scoring() -> None:
+    source = (EDULLM_ROOT / "farmshare" / "attention_diagnostic.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    assert "normalize_and_align" not in source
+    assert "aligned_normalized_attention_scores" not in source
+    calls = {ast.unparse(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)}
+    assert {
+        "AttentionPositionBaseline",
+        "aligned_log_attention_mass",
+        "baseline.observe",
+        "baseline.commit",
+        "baseline.score",
+        "per_row_topk",
+    } <= calls
+    # The acceptance rule is unchanged and still not a CLI knob.
+    assert "KEEP_RATE_LOW = 0.3" in source and "KEEP_RATE_HIGH = 0.9" in source
+    assert "NUM_BINS = 16" in source
+    assert "--keep-rate" not in source
+    # Calibration rows are disjoint from the scored rows.
+    assert "calibration_batches = all_batches[: args.calibration_batches]" in source
+    assert "batches = all_batches[args.calibration_batches :]" in source
 
 
 class FakeStream:

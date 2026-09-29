@@ -53,7 +53,7 @@ git, not here.
 | [`rho-1`](rho-1.yaml) | `rho_excess` (top `L_curr − L_ref`) | `pretrain/regmix-10b` | 60% | 6198 / 42 | frozen `instruct-reference` step 940, scored offline once into a per-instance table | 2360 steps |
 | [`rel-ema-exp`](rel-ema-exp.yaml) | `rel_ema` (top `L_curr − L_hist`) | `pretrain/regmix-10b` | 60% | 6198 / 42 | zero-seeded bias-corrected EMA, `alpha(t) = 1 - exp(-t/300)` | 2360 steps |
 | [`perplexity`](perplexity.yaml) | `middle_ppl` (middle 60% by frozen loss) | `pretrain/regmix-10b` | 60% | 6198 / 42 | frozen `instruct-reference` step 940, scored offline once into the same per-instance table `rho-1` reads | 2360 steps |
-| [`attention`](attention.yaml) | `attention_topk` (top position-normalized, target-aligned attention received) | `pretrain/regmix-10b` | 60% | 6198 / 42 | — | 2360 steps |
+| [`attention`](attention.yaml) | `attention_topk` (top target-aligned attention received, z-scored per position against the model's own immediately preceding step) | `pretrain/regmix-10b` | 60% | 6198 / 42 | — | 2360 steps |
 | [`blade`](blade.yaml) | `blade` (top `L_proxy - L_ref`, selection-weighted reference update) | `pretrain/regmix-10b` | 60% | 6198 / 42 | dynamic, synced from the proxy at steps 0/400/800/1200/1600/2000 (`tau=400`, `K=75`); second stream `pretrain/refhq-instruct` | 2360 steps |
 
 Every arm above, including the Instruct reference, is trained under the unified
@@ -63,10 +63,23 @@ earlier commit.
 ## Methodology fixes since the confounded runs
 
 - **Attention.** The raw causal column-mass score favored early positions and was one
-  position off from the target it was meant to gate. It is now normalized by its
-  expectation under uniform causal attention (removing the position bias) and aligned
-  to the target token whose loss it gates. See `token_selection_370m/selection.py`'s
-  `aligned_normalized_attention_scores`.
+  position off from the target it was meant to gate; the token-count alignment fix
+  landed first. A second, larger problem surfaced later, from a pre-production
+  diagnostic (`farmshare/attention_diagnostic.py`) run against a real trained
+  checkpoint: normalizing by the *theoretical* expectation under uniform causal
+  attention still left the score almost entirely position-confounded (keep rate
+  ranged from 1.9% at the start of a row to 100% at the end), because real trained
+  attention is recency-biased, not uniform -- the normalizer assumed a ~117x drop in
+  attention mass from the first to the last position, while the real drop is only
+  ~5.4x. The fix replaces that theoretical normalizer with an *empirical* one
+  (`AttentionPositionBaseline`): each token is z-scored against the mean/std of
+  tokens at its own position from the model's own immediately preceding training
+  step (no smoothing/decay constant -- an offline sensitivity check found smoothing
+  over more steps cut responsiveness to real drift for a barely-measurable noise
+  benefit at this batch size), falling back to the old uniform-attention prior only
+  on a fresh run's first step, before any real history exists. Re-running the same
+  diagnostic against the same checkpoint under the new score: every bin lands
+  between 56.8% and 63.6% keep rate.
 - **BLADE.** The reference's own training term is now selection-weighted (Wang et al.
   2026, Sec. 2.2), scored against the *outgoing* reference before it is overwritten by
   the sync. The schedule starts at step 0 (previously step 500), syncing at

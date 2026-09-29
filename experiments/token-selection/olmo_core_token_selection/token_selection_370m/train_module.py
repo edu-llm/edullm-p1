@@ -20,8 +20,9 @@ from olmo_core.train.train_module import TransformerTrainModule
 
 from .reference_scores import ReferenceScoreTable
 from .selection import (
+    AttentionPositionBaseline,
     EMAHistory,
-    aligned_normalized_attention_scores,
+    aligned_log_attention_mass,
     capture_last_attention,
     ema_alpha,
     selection_weights,
@@ -64,6 +65,12 @@ class TokenSelectionState:
             if config.ema_seed != "zero":
                 raise ValueError("relative EMA must explicitly select zero initialization")
             self.ema = EMAHistory(model, seed=None)
+        # attention_topk scores each token against an empirical per-position
+        # baseline of the model's own attention, carried across steps (and
+        # resumes) like the EMA weights above -- see AttentionPositionBaseline.
+        self.attention_baseline: Optional[AttentionPositionBaseline] = None
+        if config.method == "attention_topk":
+            self.attention_baseline = AttentionPositionBaseline()
 
     def alpha(self) -> float:
         return ema_alpha(
@@ -75,6 +82,8 @@ class TokenSelectionState:
     def after_optimizer_step(self, model) -> None:
         if self.ema is not None:
             self.ema.update(model, self.alpha())
+        if self.attention_baseline is not None:
+            self.attention_baseline.commit()
         self.completed_steps += 1
 
     def state_dict(self) -> dict[str, Any]:
@@ -82,6 +91,11 @@ class TokenSelectionState:
             "version": 1,
             "completed_steps": self.completed_steps,
             "ema": self.ema.state_dict() if self.ema is not None else None,
+            "attention_baseline": (
+                self.attention_baseline.state_dict()
+                if self.attention_baseline is not None
+                else None
+            ),
         }
 
     def load_state_dict(self, state: Mapping[str, Any]) -> None:
@@ -94,6 +108,17 @@ class TokenSelectionState:
             self.ema.load_state_dict(state["ema"])
         elif state.get("ema") is not None:
             raise ValueError("non-EMA arm received EMA resume state")
+        # "attention_baseline" is an additive key: a state written before it
+        # existed still loads for every arm that has no baseline, while an
+        # attention arm fails closed rather than silently restarting its
+        # baseline from the cold-start prior mid-run.
+        baseline_state = state.get("attention_baseline")
+        if self.attention_baseline is not None:
+            if not isinstance(baseline_state, Mapping):
+                raise ValueError("attention resume state is missing its position baseline")
+            self.attention_baseline.load_state_dict(baseline_state)
+        elif baseline_state is not None:
+            raise ValueError("non-attention arm received attention-baseline resume state")
 
 
 class TokenWeightedTrainModule(TransformerTrainModule):
@@ -267,7 +292,16 @@ class TokenWeightedTrainModule(TransformerTrainModule):
                 if config.method in {"rho_excess", "rel_ema"}:
                     current = token_ce.detach()
                 if config.method == "attention_topk":
-                    attention = aligned_normalized_attention_scores(captured)
+                    baseline = state.attention_baseline
+                    if baseline is None:
+                        raise RuntimeError("attention_topk is missing its position baseline")
+                    log_mass = aligned_log_attention_mass(captured)
+                    # Score against the baseline committed through the
+                    # previous step, then record this microbatch for the
+                    # next one. A dry run never feeds the baseline.
+                    attention = baseline.score(log_mass)
+                    if not dry_run:
+                        baseline.observe(log_mass, valid)
 
                 supplied = micro.get("token_weight")
                 if supplied is not None:
@@ -312,6 +346,10 @@ class TokenWeightedTrainModule(TransformerTrainModule):
             raise RuntimeError(
                 f"token-weight divisor mismatch: planned {divisor}, observed {observed_weight_value}"
             )
+        if not dry_run and state.attention_baseline is not None:
+            # Once per step on every rank: the baseline committed in
+            # after_optimizer_step is the global batch's, identical on all ranks.
+            state.attention_baseline.all_reduce_pending(self.dp_process_group)
         self.model.post_batch(dry_run=dry_run)
         if dry_run:
             self.model.reset_auxiliary_metrics()

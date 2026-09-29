@@ -2,20 +2,32 @@
 """Phase 1b.5: sanity-check the ``attention_topk`` arm's scoring before a production run.
 
 The ``attention_topk`` selection method scores each token by how much causal
-attention it receives from later positions, normalizes that raw score by what
-it would receive under uniform attention (removing the pure position bias),
-aligns it to the target token it gates, and keeps the top ``keep_fraction``
-per row (see ``token_selection_370m/selection.py``). At initialization the
-model's attention is close to uniform, so this score only carries signal once
+attention it receives from later positions, aligns that (log) score to the
+target token it gates, standardizes it against an empirical per-position
+baseline of the same model's attention (``AttentionPositionBaseline``: the
+mean and std of the aligned log mass at that position over recently seen
+rows), and keeps the top ``keep_fraction`` per row (see
+``token_selection_370m/selection.py``). At initialization the model's
+attention is close to uniform, so this score only carries signal once
 attention has differentiated from uniform through training -- this diagnostic
 therefore requires an *already-trained* checkpoint, not a fresh init.
 
-This script scores ``--num-batches`` batches of real RegMix corpus text with
-a trained 370M checkpoint, exactly mirroring the ``attention_topk`` branch of
+In training, a step is scored against the baseline committed from the
+*immediately preceding* step's global batch (unblended -- no smoothing
+constant to justify, no lag beyond that one unavoidable step). To mirror
+that without a training history, this script first builds the baseline from
+``--calibration-batches`` batches of real corpus text that are disjoint from
+the scored ones (one ``observe`` per batch, then a single ``commit``, as one
+training step would), and only then scores ``--num-batches`` further batches
+with it. The scored batches never feed the baseline, just as a training
+step's own batch never feeds the baseline it is scored against.
+
+Scoring exactly mirrors the ``attention_topk`` branch of
 ``TokenWeightedTrainModule.train_batch`` (``capture_last_attention`` around the
-forward pass, then ``aligned_normalized_attention_scores``, then
-``per_row_topk``) but on a plain, non-distributed, non-compiled, eval-mode
-model with no gradients, on a single GPU.
+forward pass, then ``aligned_log_attention_mass``, then
+``AttentionPositionBaseline.score``, then ``per_row_topk``) but on a plain,
+non-distributed, non-compiled, eval-mode model with no gradients, on a single
+GPU.
 
 It then bins every token's *position* (not its selection score) into sixteen
 128-position bins and reports each bin's keep rate, pooled across every row
@@ -53,9 +65,11 @@ from eval_task_loss_olmo_core import (  # noqa: E402
 from token_selection_370m.arms import REGMIX, get_arm  # noqa: E402
 from token_selection_370m.recipe import SEQUENCE_LENGTH  # noqa: E402
 from token_selection_370m.selection import (  # noqa: E402
-    aligned_normalized_attention_scores,
+    AttentionPositionBaseline,
+    aligned_log_attention_mass,
     capture_last_attention,
     per_row_topk,
+    uniform_prior_log_mass,
 )
 from token_selection_entrypoint import resolve_corpus  # noqa: E402
 
@@ -86,6 +100,17 @@ def parse_args() -> argparse.Namespace:
         help="FarmShare stage root containing ready.json, as written by farmshare/stage_local.py.",
     )
     parser.add_argument("--num-batches", type=int, default=8)
+    parser.add_argument(
+        "--calibration-batches",
+        type=int,
+        default=16,
+        help=(
+            "Batches (disjoint from the scored ones) used to build the empirical "
+            "position baseline before scoring. Training builds it from every "
+            "row of every previous global batch; this only needs enough rows for "
+            "a stable per-position mean/std."
+        ),
+    )
     parser.add_argument(
         "--batch-size-tokens",
         type=int,
@@ -182,6 +207,8 @@ def main() -> None:
     rows_per_batch = args.batch_size_tokens // SEQUENCE_LENGTH
     if args.num_batches <= 0:
         raise SystemExit("--num-batches must be positive")
+    if args.calibration_batches <= 0:
+        raise SystemExit("--calibration-batches must be positive")
     if SEQUENCE_LENGTH % NUM_BINS != 0:
         raise SystemExit(f"sequence length {SEQUENCE_LENGTH} does not divide evenly into {NUM_BINS} bins")
     bin_size = SEQUENCE_LENGTH // NUM_BINS
@@ -196,44 +223,75 @@ def main() -> None:
     model = load_checkpoint_model(args.checkpoint)
     device = next(model.parameters()).device
 
+    total_batches = args.calibration_batches + args.num_batches
     print(
-        f"sampling {args.num_batches} batches x {rows_per_batch} rows "
-        f"({SEQUENCE_LENGTH} tokens/row) from {REGMIX} (seed={args.seed}) ...",
+        f"sampling {total_batches} batches x {rows_per_batch} rows "
+        f"({SEQUENCE_LENGTH} tokens/row) from {REGMIX} (seed={args.seed}): "
+        f"{args.calibration_batches} to calibrate the position baseline, "
+        f"{args.num_batches} (disjoint) to score ...",
         flush=True,
     )
-    batches = sample_batches(
+    all_batches = sample_batches(
         stage_root=args.stage_root,
-        num_batches=args.num_batches,
+        num_batches=total_batches,
         rows_per_batch=rows_per_batch,
         seed=args.seed,
     )
+    calibration_batches = all_batches[: args.calibration_batches]
+    batches = all_batches[args.calibration_batches :]
 
     # get_labels is the same left-shift-by-one used for a plain LM batch with
     # no special masks in train_module.py's train_batch (batch has only
     # "input_ids"; no label_mask/attention_mask/instance_mask here).
     from olmo_core.data.utils import get_labels
 
+    def log_mass_and_valid(input_ids: torch.Tensor):
+        input_ids = input_ids.to(device, non_blocking=True)
+        labels = get_labels({"input_ids": input_ids}, label_ignore_index=LABEL_IGNORE_INDEX)
+        with capture_last_attention(model) as captured:
+            with torch.autocast("cuda", dtype=torch.bfloat16):
+                model(
+                    input_ids,
+                    labels=labels,
+                    ignore_index=LABEL_IGNORE_INDEX,
+                    loss_reduction="none",
+                    return_logits=False,
+                )
+        model.reset_auxiliary_metrics()
+        return aligned_log_attention_mass(captured), labels != LABEL_IGNORE_INDEX
+
+    baseline = AttentionPositionBaseline()
+    with torch.no_grad():
+        for batch_index, input_ids in enumerate(calibration_batches):
+            log_mass, valid = log_mass_and_valid(input_ids)
+            baseline.observe(log_mass, valid)
+            print(f"  calibration batch {batch_index + 1}/{len(calibration_batches)}", flush=True)
+    baseline.commit()
+
+    # Informational only (not part of the acceptance rule): the measured
+    # position effect next to the uniform-attention prior it replaces, as
+    # per-bin averages of the aligned log mass's per-position mean/std.
+    mean, std = baseline.position_statistics(SEQUENCE_LENGTH, device)
+    prior = uniform_prior_log_mass(SEQUENCE_LENGTH, device)
+    print()
+    print("calibrated position baseline (aligned log attention mass; last column has no label):")
+    print(f"{'bin':>3s}  {'positions':>13s}  {'mean':>9s}  {'std':>9s}  {'uniform prior':>13s}")
+    for bin_index in range(NUM_BINS):
+        start = bin_index * bin_size
+        stop = min(start + bin_size, SEQUENCE_LENGTH - 1)
+        print(
+            f"{bin_index:>3d}  [{start:>5d},{stop - 1:>5d}]  {float(mean[start:stop].mean()):>9.4f}  "
+            f"{float(std[start:stop].mean()):>9.4f}  {float(prior[start:stop].mean()):>13.4f}"
+        )
+    print()
+
     valid_per_bin = torch.zeros(NUM_BINS, dtype=torch.long)
     kept_per_bin = torch.zeros(NUM_BINS, dtype=torch.long)
 
     with torch.no_grad():
         for batch_index, input_ids in enumerate(batches):
-            input_ids = input_ids.to(device, non_blocking=True)
-            labels = get_labels({"input_ids": input_ids}, label_ignore_index=LABEL_IGNORE_INDEX)
-            valid = labels != LABEL_IGNORE_INDEX
-
-            with capture_last_attention(model) as captured:
-                with torch.autocast("cuda", dtype=torch.bfloat16):
-                    model(
-                        input_ids,
-                        labels=labels,
-                        ignore_index=LABEL_IGNORE_INDEX,
-                        loss_reduction="none",
-                        return_logits=False,
-                    )
-            model.reset_auxiliary_metrics()
-
-            attention = aligned_normalized_attention_scores(captured)
+            log_mass, valid = log_mass_and_valid(input_ids)
+            attention = baseline.score(log_mass)
             mask = per_row_topk(attention, keep_fraction, valid, tiebreak=None)
 
             for bin_index in range(NUM_BINS):

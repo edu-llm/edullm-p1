@@ -108,7 +108,7 @@ ba2de34db6a4cf6156c514a9f5bcf463fbd5343c1f34223d5ac459a5a74cb394  runpod/entrypo
 7dd20000c81dd3c1af29979c9c783060ce2180b34ce10cf194acc9502de70882  train_skillit_370m.py
 eb5c41b0dd41ecabaa18e3743240eb30d6440babd5c30f1abf9ca7bfde421590  skillit_controller.py
 92bf41b139dc8db9ebbc1505e6249cd9870091ab4b64f75d7fd067b1f808174c  skillit_loader.py
-f8d4c1b8792fa56bbbe0733d1f78942179fbd903dbfdd74cb34ba9e6ce94a186  skillit_math.py
+a01bf2b1d1d3f94fd159421e4a3583bbeac0a3032b9ce7a60bcf61a7830b6097  skillit_math.py
 b06871ef3f19fca1f982c6d66bc12f5942348504d03740eeb59a6fb165772f05  skillit_recipe.json
 c6d6a9d8292c5f48485e7ae170d913cf368cceccc4a8b6285c86ddbc4eaa7f18  production_contract/__init__.py
 67d8a787a45e5a1c9f0f2f7463363b994916e4469cadf12ddfc8e930cd5632af  production_contract/checkpoint.py
@@ -130,8 +130,8 @@ c18ca465f60327415c81e48a7342eee7906a0c68fc2fcea376d18d3a9bd8df84  farmshare/laun
 Several changes were made to the vendored bundle itself, all after the
 reported probe and derivative runs and none touching training math:
 
-- **`SKILLIT.md` was deleted.** It was an upstream design doc for an 8×A100
-  platform profile that neither reported run used (see "What is included"
+- **`SKILLIT.md` was deleted.** It was an upstream design doc for a platform
+  profile that neither reported run used (see "What is included"
   above, and "What is deliberately excluded" below). Its original hash was
   `ea38b1a8b0d8fb0624a8791213c8cbddfee7acbef6550a9d29c297dd8445de8f`; the file
   is recoverable from this repository's git history before this change.
@@ -139,7 +139,7 @@ reported probe and derivative runs and none touching training math:
   resolver, and the now-unused imports that only it needed** (user decision,
   to remove every trace of the vendored bundle's legacy cloud-staging path).
   This function was never the code path any reported run, or any of the four
-  current static reruns, actually executed: `runpod/entrypoint.py` -- the only
+  static validation runs, actually executed: `runpod/entrypoint.py` -- the only
   entrypoint any of them used (see "How the runs were launched" above) --
   always reassigns `resolve_domain_datasets` to its own `resolve_local_datasets`
   before calling `main()`, and refuses to start at all if any `AWS_*`
@@ -157,27 +157,24 @@ reported probe and derivative runs and none touching training math:
   derivative runs above); both are recoverable from git history before this
   change, and `skillit_loader.py` moves from "same" to "differs" against
   `f2ded0b6` in the table above as a result.
-- **`skillit_recipe.json`'s `initial_weights_source` string was rewritten.**
-  It named the A100 RunPod LightGBM run
-  (`wandb:eduLLM/mixlaw-1/78a3a85b7a5304a426f71629de27b198`) that first
-  produced the LGB-min1pct weights; it now cites
-  `mixlaw_fit_lightgbm_chinchilla.json`'s `optimization.min1pct.weights`
-  instead, which is the weights' underlying source and needs no W&B access to
-  check. No code reads this field, but changing the file's bytes moves
-  `RECIPE_SHA256`. The recipe's original hash was
+- **`skillit_recipe.json`'s `initial_weights_source` string was rewritten**
+  after the reported runs. It now cites
+  `mixlaw_fit_lightgbm_chinchilla.json`'s `optimization.min1pct.weights`, the
+  weights' underlying source, which needs no W&B access to check. No code reads
+  this field, but changing the file's bytes moves `RECIPE_SHA256`. The probe
+  and derivative W&B configs keep the string as it was when they ran. The
+  recipe's original hash was
   `28506e7c3e15814c1dd0082c1c3c52dd228083fec83556616019504583b48f91`, checked
   in `skillit_math.py` and above, before this change; the byte-identical
-  original is recoverable the same way.
+  original is recoverable from git history.
 - **`skillit_recipe.json`'s `derivative_fit_source_sha256` was updated a second
-  time**, to track `mixlaw_fit_chinchilla.json` after the unconstrained-fit
-  removal (see that file's own history): the `uncapped` and `pilot_caps`
-  optimization blocks were dropped and one diagnostic field was renamed
-  (`best_unconstrained_rmse_proxy` → `best_rmse_before_c_bound`), verified
-  bit-identical everywhere it matters -- `optimization.min1pct` (the weights
-  and predicted macro both Skill-It arms and the LGB-min1pct rerun actually
-  used) and every fitted `c`/`k`/`t` value are unchanged; only
-  `near_optimal_balanced_samples` legitimately differs, since it's now
-  measured against a single reference point instead of three. The recipe's
+  time**, to track `mixlaw_fit_chinchilla.json` after that file was simplified:
+  its optimization blocks other than `min1pct` were dropped and one diagnostic
+  field was renamed, verified bit-identical everywhere it matters --
+  `optimization.min1pct` (the weights and predicted macro both Skill-It arms
+  and the LGB-min1pct static run actually used) and every fitted `c`/`k`/`t` value
+  are unchanged; only `near_optimal_balanced_samples` legitimately differs,
+  since it's now measured against a single reference point. The recipe's
   hash before this second change was
   `feab875f9706860d0f61835f9e7d7326c079e56dac7e8d792ed5b6dc3ad0c8de` (itself
   already past the original `28506e7c…`, from the edit above), and
@@ -185,8 +182,13 @@ reported probe and derivative runs and none touching training math:
   `acb4754b46cd6a588dffce7e7ad0d9bd70b0188db010669a7cfccf8622da2bcc`; both are
   recoverable from git history before this change. Every other field in the
   recipe is untouched.
+  The two matching constants in `skillit_math.py` (`RECIPE_SHA256` and
+  `DERIVATIVE_FIT_SOURCE_SHA256`) were updated with them, so that file's hash
+  moved too; the value pinned above is its current one, and its hash before
+  these two edits was
+  `f8d4c1b8792fa56bbbe0733d1f78942179fbd903dbfdd74cb34ba9e6ce94a186`.
 - **`farmshare/common.sh` dropped its unused `AWS_ENV_FILE` line.** Neither
-  reported run, nor any of the four static reruns, ever reads that variable;
+  reported run, nor any of the four static validation runs, ever reads that variable;
   it was inert from before this bundle's own no-AWS pivot. No script's
   behavior changes. The file's hash before this edit was
   `f8580f58284d0e748a1cea1ef12cd2eab0199496f5477abf8bc00a0b084cd4e6`, the same
@@ -235,8 +237,8 @@ reported probe and derivative runs and none touching training math:
 Three files in `farmshare/` were added after this directory was vendored, so
 they are not in the SHA-256 list above: `patch_legacy_static_lgbm_arm.py`,
 `farmshare_static_lgbm_l40s.sbatch` and
-`farmshare_preflight_submit_static_lgbm.sh`. They produced the 4×L40S rerun of
-the static LightGBM mixture (Slurm job 1744338, W&B `eduLLM/skillit/zgmte13g`).
+`farmshare_preflight_submit_static_lgbm.sh`. They produced the 4×L40S static
+LightGBM run (Slurm job 1744338, W&B `eduLLM/skillit/zgmte13g`).
 The patch script added a static arm (arm index 2, `a_mode` `static`, no
 Skill-It updates) to a separate copy of this bundle; every source string it
 replaces, including `RECIPE_SHA256 = "28506e7c…"` in `skillit_math.py`, occurs
@@ -245,7 +247,7 @@ and ran that patched copy. The vendored files themselves were left unmodified,
 and their hashes above still hold.
 
 Three more files in `farmshare/` run the four static validation arms on
-4×L40S (Slurm jobs 1745704, 1745706, 1745708, 1745710; W&B
+4×L40S (Slurm jobs 1745704, 1745706, 1745708, 1760339; W&B
 `eduLLM/mixlaw-new`):
 
 - `patch_static_validation_arms.py`: on a separate copy of this bundle, adds

@@ -2,9 +2,9 @@
 
 The recovery/production-contract tests that used to live here covered
 mixlaw_runtime.py and train_mixlaw_validation_370m.py, the curriculum-derived
-370M trainer that produced only the discarded seed-12345 control. Both files
-were removed once that control was discarded in favor of an all-L40S rerun on
-the Skill-It trainer; see the mixlaw README's "Earlier runs" note. This test
+370M trainer that no reported run used. Both files
+were removed once every reported arm ran on
+the Skill-It trainer. This test
 covers mixlaw_wandb.py, which the 60M pilots and probes still use.
 """
 from __future__ import annotations

@@ -4,17 +4,22 @@ Domain-mixture levers under a shared Mixing Laws Dataset / OLMoHQ × OLMo-2 370M
 
 | Experiment | Question | Outcome |
 |------------|----------|---------|
-| MixLaw | Can a mixing law from short runs beat fixed mixtures? | **Yes** — fitted mixtures beat the baseline (\(p < 10^{-4}\)) |
-| Skill-It | Can mid-run Skill-It reweighting beat the fixed mixture it starts from? | **No reliable evidence** — both arms beat the Olmo-mix-1124 control (probe \(p < 10^{-4}\), derivative \(p = 0.004\)), but they trail the 8×A100 run of their LightGBM starting mixture and lead a matched 4×L40S rerun of it; the two static runs differ by 0.0158 bpb, more than any arm-vs-static gap, so the effect cannot be separated from run-to-run variation |
+| MixLaw | Can a mixing law from short runs beat fixed mixtures? | **No** — none of the three optimized static mixtures beats the Olmo-mix-1124 control average (fitted final 1.6148 bpb): LightGBM 1.6238 (\(+0.0091\), \(p = 0.0048\)), Data Mixing Laws 1.6411 (\(+0.0264\), \(p < 5\times10^{-6}\)) and MixLaw 1.6433 (\(+0.0286\), \(p < 5\times10^{-6}\)) all finish behind it |
+| Skill-It | Can mid-run Skill-It reweighting beat the fixed mixture it starts from? | **No reliable evidence** — against the control average, probe \(-0.0035\) bpb (\(p = 0.20\)) and derivative \(+0.0019\) (\(p = 0.66\)) are indistinguishable from it. The probe arm does finish ahead of its own static starting mixture (LightGBM, \(-0.0126\), \(p < 5\times10^{-6}\); derivative \(-0.0072\), \(p = 0.087\)), but that gap is about the size of the 0.0105 bpb difference between the two control seeds |
+
+All seven reported 370M runs (the Olmo-mix-1124 control at data seeds 42 and 69,
+Data Mixing Laws, MixLaw, LightGBM, and the two Skill-It arms) ran the vendored
+Skill-It trainer on FarmShare 4×L40S, matched in everything except mixture (and,
+for the second control, the data seed).
 
 Shared evaluation: macro task-loss CE bits-per-byte over 20 OLMES-style labels;
 power-law **alpha-free** residual-bootstrap CIs on fitted finals (steps ≥ 1000),
 one independent resampling stream per arm, reproducible offline via
-[`mixlaw/fit_and_bootstrap_370m.py`](mixlaw/fit_and_bootstrap_370m.py).
-A100-hours: MixLaw 188.74 (its four 8×A100 arms; both Skill-It arms and the
-LightGBM static rerun ran on 4×L40S). FLOPs: \(2.63\times10^{19}\) per 370M
-arm (W&B); MixLaw 60M pilot grid \(\approx 4.17\times10^{18}\); Skill-It 60M
-probes \(\approx 1.22\times10^{18}\).
+[`mixlaw/fit_and_bootstrap_370m.py`](mixlaw/fit_and_bootstrap_370m.py) from the
+single curve file `mixlaw/skill_dag_370m_wandb_curves.json`, which
+[`mixlaw/pull_370m_curves.py`](mixlaw/pull_370m_curves.py) writes from W&B.
+FLOPs: \(2.63\times10^{19}\) per 370M arm (W&B); MixLaw 60M pilot grid
+\(\approx 4.17\times10^{18}\); Skill-It 60M probes \(\approx 1.22\times10^{18}\).
 
 **Data.** Every arm draws from the ~127B-token reservoir `pretrain/olmo-127b` v1,
 a subset of Olmo-mix-1124 (DCLM 29.691B, arXiv 22.148B, pes2o 26.379B, StarCoder
@@ -25,20 +30,20 @@ the reservoir byte for byte from the public Olmo-mix-1124 files with
 [`datasets/manifests/olmo-127b-v1/`](../../datasets/manifests/olmo-127b-v1/README.md)
 (`rebuild.py`).
 
-**Seed noise floor.** Two Olmo-mix-1124 runs differing in dataloader seed (12536 vs
-12345), hardware (8×A100 vs 4×L40S, which also changed the realized initialization)
-and training code (the second control ran a separate trainer)
-land 0.0044 bpb apart (\(p = 0.34\)); treat differences below ~0.004 bpb as
-indistinguishable. Two runs of the LightGBM mixture that differ in the same three
-ways land 0.0158 bpb apart (\(p < 10^{-4}\)), so run-to-run variation across
-hardware and training code can be several times larger; see
+**Seed noise floor.** Two Olmo-mix-1124 runs differing only in data seed (42 vs 69)
+land 0.0105 bpb apart (95% CI [+0.0023, +0.0193], \(p = 0.0095\)); treat
+single-run differences of about 0.01 bpb or less as indistinguishable from
+run-to-run variation. Even identically configured runs on this stack are not
+bit-reproducible (the Skill-It probe, derivative and LightGBM runs diverge by
+step ~15, before any Skill-It update), so this is a floor on data order plus
+GPU nondeterminism, not on data order alone; see
 [`skillit/README.md`](skillit/README.md#results).
 
 ## Bootstrap convention (and how it differs from the token-selection paper)
 
 Both papers report 95% intervals from an alpha-free residual bootstrap on the
 fit window, but the two are **not** computed identically. The difference is
-worth knowing before comparing their seed-noise floors (0.0044 bpb here,
+worth knowing before comparing their seed-noise floors (0.0105 bpb here,
 0.0082 bpb there).
 
 | | this paper (`fit_and_bootstrap_370m.py`) | token selection (`fit_and_plot.py`) |

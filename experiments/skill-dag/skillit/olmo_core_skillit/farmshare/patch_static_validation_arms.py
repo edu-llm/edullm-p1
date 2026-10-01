@@ -6,7 +6,7 @@ repository as ``olmo_core_skillit/`` (the copy's ``OLMo-core/.edullm``). The
 vendored files themselves are never edited.
 
 This supersedes ``patch_legacy_static_lgbm_arm.py`` for new runs. That script
-stays unchanged as the provenance of the static LightGBM rerun (Slurm job
+stays unchanged as the provenance of the static LightGBM run (Slurm job
 1744338, W&B ``eduLLM/skillit/zgmte13g``). This one folds in that arm-2 patch,
 so it runs once against a pristine copy and produces all of arms 0-6:
 
@@ -55,7 +55,7 @@ PRISTINE_SHA256 = {
     "train_skillit_370m.py": "7dd20000c81dd3c1af29979c9c783060ce2180b34ce10cf194acc9502de70882",
 }
 
-# Identical to patch_legacy_static_lgbm_arm.STATIC_ARM (the zgmte13g rerun).
+# Identical to patch_legacy_static_lgbm_arm.STATIC_ARM (the zgmte13g run).
 LGBM_STATIC_ARM = {
     "arm_index": 2,
     "arm_id": "static-lgbm-min1pct",
@@ -391,7 +391,7 @@ def patch_controller(controller_path: Path) -> None:
         "    @property\n"
         "    def loader",
     )
-    # Arm 2 keeps its rerun note; arms 3-6 must not claim to be LightGBM.
+    # Arm 2 keeps its static_rerun note; arms 3-6 must not claim to be LightGBM.
     replace_once(
         controller_path,
         '                        note="arm-specific starting domain weights; no Skill-It update",',

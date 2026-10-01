@@ -12,7 +12,7 @@ The copy keeps the source run's name and group, and by default its run id, so
 re-running is safe: an existing complete copy is only re-verified, and an
 existing incomplete one is left alone with an error.
 
-Used to put the static LightGBM L40S rerun (``eduLLM/skillit/zgmte13g``, Slurm
+Used to put the static LightGBM L40S run (``eduLLM/skillit/zgmte13g``, Slurm
 job 1744338) into ``eduLLM/mixlaw-new`` next to the other static 370M runs:
 
     python clone_wandb_run.py --source eduLLM/skillit/zgmte13g \

@@ -12,11 +12,11 @@ of each source's token stream carved into `val-00000.u32le.bin` so validation
 mix weights match the full mix.
 
 Trained on by:
-- The four RunPod 370M static-mixture arms, which drew from it via
-  OLMo-core's source-mixture sampler (seed 12536) over leading runs of the v1
-  train shards, per domain.
-- The two Skill-It 370M arms, which read all v1 train shards from the
-  FarmShare publish-stage copy directly.
+- All seven 370M validation arms (the Olmo-mix-1124 control at data seeds 42
+  and 69, Data Mixing Laws, MixLaw, LightGBM, and the two Skill-It arms), which
+  read all v1 train shards from the FarmShare publish-stage copy through the
+  same pre-staged input manifest and the vendored trainer's weighted domain
+  loader.
 
 ## Trained-on objects
 

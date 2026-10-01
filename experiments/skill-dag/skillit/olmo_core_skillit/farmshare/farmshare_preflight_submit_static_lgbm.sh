@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Preflight and submit a staged static LightGBM rerun from FarmShare login.
+# Preflight and submit a staged static LightGBM run from FarmShare login.
 #
 # Run only after the dedicated RUN_DIR has been staged and patched by
 # patch_legacy_static_lgbm_arm.py. No dataset bytes or credentials are copied.

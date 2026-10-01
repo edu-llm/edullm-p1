@@ -4,7 +4,7 @@
 Each panel shows the cumulative domain-weight mixture Skill-It was training on
 at each point in the run, as a discrete (step-function) stacked area so it's
 clear the mixture only changes at update boundaries. Probe data reflects the
-FarmShare rerun of arm 0 (job 1730368, run "probe" in eduLLM/skillit); the
+FarmShare arm 0 (job 1730368, run "probe" in eduLLM/skillit); the
 Derivative panel uses arm 1's update history unchanged.
 
 Update data is read directly from each arm's `skillit_updates.jsonl` (written
@@ -41,7 +41,7 @@ COLORS = {
 LEGEND_ORDER = ["wiki", "algebraic-stack", "open-web-math", "pes2o", "starcoder", "arxiv", "dclm"]
 
 
-# Probe: FarmShare rerun of arm 0, job 1730368 (skillit_updates.jsonl p_after).
+# Probe: FarmShare arm 0, job 1730368 (skillit_updates.jsonl p_after).
 PROBE_UPDATES = [
     (0,    {"dclm": 0.5528505096102141, "arxiv": 0.21178482308348512, "starcoder": 0.08723935826031831, "pes2o": 0.08163337756774411, "open-web-math": 0.041786239404329344, "algebraic-stack": 0.013571059505826967, "wiki": 0.01113463256808213}),
     (500,  {"dclm": 0.6459461253946372, "arxiv": 0.16781238139729543, "starcoder": 0.05665913498302511, "pes2o": 0.07727008631788466, "open-web-math": 0.03104617306715885, "algebraic-stack": 0.010195690011512803, "wiki": 0.011070408828485898}),
@@ -51,7 +51,7 @@ PROBE_UPDATES = [
     (2000, {"dclm": 0.8640046143237808, "arxiv": 0.05748684666307869, "starcoder": 0.009327972256629744, "pes2o": 0.049564753592122174, "open-web-math": 0.00839236464681183, "algebraic-stack": 0.0028678558874201884, "wiki": 0.008355592630156597}),
 ]
 
-# Derivative: arm 1, unaffected by the probe-arm defects that required a rerun.
+# Derivative: arm 1, job 1728144 (run "derivative" in eduLLM/skillit).
 DERIVATIVE_UPDATES = [
     (1,    {"dclm": 0.5528504848, "arxiv": 0.2117848247, "starcoder": 0.0872393548, "pes2o": 0.0816333741, "open-web-math": 0.0417862386, "algebraic-stack": 0.0135710593, "wiki": 0.0111346329}),
     (501,  {"dclm": 0.5561979413, "arxiv": 0.1995353103, "starcoder": 0.0821934864, "pes2o": 0.0864803717, "open-web-math": 0.0471215174, "algebraic-stack": 0.0127861174, "wiki": 0.0156852882}),

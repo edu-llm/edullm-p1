@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 370M fixed static LightGBM mixture rerun on one 4×L40S node.
+# 370M fixed static LightGBM mixture run on one 4×L40S node.
 #
 # Stage a dedicated RUN_DIR before submission. It must contain a patched,
 # loader-compatible OLMo-core snapshot at OLMo-core/.edullm with arm index 2
@@ -62,7 +62,7 @@ export WANDB_DIR="${ARM_ROOT}/wandb"
 export EDULLM_RUNPOD_INPUT_MANIFEST="${MANIFEST}"
 export PYTHONPATH="${REPO_DIR}/src:${EDULLM_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
 
-# The static rerun is intentionally a local-manifest-only path over the
+# The static run is intentionally a local-manifest-only path over the
 # verified pre-staged manifest. Do not permit inherited cloud credential
 # variables to reach the loader.
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE \

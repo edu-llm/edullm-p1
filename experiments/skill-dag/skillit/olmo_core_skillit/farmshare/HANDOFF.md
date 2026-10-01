@@ -1,7 +1,7 @@
 # Skill-It OLMo2-370M — FarmShare handoff
 
 Run one Skill-It arm (`probe` or `deriv`) on FarmShare at 4×L40S. This bundle
-is self-contained: no AWS/S3 access, no GitHub access, and no dataset
+is self-contained: no cloud-storage access, no GitHub access, and no dataset
 download are required. The training corpus is read directly from a shared
 collaborator's FarmShare scratch over the cluster's shared filesystem — you
 only need read access to one already-open path, not a copy of the data.
@@ -20,8 +20,8 @@ only need read access to one already-open path, not a copy of the data.
 - Which arm index to run: **coordinate with nzhao2 first** so you don't both
   submit the same arm. `0` = probe, `1` = deriv.
 
-Nothing else. Do not attempt `sb-aws-creds login` or any AWS setup — this
-path never touches AWS.
+Nothing else. Do not attempt `sb-aws-creds login` or any cloud-credential
+setup — this path never touches external object storage.
 
 ## 0. If your agent uses Claude Code: install the FarmShare operating skill
 

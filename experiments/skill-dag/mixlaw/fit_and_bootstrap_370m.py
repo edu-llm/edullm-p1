@@ -4,6 +4,12 @@
 Reproduces Tables II and III of the paper from the committed curve file
 ``skill_dag_370m_wandb_curves.json``. No network or W&B access required.
 
+Every arm is a static or dynamic 370M run on FarmShare 4xL40S with the
+vendored Skill-It trainer, so all comparisons share hardware, initialization
+and training code. Table III compares the two dynamic-reweighting (Skill-It)
+arms against the single static 1%-floor LightGBM mixture (``lightgbm-l40s``)
+they start from and share data seed with.
+
 Method
 ------
 For each arm we fit
@@ -31,10 +37,23 @@ silently couples them and distorts every between-arm interval -- here it made
 the derivative arm's bootstrap draws correlate +0.91 with the control's and the
 probe arm's -0.43, shrinking one difference interval and inflating the other.
 
-The Olmo-mix-1124 control is the *average of the two dataloader seeds*: its
+Each run's stream index is fixed explicitly by its ``bootstrap_stream`` field
+in the curve JSON (``SeedSequence(seed).spawn(bootstrap_stream_count)[index]``),
+not by its position in the file or in ``VS_CONTROL``/``VS_STATIC`` below.
+Probe, derivative and lightgbm-l40s keep the stream indices (5, 6, 7) they held
+in earlier committed versions of this file, so their own fitted-final CIs are
+bit-identical to every previously reported number; index 4 is intentionally
+unused, and the four newer arms take indices 0-3. Only comparisons against the
+control changed.
+
+The Olmo-mix-1124 control is the *average of the two data seeds*: its
 bootstrap distribution is the element-by-element mean of the two seeds' own
 alpha-free bootstrap distributions, and its CI is the 2.5/97.5 percentiles of
-that averaged distribution.
+that averaged distribution. The two control runs share hardware, initialization
+and training code, and differ only in data seed -- though even matched runs on
+this stack are not bit-reproducible (see the skillit README's run-to-run note),
+so their difference (``seed_variance_estimate``) still carries some run-to-run
+noise beyond pure data order.
 
 p-values are two-sided bootstrap tests on the difference of two independent
 distributions, ``p = 2 * min(P(diff <= 0), P(diff >= 0))``, floored at the
@@ -64,9 +83,16 @@ MIN_STEP = 1000
 VS_CONTROL = [
     "data-mixing-laws-paper",
     "mixlaw-fit",
-    "lightgbm",
     "skillit-probe",
     "skillit-derivative",
+    "lightgbm-l40s",
+]
+
+# (arm, reference) pairs reported as arm - reference: both dynamic arms
+# against the single static LightGBM mixture they start from.
+VS_STATIC = [
+    ("skillit-probe", "lightgbm-l40s"),
+    ("skillit-derivative", "lightgbm-l40s"),
 ]
 
 
@@ -88,12 +114,20 @@ def _ols_over_alpha(X: np.ndarray, Y: np.ndarray):
     return sse, slope, intercept
 
 
-def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000):
+def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000,
+                       return_params=False):
     """Point fit + alpha-free residual bootstrap. Returns (fitted, finals).
 
     ``seed`` should be a per-arm :class:`numpy.random.SeedSequence` so that arms
     are resampled independently; see the module docstring. Draws are generated
     in blocks of ``chunk`` to bound peak memory at large ``n_boot``.
+
+    With ``return_params=True``, also returns the per-draw ``(a, b, alpha)``
+    arrays (each shape ``(n_boot,)``), so a caller can evaluate the bootstrapped
+    power law at any step, not just ``final_step`` -- e.g. to bootstrap a
+    step-count crossing between two arms (see ``bootstrap_crossing`` below).
+    The returned tuple is then ``(fitted, finals, a_draws, b_draws, alpha_draws)``;
+    default behavior and every existing caller are unaffected.
     """
     s = np.asarray(steps, dtype=float)
     y = np.asarray(losses, dtype=float)
@@ -113,6 +147,10 @@ def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000):
 
     rng = np.random.default_rng(seed)
     finals = np.empty(n_boot, dtype=float)
+    if return_params:
+        a_draws = np.empty(n_boot, dtype=float)
+        b_draws = np.empty(n_boot, dtype=float)
+        alpha_draws = np.empty(n_boot, dtype=float)
     for lo in range(0, n_boot, chunk):
         hi = min(lo + chunk, n_boot)
         draws = rng.integers(0, resid.size, (hi - lo, resid.size))
@@ -121,7 +159,51 @@ def fit_and_bootstrap(steps, losses, *, final_step, n_boot, seed, chunk=20_000):
         pick = np.argmin(sse, axis=0)                  # alpha-free: per-draw alpha
         cols = np.arange(hi - lo)
         finals[lo:hi] = icept[pick, cols] + slope[pick, cols] * final_step ** (-ALPHA_GRID[pick])
+        if return_params:
+            a_draws[lo:hi] = icept[pick, cols]
+            b_draws[lo:hi] = slope[pick, cols]
+            alpha_draws[lo:hi] = ALPHA_GRID[pick]
+    if return_params:
+        return fitted, finals, a_draws, b_draws, alpha_draws
     return fitted, finals
+
+
+def bootstrap_crossing(a_from, b_from, alpha_from, target, *, at_or_above=False):
+    """Per-draw step at which ``a_from + b_from / step**alpha_from`` first
+    reaches ``target``, given per-draw fit parameters and a per-draw target
+    value (e.g. the other arm's own bootstrapped final, paired draw-by-draw
+    as ``ci``/``diff_p`` already pair independent arms' distributions).
+
+    The power law is monotonic in ``step`` for ``b > 0, alpha > 0`` (decreasing
+    as step grows), so the crossing has a closed form:
+    ``step = (b / (target - a)) ** (1 / alpha)``. Used for two directions:
+
+    - **A given arm reaches a fixed target from above** (the "N% fewer steps"
+      metric): the fitted curve is decreasing, so it reaches ``target`` once
+      ``target > a`` (otherwise the curve never gets that high again past the
+      fit window, and by construction ``target`` -- the other arm's own
+      final -- should already be within the descending regime).
+    - **Extrapolating an arm forward until it reaches a lower target it
+      hasn't achieved within the observed budget** (the "N times longer"
+      metric): same formula, just typically evaluated far beyond
+      ``final_step``; ``at_or_above=True`` documents that direction for
+      readability at the call site, but the math is identical.
+
+    A row where ``target <= a`` (asymptote at or above the target -- this arm's
+    fitted curve never reaches it, even in the infinite-step limit) has no
+    finite crossing and is returned as ``np.inf``, so it never spuriously wins
+    a ``min``/percentile and shows up as a visibly non-finite tail instead of a
+    silently wrong number. Callers should report the fraction of non-finite
+    draws alongside the CI.
+    """
+    a_from = np.asarray(a_from, dtype=float)
+    b_from = np.asarray(b_from, dtype=float)
+    alpha_from = np.asarray(alpha_from, dtype=float)
+    target = np.asarray(target, dtype=float)
+    gap = target - a_from
+    with np.errstate(divide="ignore", invalid="ignore"):
+        step = np.where(gap > 0, (b_from / np.maximum(gap, 1e-300)) ** (1.0 / alpha_from), np.inf)
+    return step
 
 
 def ci(finals):
@@ -159,11 +241,15 @@ def main() -> None:
     final_step = int(data["final_step"])
     runs = data["runs"]
 
-    # One independent stream per arm -- see the module docstring.
-    streams = np.random.SeedSequence(args.seed).spawn(len(runs))
+    # One independent stream per arm, indexed by each run's own
+    # bootstrap_stream field rather than by position -- see the module
+    # docstring for why.
+    stream_count = int(data.get("bootstrap_stream_count", len(runs)))
+    streams = np.random.SeedSequence(args.seed).spawn(stream_count)
 
     fitted, finals, observed = {}, {}, {}
-    for (key, run), stream in zip(runs.items(), streams):
+    for key, run in runs.items():
+        stream = streams[run["bootstrap_stream"]]
         f, dist = fit_and_bootstrap(
             run["steps"], run["macro_bpb"],
             final_step=final_step, n_boot=args.n_boot, seed=stream,
@@ -172,7 +258,7 @@ def main() -> None:
         observed[key] = float(run["macro_bpb"][-1])
 
     # Control = element-by-element average of the two seeds' bootstrap draws.
-    s1, s2 = "olmo-mix-1124-seed6198", "olmo-mix-1124-seed12345"
+    s1, s2 = "olmo-mix-1124-s42", "olmo-mix-1124-s69"
     finals["olmo-mix-1124-average"] = 0.5 * (finals[s1] + finals[s2])
     fitted["olmo-mix-1124-average"] = 0.5 * (fitted[s1] + fitted[s2])
     observed["olmo-mix-1124-average"] = 0.5 * (observed[s1] + observed[s2])
@@ -216,33 +302,35 @@ def main() -> None:
         }
         print(f"{key:28s} vs olmo avg: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
-    # Dynamic arms against the best static mixture (LightGBM), which is the
-    # comparison the dynamic-reweighting conclusion actually rests on.
+    # Dynamic arms against the static LightGBM mixture they start from.
     print()
-    for key in ("skillit-probe", "skillit-derivative"):
-        d = finals[key] - finals["lightgbm"]
-        p = diff_p(finals[key], finals["lightgbm"])
+    for key, ref in VS_STATIC:
+        d = finals[key] - finals[ref]
+        p = diff_p(finals[key], finals[ref])
         lo, hi = ci(d)
-        out["comparisons"][f"{key}_vs_lightgbm"] = {
+        out["comparisons"][f"{key}_vs_{ref}"] = {
             "mean_diff_bpb": round(float(d.mean()), 6),
             "ci95": [round(lo, 6), round(hi, 6)],
             "p_value": p,
             "p_display": fmt_p(p, args.n_boot),
         }
-        print(f"{key:28s} vs LightGBM: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
+        print(f"{key:20s} vs {ref:14s}: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
     # Seed-variance estimate quoted in the paper.
     d = finals[s1] - finals[s2]
     p = diff_p(finals[s1], finals[s2])
     lo, hi = ci(d)
     out["seed_variance_estimate"] = {
-        "description": "Olmo-mix-1124 seed 12536 minus seed 12345 (dataloader seed only)",
+        "description": "Olmo-mix-1124 data seed 42 minus data seed 69 (same hardware, "
+                       "initialization and training code; not a pure data-order "
+                       "contrast, since matched runs on this stack are not "
+                       "bit-reproducible)",
         "mean_diff_bpb": round(float(d.mean()), 6),
         "ci95": [round(lo, 6), round(hi, 6)],
         "p_value": p,
         "p_display": fmt_p(p, args.n_boot),
     }
-    print(f"\nseed variance (12536 - 12345): {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
+    print(f"\nseed variance (42 - 69): {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
 
     args.out.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
     print(f"\nwrote {args.out}")

@@ -24,9 +24,11 @@ from fit_and_bootstrap_370m import ci, diff_p, fit_and_bootstrap, fmt_p  # noqa:
 
 curves = json.loads((MIXLAW / "heldout_label_curves.json").read_text(encoding="utf-8"))
 
-# same order as skill_dag_370m_wandb_curves.json's runs, so streams line up
-ORDER = ["olmo_12536", "olmo_12345", "dml_paper", "mixlaw", "lightgbm", "probe", "derivative"]
-EXCLUDE = {2375}          # the paper excludes the off-cadence eval
+# All-L40S arm set; aliases match pull_370m_curves.py's key_alias mapping.
+# No arm here has a previously reported targeted/held-out number to keep
+# bit-identical (that breakdown is new for every arm), so a plain positional
+# spawn is fine, unlike fit_and_bootstrap_370m.py's Table II/III streams.
+ORDER = ["olmo_s42", "olmo_s69", "dml_paper", "mixlaw", "lightgbm", "probe", "derivative"]
 FINAL_STEP = 2384
 N_BOOT = 200_000
 
@@ -35,8 +37,6 @@ def series(arm, field):
     steps, vals = [], []
     for s, rec in sorted(rows.items(), key=lambda kv: int(kv[0])):
         st = int(s)
-        if st in EXCLUDE:
-            continue
         steps.append(st)
         vals.append(rec[field])
     return steps, vals
@@ -52,9 +52,9 @@ for field, pretty, n_lab in (("targeted", "12 targeted labels", 12),
                                     n_boot=N_BOOT, seed=stream)
         fitted[arm], finals[arm], obs[arm] = f, dist, float(v[-1])
 
-    finals["control"] = 0.5 * (finals["olmo_12536"] + finals["olmo_12345"])
-    fitted["control"] = 0.5 * (fitted["olmo_12536"] + fitted["olmo_12345"])
-    obs["control"] = 0.5 * (obs["olmo_12536"] + obs["olmo_12345"])
+    finals["control"] = 0.5 * (finals["olmo_s42"] + finals["olmo_s69"])
+    fitted["control"] = 0.5 * (fitted["olmo_s42"] + fitted["olmo_s69"])
+    obs["control"] = 0.5 * (obs["olmo_s42"] + obs["olmo_s69"])
 
     print(f"{'arm':12s} {'fitted':>8s} {'observed':>9s}   95% CI")
     for arm in ORDER + ["control"]:
@@ -69,3 +69,9 @@ for field, pretty, n_lab in (("targeted", "12 targeted labels", 12),
         sign = "better" if d.mean() < 0 else "WORSE"
         print(f"{arm + ' - control':28s} {d.mean():+8.4f}   "
               f"[{lo:+.4f}, {hi:+.4f}]   {fmt_p(p, N_BOOT)}  ({sign})")
+
+    d = finals["olmo_s69"] - finals["olmo_s42"]
+    lo, hi = ci(d)
+    p = diff_p(finals["olmo_s69"], finals["olmo_s42"])
+    print(f"\n{'seed spread (s69 - s42)':28s} {d.mean():+8.4f}   "
+          f"[{lo:+.4f}, {hi:+.4f}]   {fmt_p(p, N_BOOT)}")

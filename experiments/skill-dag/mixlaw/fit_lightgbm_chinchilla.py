@@ -59,7 +59,10 @@ HYPERPARAM_GRID = {
     "num_boost_round": [100, 200],
 }
 
-OPT_SEED_OFFSET = {"uncapped": 0, "pilot_caps": 1, "min1pct": 2}
+# Search-seed offset per constraint setting. min1pct keeps offset 2, the value it
+# had when two other settings (offsets 0 and 1) were also optimized, so its
+# random-search stream is unchanged.
+OPT_SEED_OFFSET = {"min1pct": 2}
 
 GLOBAL_OPT = {
     "n_random": 50_000,
@@ -427,18 +430,8 @@ def main() -> None:
 
     optima = {}
     optimization_meta: dict[str, dict] = {}
-    constraint_order = [c[0] for c in OPT_CONSTRAINTS if c[0] != "uncapped"] + ["uncapped"]
-    constraint_by_name = {name: (caps, floors) for name, caps, floors in OPT_CONSTRAINTS}
-
-    for name in constraint_order:
-        caps, floors = constraint_by_name[name]
+    for name, caps, floors in OPT_CONSTRAINTS:
         print(f"\n=== Optimizing ({name}) ===")
-        extra_starts: list[np.ndarray] = []
-        if name == "uncapped":
-            for other_name, other in optima.items():
-                extra_starts.append(
-                    np.array([other["weights"][d] for d in DOMAINS], dtype=float)
-                )
         r_star, val, meta = optimize_simplex_global(
             objective,
             objective_batch,
@@ -446,7 +439,6 @@ def main() -> None:
             caps,
             floors,
             seed=SEED + OPT_SEED_OFFSET[name],
-            extra_starts=extra_starts,
         )
         optima[name] = {
             "weights": {d: float(v) for d, v in zip(DOMAINS, r_star)},
@@ -481,7 +473,7 @@ def main() -> None:
     macro_err = pred_macro - true_macro
 
     rng = np.random.default_rng(SEED + 99)
-    best_pred = optima["uncapped"]["predicted_macro"]
+    best_pred = optima["min1pct"]["predicted_macro"]
     floor_v = np.asarray(NEAR_OPT_DOMAIN_FLOORS, dtype=float)
     cap_v = np.asarray(NEAR_OPT_DOMAIN_CAPS, dtype=float)
     samples = []

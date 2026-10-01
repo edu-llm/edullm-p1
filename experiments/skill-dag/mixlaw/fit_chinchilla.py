@@ -33,7 +33,7 @@ T_HARD = 8.0          # hard bound on each t_j
 K_RATIO_SOFT = 20.0   # prefer k / y_std below this
 LAMBDA_T = 0.02       # weight on soft |t| penalty in residual stack
 LAMBDA_K = 0.05       # weight on soft log(k) penalty
-RMSE_SLACK = 1.35     # accept solutions up to this × best unconstrained RMSE
+RMSE_SLACK = 1.35     # accept solutions up to this × best multi-start RMSE
 N_STARTS = 128
 SEED = 0
 
@@ -210,7 +210,7 @@ def main() -> None:
                 "std": float(y.std()),
             },
             "n_eligible": len(cands),
-            "best_unconstrained_rmse_proxy": min(c["rmse"] for c in cands),
+            "best_rmse_before_c_bound": min(c["rmse"] for c in cands),
         }
         # Keep a few alternate near-optimal candidates for inspection.
         report["candidates"][fam] = [
@@ -237,7 +237,7 @@ def main() -> None:
             sum(_predict(thetas[f], r[None, :])[0] for f in families) / len(families)
         )
 
-    # Uncapped optimum + capped / balanced optima.
+    # Optimum under the 1% per-domain floor and the Wikipedia cap.
     optima = {}
     for name, caps, floors in MIXTURE_OPT_CONSTRAINTS:
         r_star, val = optimize_simplex(
@@ -266,9 +266,9 @@ def main() -> None:
         )
     pilot_rows.sort(key=lambda x: x["predicted_macro"])
 
-    # Near-optimal samples: all domains >= 1%, within +0.04 bpb of uncapped optimum.
+    # Near-optimal samples: all domains >= 1%, within +0.04 bpb of the min1pct optimum.
     rng = np.random.default_rng(SEED + 99)
-    best_pred = optima["uncapped"]["predicted_macro"]
+    best_pred = optima["min1pct"]["predicted_macro"]
     floor_v = np.asarray(NEAR_OPT_DOMAIN_FLOORS, dtype=float)
     cap_v = np.asarray(NEAR_OPT_DOMAIN_CAPS, dtype=float)
     samples = []
@@ -320,7 +320,7 @@ def main() -> None:
             f"max_w={row['max_w']:.3f} measured6={row['measured_curve_6']:.4f}"
         )
 
-    print("\n=== Near-optimal balanced samples (min_w>=0.01, within +0.04 of uncapped) ===")
+    print("\n=== Near-optimal balanced samples (min_w>=0.01, within +0.04 of min1pct) ===")
     for i, s in enumerate(novel, 1):
         w = s["weights"]
         print(

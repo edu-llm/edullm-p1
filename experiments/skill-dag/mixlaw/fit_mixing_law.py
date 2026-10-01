@@ -59,8 +59,8 @@ def cmd_collect(args: argparse.Namespace) -> None:
     runs = []
     missing = []
     for mix_id, mix in sorted(mixtures.items()):
-        progress = args.runs_dir / mix.run_name / "progress"
-        final = progress / "task_loss_final.json"
+        run_dir = args.runs_dir / mix.run_name
+        final = run_dir / "task_loss_final.json"
         if not final.is_file():
             missing.append(mix.run_name)
             continue
@@ -79,14 +79,14 @@ def cmd_collect(args: argparse.Namespace) -> None:
                 f"{mix.run_name}: expected curve families {CURVE_FAMILIES}, got {sorted(families)}"
             )
         curve = []
-        curve_path = progress / "task_loss.jsonl"
+        curve_path = run_dir / "task_loss.jsonl"
         if curve_path.is_file():
             for line in curve_path.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if line:
                     curve.append(json.loads(line))
 
-        meta_path = progress / "run_meta.json"
+        meta_path = run_dir / "run_meta.json"
         runs.append(
             {
                 "id": mix_id,

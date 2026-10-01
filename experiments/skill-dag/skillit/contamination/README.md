@@ -170,6 +170,10 @@ python "$CONTAM/trajectory_exposure.py" \
   --updates "$CONTAM/skillit_updates_online-derivative.jsonl" \
   --arm online-derivative --final-step 2384 \
   --out "$CONTAM/exposure_online-derivative.json"
+
+# The "vs. baseline" and "vs. its own start" ratios quoted in Results, from
+# the two files above and $MIXLAW/exposure_by_arm.json.
+python "$CONTAM/exposure_ratios.py"
 ```
 
 To reproduce the `skillit_updates_<arm>.jsonl` files themselves from source,

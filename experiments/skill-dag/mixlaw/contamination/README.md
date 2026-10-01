@@ -84,7 +84,7 @@ independent of anything the mixture-selection method itself is doing.
 the same four named in `../README.md`'s "Arms actually run (370M)" table,
 matched here to their `run_name` by their published weight vectors in
 "Validated mixture weights (370M)": `olmo-mix-1124` = OLMo Mix 1124
-(control), `mix01` = Data Mixing Laws paper, `ML-pilot_caps` = MixLaw,
+(control), `mix01` = Data Mixing Laws paper, `ML-min1pct` = MixLaw,
 `LGB-min1pct` = LightGBM. `exposure_by_arm.json` covers exactly these four
 (see Reproducing below).
 
@@ -96,19 +96,20 @@ published Dolma/OLMo-mix domain proportions with no re-weighting).
 | `mix01` | Data Mixing Laws paper | 1.303e-05 | 0.687x | 6.031e-04 | 0.845x |
 | `LGB-min1pct` | LightGBM | 1.494e-05 | 0.788x | 6.545e-04 | 0.917x |
 | `olmo-mix-1124` | OLMo Mix 1124 (control) | 1.895e-05 | 1.000x | 7.139e-04 | 1.000x |
-| `ML-pilot_caps` | MixLaw | 4.016e-05 | 2.119x | 7.576e-04 | 1.061x |
+| `ML-min1pct` | MixLaw | 3.999e-05 | 2.110x | 7.521e-04 | 1.053x |
 
-Span-rate spread across these four arms: **3.08x** (lowest `mix01`,
-highest `ML-pilot_caps`; `exposure_by_arm.json` ->
+Span-rate spread across these four arms: **3.07x** (lowest `mix01`,
+highest `ML-min1pct`; `exposure_by_arm.json` ->
 `span_rate_spread_across_arms`). MixLaw's exposure is more than double the
-control's (2.12x) while LightGBM's is close to or below it (0.79x), yet the
-paper reports both beating the control by a comparable margin (1.6057 and
-1.6080 fitted-final bpb respectively) -- so a contamination-driven
-explanation for the win would have to apply very differently to the two
-search methods, which is weak evidence for one. The Data Mixing Laws paper
-mixture has the lowest exposure of any arm (0.69x control) and is the only
-one of the three non-control arms that does not beat the control, which
-argues against lower exposure conferring an advantage either.
+control's (2.11x), while LightGBM's (0.79x) and the Data Mixing Laws
+mixture's (0.69x) are below it. The measured task losses do not follow
+exposure. Against the two-seed control average, the highest-exposure arm
+(MixLaw) finishes worst (+0.0286 bpb fitted-final, 95% CI [+0.0234,
++0.0338]), the lowest-exposure arm (Data Mixing Laws) is also worse
+(+0.0264, [+0.0200, +0.0325]), and LightGBM is worse too (+0.0091,
+[+0.0026, +0.0158]). No optimized mixture beats the control, so there is no
+win for contamination to explain, and no sign that either higher or lower
+exposure conferred an advantage.
 
 ## Code map
 
@@ -270,6 +271,6 @@ python "$CONTAM/mixture_exposure.py" \
   --per-domain "$CONTAM/results_olmo127b-reservoir.json" \
   --mixtures "$CONTAM/../validation_mixtures_10b.json" \
   --baseline natural \
-  --include olmo-mix-1124,mix01,ML-pilot_caps,LGB-min1pct \
+  --include olmo-mix-1124,mix01,ML-min1pct,LGB-min1pct \
   --out "$CONTAM/exposure_by_arm.json"
 ```

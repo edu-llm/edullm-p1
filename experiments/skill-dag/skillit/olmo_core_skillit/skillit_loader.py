@@ -10,14 +10,12 @@ import torch
 
 from olmo_core.data import (
     DataCollator,
-    NumpyDatasetDType,
-    NumpyFSLDatasetConfig,
     TextDataLoaderBase,
     TokenizerConfig,
 )
 from olmo_core.data.numpy_dataset import NumpyDatasetBase
 
-from skillit_math import DATASET_ID, DATASET_VERSION, DOMAINS, initial_weights
+from skillit_math import DOMAINS, initial_weights
 
 SEQUENCE_LENGTH = 2_048
 GLOBAL_BATCH_TOKENS = 4_194_304
@@ -27,52 +25,6 @@ SEED = 42
 
 class SkillItDataError(RuntimeError):
     """The published pool or loader resume state violates the fixed contract."""
-
-
-def resolve_domain_datasets(work_dir: str | Path) -> tuple[NumpyDatasetBase, ...]:
-    """Resolve the seven immutable labeled views through ``edullm_data.read``."""
-    from edullm_data.read import dataset_paths
-    from edullm_data.s3 import Boto3S3
-
-    tokenizer = TokenizerConfig.dolma2()
-    s3 = Boto3S3.default()
-    datasets: list[NumpyDatasetBase] = []
-    for domain in DOMAINS:
-        resolved = dataset_paths(
-            DATASET_ID,
-            DATASET_VERSION,
-            split="train",
-            s3=s3,
-            labels={"source": domain},
-        )
-        if not resolved.paths:
-            raise SkillItDataError(f"{domain}: published source resolved no training shards")
-        if resolved.dtype != "uint32":
-            raise SkillItDataError(f"{domain}: expected uint32, got {resolved.dtype!r}")
-        if resolved.byte_order != "little":
-            raise SkillItDataError(
-                f"{domain}: expected explicit little byte order, got {resolved.byte_order!r}"
-            )
-        if int(resolved.header_bytes or 0) != 0:
-            raise SkillItDataError(
-                f"{domain}: expected headerless shards, got {resolved.header_bytes!r}"
-            )
-        if any(not str(path).startswith("s3://edullm-data/") for path in resolved.paths):
-            raise SkillItDataError(f"{domain}: source escaped s3://edullm-data/")
-        config = NumpyFSLDatasetConfig(
-            paths=list(resolved.paths),
-            tokenizer=tokenizer,
-            sequence_length=SEQUENCE_LENGTH,
-            dtype=NumpyDatasetDType.uint32,
-            work_dir=str(Path(work_dir) / domain),
-            include_instance_metadata=False,
-        )
-        dataset = config.build()
-        dataset.prepare()
-        if len(dataset) <= 0:
-            raise SkillItDataError(f"{domain}: source contains no full sequences")
-        datasets.append(dataset)
-    return tuple(datasets)
 
 
 class WeightedDomainDataLoader(TextDataLoaderBase):
@@ -237,5 +189,4 @@ __all__ = [
     "TOTAL_STEPS",
     "SkillItDataError",
     "WeightedDomainDataLoader",
-    "resolve_domain_datasets",
 ]

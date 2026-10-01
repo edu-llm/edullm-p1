@@ -229,7 +229,7 @@ def regmix_family_losses_measured(
         mixlaw = optional_mixlaw_paths()
         if mixlaw is None:
             raise FileNotFoundError("mixlaw sibling directory not found next to skillit/")
-        path = mixlaw / "pilot_runs/mix01/progress/task_loss_final.json"
+        path = mixlaw / "pilot_runs/mix01/task_loss_final.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     fam_src = payload.get("task_loss_families") or payload.get("task_families") or {}
     return {fam: float(fam_src[fam]) for fam in families}

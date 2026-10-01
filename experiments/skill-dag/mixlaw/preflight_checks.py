@@ -1,4 +1,4 @@
-"""Local sanity checks for the mixlaw scripts. No GPU, no AWS, no data required."""
+"""Local sanity checks for the mixlaw scripts. No GPU, no cloud access, no data required."""
 from __future__ import annotations
 
 import sys

@@ -1,20 +1,30 @@
-"""Figure III: compute savings, MixLaw optimized mix vs the Olmo-mix-1124 control.
+"""Figure III: does the MixLaw mixture reach the control's performance sooner?
 
-This is the generator behind the paper's Figure III. Two changes from the
-originally published panel, both to the numbers rather than the styling:
+The figure asks how many training steps the MixLaw 1%-floor mixture needs to
+reach the Olmo-mix-1124 control's final loss, and conversely how long the
+control needs to reach MixLaw's. Both answers come from one estimator, the same
+one behind Table II: the power law ``y = a + b / step**alpha`` fitted on steps
+>= 1000 over the shared ``ALPHA_GRID``, with the alpha-free residual bootstrap
+of ``fit_and_bootstrap_370m.py``. The control is the average of its two data
+seeds (42 and 69); its envelope is shaded because the control is the only arm
+run twice, so no band is drawn for the single-seed MixLaw arm.
 
-* The control is the average of its two seeds (12536 and 12345) instead of seed
-  12536 alone, and its seed-to-seed envelope is shaded. The control is the only
-  arm that was run twice, so that band is the only uncertainty this panel can
-  honestly show; no band is drawn for the single-seed optimized arm.
-* Both arrows are measured between the two arms' fitted power laws. The
-  published panel mixed estimators -- it crossed MixLaw's fitted curve against
-  the control's *observed* final value for the upper arrow while taking the
-  lower arrow from the fits -- so the two arrows implied different speedups.
+Crossings are bootstrapped with ``bootstrap_crossing``, pairing the draws of the
+two arms, and are reported with the fraction of draws that cross at all (a
+fitted asymptote at or above the target never reaches it).
 
-With those changes the arrows read 21.7% fewer steps and 1.53x longer, which
-are the numbers quoted in section 4.
+Whether a crossing exists is decided from the fits, not assumed: if MixLaw's
+fitted curve does not reach the control's final fitted loss within the run, the
+script says so in its printed output, in the figure (no savings arrow) and in
+``compute_savings_results.json`` (``crossing_exists: false``). With the current
+curves MixLaw finishes above the control, so the figure instead marks the step
+at which the control's fitted curve reaches MixLaw's final loss.
+
+Reads only ``skill_dag_370m_wandb_curves.json``; runs offline.
+
+Usage: python plot_figure_iii_compute_savings.py [--n-boot 200000] [--seed 0]
 """
+import argparse
 import json
 from pathlib import Path
 
@@ -22,21 +32,43 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+
+from fit_and_bootstrap_370m import (
+    ALPHA_GRID, CURVES_PATH, MIN_STEP, _ols_over_alpha, bootstrap_crossing, ci,
+    diff_p, fit_and_bootstrap, fmt_p,
+)
+from flops import report as flops_report
 
 MIXLAW = Path(__file__).resolve().parent
 OUT_DIRS = [MIXLAW / "figures"]
+RESULTS_PATH = MIXLAW / "compute_savings_results.json"
 
-mixlaw_curves = json.loads((MIXLAW / "mixlaw_370m_wandb_curves.json").read_text(encoding="utf-8"))
-# Two-seed control average and the individual seeds, written by
-# figure_i_control_seed_average.py and shared with Figure I.
-_ctrl_data = json.loads((MIXLAW / "figure_i_wandb_curves.json").read_text(encoding="utf-8"))
+ap = argparse.ArgumentParser()
+ap.add_argument("--n-boot", type=int, default=200_000)
+ap.add_argument("--seed", type=int, default=0)
+args = ap.parse_args()
+
+data = json.loads(CURVES_PATH.read_text(encoding="utf-8"))
+RUNS = data["runs"]
+FINAL_STEP = int(data["final_step"])
+SEED_KEYS = ("olmo-mix-1124-s42", "olmo-mix-1124-s69")
+ML_KEY = "mixlaw-fit"
 
 COL_CONTROL = "#6b7280"      # gray
 COL_MIXLAW = "#2563eb"       # blue
 COL_CONTROL_BAND = "#9ca3af"  # lighter gray, control seed envelope
 WINDOW_MIN = 700
 X_LEFT = 650
+X_RIGHT = 3000
+
+plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans"],
+    "font.size": 12,
+    "axes.edgecolor": "#333333",
+    "axes.linewidth": 0.9,
+})
+
 
 def lead_in(all_steps, all_y, window_min, x_left):
     """Segment running left from the first in-window point.
@@ -57,121 +89,258 @@ def lead_in(all_steps, all_y, window_min, x_left):
     return (np.array([x_left, s1]), np.array([y1 + slope * (x_left - s1), y1]))
 
 
-plt.rcParams.update({
-    "font.family": "sans-serif",
-    "font.sans-serif": ["DejaVu Sans"],
-    "font.size": 12,
-    "axes.edgecolor": "#333333",
-    "axes.linewidth": 0.9,
-})
-
-steps = np.array(mixlaw_curves["steps"], dtype=float)
-ml = np.array(mixlaw_curves["runs"]["ML-pilot_caps"]["curve"], dtype=float)
-_avg = {int(p[0]): float(p[1]) for p in _ctrl_data["olmo_mix_1124"]}
-_s12536 = {int(p[0]): float(p[1]) for p in _ctrl_data["olmo_mix_1124_seed6198"]}
-_s12345 = {int(p[0]): float(p[1]) for p in _ctrl_data["olmo_mix_1124_seed12345"]}
-_missing = [int(x) for x in steps if int(x) not in _avg]
-if _missing:
-    raise SystemExit(f"two-seed control average is missing steps {_missing}")
-ctrl = np.array([_avg[int(x)] for x in steps], dtype=float)
-band_lo = np.array([min(_s12536[int(x)], _s12345[int(x)]) for x in steps], dtype=float)
-band_hi = np.array([max(_s12536[int(x)], _s12345[int(x)]) for x in steps], dtype=float)
-mask = steps >= 1000
-
 def powerlaw(x, a, b, alpha):
     return a + b / np.power(x, alpha)
 
-def fit(x, y):
-    best = None
-    for alpha0 in (0.1, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0):
-        try:
-            p0 = [y.min(), (y.max() - y.min()) * (x.min() ** alpha0), alpha0]
-            popt, _ = curve_fit(powerlaw, x, y, p0=p0, maxfev=20000,
-                                 bounds=([0, 0, 0.05], [10, 1e6, 3.0]))
-            resid = np.sum((powerlaw(x, *popt) - y) ** 2)
-            if best is None or resid < best[0]:
-                best = (resid, popt)
-        except Exception:
-            pass
-    return best[1]
 
-popt_ml = fit(steps[mask], ml[mask])
-popt_ctrl = fit(steps[mask], ctrl[mask])
+def point_fit(steps, losses):
+    """Point estimate (a, b, alpha) of the estimator inside fit_and_bootstrap."""
+    s = np.asarray(steps, dtype=float)
+    y = np.asarray(losses, dtype=float)
+    keep = s >= MIN_STEP
+    s, y = s[keep], y[keep]
+    X = s[None, :] ** (-ALPHA_GRID[:, None])
+    sse, slope, icept = _ols_over_alpha(X, y[None, :])
+    best = int(np.argmin(sse[:, 0]))
+    return float(icept[best, 0]), float(slope[best, 0]), float(ALPHA_GRID[best])
 
-FINAL_STEP = 2384
-ml_final_fitted = powerlaw(FINAL_STEP, *popt_ml)
-# Fitted, not observed: the lower arrow already comes from the fits, so using
-# the observed final here made the two arrows disagree.
-ctrl_final_fitted = powerlaw(FINAL_STEP, *popt_ctrl)
 
-fine = np.linspace(1000, FINAL_STEP, 20000)
-ml_fine = powerlaw(fine, *popt_ml)
-idx = np.argmax(ml_fine <= ctrl_final_fitted)
-cross_step = fine[idx]
-pct_faster = (1 - cross_step / FINAL_STEP) * 100
+def num(x, nd=6):
+    """JSON-safe rounded float (non-finite -> None)."""
+    return None if x is None or not np.isfinite(x) else round(float(x), nd)
 
-big = np.linspace(1000, 45000, 4_000_000)
-ctrl_big = powerlaw(big, *popt_ctrl)
-idx2 = np.argmax(ctrl_big <= ml_final_fitted)
-cross_step2 = big[idx2]
-times_longer = cross_step2 / FINAL_STEP
 
+def finite_summary(x):
+    """Median and 95% interval of the finite entries, plus the finite share."""
+    x = np.asarray(x, dtype=float)
+    finite = np.isfinite(x)
+    out = {"fraction_finite": num(finite.mean())}
+    if finite.any():
+        lo, hi = ci(x[finite])
+        out.update(median=num(np.median(x[finite]), 1), ci95=[num(lo, 1), num(hi, 1)])
+    else:
+        out.update(median=None, ci95=None)
+    return out
+
+
+# ---------------------------------------------------------------- data
+steps = np.array(RUNS[SEED_KEYS[0]]["steps"], dtype=float)
+if RUNS[SEED_KEYS[1]]["steps"] != RUNS[SEED_KEYS[0]]["steps"] or \
+        RUNS[ML_KEY]["steps"] != RUNS[SEED_KEYS[0]]["steps"]:
+    raise SystemExit("control seeds and MixLaw arm are not evaluated at the same steps")
+seed_y = [np.array(RUNS[k]["macro_bpb"], dtype=float) for k in SEED_KEYS]
+ctrl = 0.5 * (seed_y[0] + seed_y[1])
+band_lo = np.minimum(seed_y[0], seed_y[1])
+band_hi = np.maximum(seed_y[0], seed_y[1])
+ml = np.array(RUNS[ML_KEY]["macro_bpb"], dtype=float)
+
+# ----------------------------------------------------------- estimator
+# MixLaw keeps its own bootstrap stream from the curve file. The averaged
+# control curve is a different series from either seed, so it gets its own
+# independent stream (the next index after the file's streams).
+n_streams = int(data["bootstrap_stream_count"])
+streams = np.random.SeedSequence(args.seed).spawn(n_streams + 1)
+
+fit_ml, finals_ml, a_ml, b_ml, al_ml = fit_and_bootstrap(
+    steps, ml, final_step=FINAL_STEP, n_boot=args.n_boot,
+    seed=streams[RUNS[ML_KEY]["bootstrap_stream"]], return_params=True)
+fit_ct, finals_ct, a_ct, b_ct, al_ct = fit_and_bootstrap(
+    steps, ctrl, final_step=FINAL_STEP, n_boot=args.n_boot,
+    seed=streams[n_streams], return_params=True)
+
+pt_ml = point_fit(steps, ml)
+pt_ct = point_fit(steps, ctrl)
+assert abs(powerlaw(FINAL_STEP, *pt_ml) - fit_ml) < 1e-9
+assert abs(powerlaw(FINAL_STEP, *pt_ct) - fit_ct) < 1e-9
+
+# Table II's control average is the mean of the two seeds' own fitted finals;
+# the single power law fitted to the averaged curve (used here, so that the
+# control is one curve that can be extrapolated and crossed) matches it closely.
+table2_ctrl = float(np.mean([powerlaw(FINAL_STEP, *point_fit(steps, y)) for y in seed_y]))
+
+# ------------------------------------------------- crossings, both directions
+# (1) MixLaw reaching the control's final fitted loss. Draws are paired: each
+#     MixLaw draw is crossed with the same-index control final.
+cross_ml_pt = float(bootstrap_crossing(*pt_ml, fit_ct))
+cross_ml_draws = bootstrap_crossing(a_ml, b_ml, al_ml, finals_ct)
+within = cross_ml_draws <= FINAL_STEP
+crossing_exists = bool(np.isfinite(cross_ml_pt) and cross_ml_pt <= FINAL_STEP)
+
+# (2) Converse: the step at which the control's fitted power law reaches
+#     MixLaw's final fitted loss.
+cross_ct_pt = float(bootstrap_crossing(*pt_ct, fit_ml, at_or_above=True))
+cross_ct_draws = bootstrap_crossing(a_ct, b_ct, al_ct, finals_ml, at_or_above=True)
+cross_ct_summary = finite_summary(cross_ct_draws)
+
+final_diff = finals_ml - finals_ct
+fd_lo, fd_hi = ci(final_diff)
+fd_p = diff_p(finals_ml, finals_ct)
+fl = flops_report()
+
+# ------------------------------------------------------------- printout
+print("Figure III: does the MixLaw 1%-floor mixture reach the control's loss?")
+print(f"  estimator: y = a + b/step^alpha on steps >= {MIN_STEP}, alpha grid "
+      f"[{ALPHA_GRID[0]:.2f}, {ALPHA_GRID[-1]:.2f}] ({ALPHA_GRID.size} pts), "
+      f"alpha-free residual bootstrap, n_boot={args.n_boot}, seed={args.seed}")
+print(f"  control (2-seed average) fitted final: {fit_ct:.4f}  "
+      f"95% CI [{ci(finals_ct)[0]:.4f}, {ci(finals_ct)[1]:.4f}]  "
+      f"(mean of per-seed fits, Table II: {table2_ctrl:.4f})")
+print(f"  MixLaw fitted final:                   {fit_ml:.4f}  "
+      f"95% CI [{ci(finals_ml)[0]:.4f}, {ci(finals_ml)[1]:.4f}]")
+print(f"  MixLaw - control at step {FINAL_STEP}: {fit_ml - fit_ct:+.4f}  "
+      f"95% CI [{fd_lo:+.4f}, {fd_hi:+.4f}]  two-sided {fmt_p(fd_p, args.n_boot)}")
+print(f"  fitted asymptotes: MixLaw {pt_ml[0]:.4f}, control {pt_ct[0]:.4f}")
+if crossing_exists:
+    print(f"  CROSSING EXISTS: MixLaw reaches the control's final fitted loss "
+          f"at step {cross_ml_pt:.0f} of {FINAL_STEP} "
+          f"({100 * (1 - cross_ml_pt / FINAL_STEP):.1f}% fewer steps); "
+          f"{100 * within.mean():.1f}% of bootstrap draws cross within the run")
+else:
+    shown = ("never reaches it (its fitted asymptote is above the control's final loss)"
+             if not np.isfinite(cross_ml_pt)
+             else f"reaches it only at step {cross_ml_pt:.0f}, beyond the {FINAL_STEP}-step run")
+    print(f"  NO CROSSING: MixLaw does not reach the control's final fitted loss "
+          f"{fit_ct:.4f} within the run; its fitted curve {shown}.")
+    print(f"    {100 * within.mean():.1f}% of bootstrap draws cross within the run; "
+          f"{100 * np.isfinite(cross_ml_draws).mean():.1f}% cross at any step.")
+print(f"  Converse: the control's fitted curve reaches MixLaw's final fitted loss "
+      f"{fit_ml:.4f} at step {cross_ct_pt:.0f} "
+      f"({100 * cross_ct_pt / FINAL_STEP:.1f}% of the run, "
+      f"{FINAL_STEP - cross_ct_pt:.0f} steps before the end)")
+if cross_ct_summary["median"] is not None:
+    print(f"    bootstrap median step {cross_ct_summary['median']:.0f}, 95% CI "
+          f"[{cross_ct_summary['ci95'][0]:.0f}, {cross_ct_summary['ci95'][1]:.0f}]; "
+          f"{100 * (cross_ct_draws < FINAL_STEP).mean():.1f}% of draws reach it before "
+          f"step {FINAL_STEP}")
+print(f"  Pilot cost (arm-independent): {fl['pilot_grid_24']:.3e} FLOPs = "
+      f"{100 * fl['pilot_grid_over_one_370m_arm']:.1f}% of one {fl['per_370m_arm']:.3e}-FLOP arm")
+
+results = {
+    "description": "Figure III: whether, and where, the MixLaw 1%-floor mixture reaches the "
+                   "Olmo-mix-1124 control's loss, and the converse crossing for the control.",
+    "estimator": f"y = a + b/step**alpha on steps >= {MIN_STEP}; alpha-free residual bootstrap; "
+                 "paired draws; same estimator as Table II",
+    "n_boot": args.n_boot,
+    "seed": args.seed,
+    "final_step": FINAL_STEP,
+    "alpha_grid": {"lo": float(ALPHA_GRID[0]), "hi": float(ALPHA_GRID[-1]), "n": int(ALPHA_GRID.size)},
+    "control": "Olmo-mix-1124 control, average of data seeds 42 and 69",
+    "crossing_exists": crossing_exists,
+    "crossing_definition": "the MixLaw fitted curve reaches the control's final fitted loss at or "
+                           "before the final step",
+    "fitted_final": {
+        "control_average": num(fit_ct),
+        "control_average_table_ii_mean_of_seed_fits": num(table2_ctrl),
+        "mixlaw": num(fit_ml),
+        "control_s42": num(powerlaw(FINAL_STEP, *point_fit(steps, seed_y[0]))),
+        "control_s69": num(powerlaw(FINAL_STEP, *point_fit(steps, seed_y[1]))),
+    },
+    "fitted_final_ci95": {
+        "control_average": [num(v) for v in ci(finals_ct)],
+        "mixlaw": [num(v) for v in ci(finals_ml)],
+    },
+    "fitted_asymptote": {"control_average": num(pt_ct[0]), "mixlaw": num(pt_ml[0])},
+    "fitted_alpha": {"control_average": num(pt_ct[2]), "mixlaw": num(pt_ml[2])},
+    "mixlaw_minus_control_final": {
+        "mean_diff_bpb": num(final_diff.mean()),
+        "ci95": [num(fd_lo), num(fd_hi)],
+        "p_value": num(fd_p),
+        "p_display": fmt_p(fd_p, args.n_boot),
+    },
+    "mixlaw_reaches_control_final": {
+        "target": num(fit_ct),
+        "point_estimate_step": num(cross_ml_pt, 1),
+        "reaches_within_run_point_estimate": crossing_exists,
+        "probability_within_run": num(within.mean()),
+        "fraction_of_draws_that_cross_at_any_step": num(np.isfinite(cross_ml_draws).mean()),
+        "extrapolated_crossing_step_over_finite_draws": finite_summary(cross_ml_draws),
+    },
+    "control_reaches_mixlaw_final": {
+        "target": num(fit_ml),
+        "point_estimate_step": num(cross_ct_pt, 1),
+        "steps_before_end_of_run": num(FINAL_STEP - cross_ct_pt, 1),
+        "fraction_of_run": num(cross_ct_pt / FINAL_STEP),
+        "bootstrap_step": cross_ct_summary,
+        "probability_before_end_of_run": num((cross_ct_draws < FINAL_STEP).mean()),
+    },
+    "pilot_flops": {
+        "pilot_grid_24": num(fl["pilot_grid_24"], 6),
+        "one_370m_arm": num(fl["per_370m_arm"], 6),
+        "pilot_grid_over_one_370m_arm": num(fl["pilot_grid_over_one_370m_arm"]),
+    },
+}
+RESULTS_PATH.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
+print(f"Wrote {RESULTS_PATH}")
+
+# --------------------------------------------------------------- figure
 fig, ax = plt.subplots(figsize=(9.2, 5.8), dpi=200)
 
 keep = steps >= 700
 ax.fill_between(steps[keep], band_lo[keep], band_hi[keep], color=COL_CONTROL_BAND,
                 alpha=0.40, linewidth=0, zorder=1, label="Control seed range (n=2)")
 ax.plot(steps[keep], ctrl[keep], color=COL_CONTROL, linestyle="-", marker="s", markersize=4,
-        linewidth=2.0, zorder=3, label="Olmo-mix-1124 (control, 2-seed avg)")
+        linewidth=2.0, zorder=3, label="Olmo-mix-1124 control (2-seed avg)")
 ax.plot(steps[keep], ml[keep], color=COL_MIXLAW, linestyle="-", marker="o", markersize=4,
         linewidth=2.4, zorder=4, label="MixLaw fit (ours, observed)")
 
 # Lead-in: extend both curves off the left edge at the slope implied by the
-# checkpoint before the window, so the panel reads as a run already under way
-# rather than one that begins at step 750.
+# checkpoint before the window, so the panel reads as a run already under way.
 for _y, _color, _lw, _z in ((ctrl, COL_CONTROL, 2.0, 3), (ml, COL_MIXLAW, 2.4, 4)):
     _seg = lead_in(steps, _y, WINDOW_MIN, X_LEFT)
     if _seg is not None:
         ax.plot(_seg[0], _seg[1], color=_color, linestyle="-", linewidth=_lw, zorder=_z)
-
 _lo_seg = lead_in(steps, band_lo, WINDOW_MIN, X_LEFT)
 _hi_seg = lead_in(steps, band_hi, WINDOW_MIN, X_LEFT)
 if _lo_seg is not None and _hi_seg is not None:
     ax.fill_between(_lo_seg[0], _lo_seg[1], _hi_seg[1], color=COL_CONTROL_BAND,
                     alpha=0.40, linewidth=0, zorder=1)
 
-ext = np.linspace(FINAL_STEP, cross_step2 * 1.03, 500)
-ax.plot(ext, powerlaw(ext, *popt_ctrl), color=COL_CONTROL, linestyle=(0, (2, 2)), linewidth=1.8,
+# Power-law extrapolation past the end of the run: dashed gray for the control,
+# dotted blue for the MixLaw arm's own fit, so the gap between the two fitted
+# asymptotes is visible.
+ext = np.linspace(FINAL_STEP, X_RIGHT, 300)
+ax.plot(ext, powerlaw(ext, *pt_ct), color=COL_CONTROL, linestyle=(0, (2, 2)), linewidth=1.8,
         zorder=2, label="Control, power-law extrapolation")
+ax.plot(ext, powerlaw(ext, *pt_ml), color=COL_MIXLAW, linestyle=(0, (1, 2)), linewidth=1.8,
+        zorder=2, label="MixLaw, power-law extrapolation")
 
-ax.axhline(ml_final_fitted, color="#999999", linestyle=":", linewidth=1.0, zorder=1)
-
-# "27% faster" arrow sits ABOVE both curves for the whole [cross_step, FINAL_STEP] span,
-# not just above their final values (the curves are still elevated above their final
-# values in that window, which is what caused the earlier collision).
-window = (steps >= cross_step) & (steps <= FINAL_STEP)
-local_max = (max(band_hi[window].max(), ml[window].max()) if window.any()
-             else ctrl_final_fitted)
-faster_y = local_max + 0.018
-ax.annotate("", xy=(cross_step, faster_y), xytext=(FINAL_STEP, faster_y),
-            arrowprops=dict(arrowstyle="<->", color="#111", lw=1.6))
-ax.plot([cross_step, cross_step], [faster_y - 0.004, local_max + 0.002], color="#111", lw=0.8, ls=":")
-ax.plot([FINAL_STEP, FINAL_STEP], [faster_y - 0.004, local_max + 0.002], color="#111", lw=0.8, ls=":")
-ax.text((cross_step + FINAL_STEP) / 2, faster_y + 0.010, f"{pct_faster:.1f}% fewer steps",
-        ha="center", fontsize=11, fontweight="bold")
-
-ax.annotate("", xy=(FINAL_STEP, ml_final_fitted), xytext=(cross_step2, ml_final_fitted),
-            arrowprops=dict(arrowstyle="<->", color="#111", lw=1.6))
-ax.text((FINAL_STEP + cross_step2) / 2, ml_final_fitted - 0.016, f"{times_longer:.2f}× longer",
-        ha="center", fontsize=11, fontweight="bold")
+if crossing_exists:
+    # MixLaw's fitted curve reaches the control's final fitted loss inside the
+    # run: mark the step and the shortfall, above both curves.
+    window = (steps >= cross_ml_pt) & (steps <= FINAL_STEP)
+    local_max = max(band_hi[window].max(), ml[window].max()) if window.any() else fit_ct
+    faster_y = local_max + 0.018
+    ax.annotate("", xy=(cross_ml_pt, faster_y), xytext=(FINAL_STEP, faster_y),
+                arrowprops=dict(arrowstyle="<->", color="#111", lw=1.6))
+    ax.text((cross_ml_pt + FINAL_STEP) / 2, faster_y + 0.010,
+            f"{100 * (1 - cross_ml_pt / FINAL_STEP):.1f}% fewer steps",
+            ha="center", fontsize=11, fontweight="bold")
+    ax.axhline(fit_ct, color="#999999", linestyle=":", linewidth=1.0, zorder=1)
+    title = "MixLaw reaches the control's final loss before the end of the run"
+else:
+    # No crossing, so no savings arrow. Mark the control's fitted final (the
+    # level MixLaw does not reach) and where the control reaches MixLaw's final.
+    ax.axhline(fit_ct, color=COL_CONTROL, linestyle=":", linewidth=1.0, zorder=1)
+    ax.axhline(fit_ml, color=COL_MIXLAW, linestyle=":", linewidth=1.0, zorder=1)
+    ax.text(X_RIGHT - 25, fit_ct + 0.0045, f"control fitted final {fit_ct:.4f}",
+            ha="right", va="bottom", fontsize=9, color=COL_CONTROL)
+    ax.text(X_RIGHT - 25, fit_ml + 0.0045, f"MixLaw fitted final {fit_ml:.4f}",
+            ha="right", va="bottom", fontsize=9, color=COL_MIXLAW)
+    ax.plot([cross_ct_pt], [fit_ml], marker="s", markersize=7, markerfacecolor="white",
+            markeredgecolor=COL_CONTROL, markeredgewidth=1.6, zorder=6, linestyle="none")
+    ax.annotate(f"control's fit reaches\nMixLaw's final loss\nat step {cross_ct_pt:.0f}",
+                xy=(cross_ct_pt, fit_ml), xytext=(cross_ct_pt - 120, fit_ml + 0.075),
+                ha="center", fontsize=9.5, color="#111",
+                arrowprops=dict(arrowstyle="->", color="#111", lw=1.0))
+    title = "MixLaw does not reach the control's final loss"
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")
-ax.set_title("MixLaw fit and the control's power-law extrapolation", fontsize=15, fontweight="bold", pad=12)
+ax.set_title(title, fontsize=15, fontweight="bold", pad=12)
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
-ax.set_xlim(650, cross_step2 * 1.05)
-ax.set_ylim(1.585, 1.90)
+ax.set_xlim(650, X_RIGHT)
+ax.set_ylim(1.565, 1.90)
 ax.legend(loc="upper right", frameon=False, fontsize=10)
 
 fig.subplots_adjust(left=0.115, right=0.97, top=0.90, bottom=0.13)
@@ -179,8 +348,6 @@ for out_dir in OUT_DIRS:
     if not out_dir.parent.exists():
         continue
     out_dir.mkdir(parents=True, exist_ok=True)
-    for ext in ("png",):
-        path = out_dir / f"figure_iii_compute_savings.{ext}"
-        fig.savefig(path)
-        print(f"Wrote {path}")
-print("pct_faster=", pct_faster, "times_longer=", times_longer)
+    path = out_dir / "figure_iii_compute_savings.png"
+    fig.savefig(path)
+    print(f"Wrote {path}")

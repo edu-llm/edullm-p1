@@ -178,19 +178,6 @@
     ]
   },
   "optimization_method": {
-    "pilot_caps": {
-      "method": "random_search + slsqp_polish",
-      "n_random": 50000,
-      "n_polish": 32,
-      "n_slsqp_starts": 64,
-      "n_refine_perturbations": 64,
-      "random_best_predicted_macro": 1.8315571069985712,
-      "final_predicted_macro": 1.8315571069985712,
-      "improvement_over_random_best": 0.0,
-      "n_polish_converged": 32,
-      "n_slsqp_converged": 64,
-      "n_refine_converged": 64
-    },
     "min1pct": {
       "method": "random_search + slsqp_polish",
       "n_random": 50000,
@@ -202,19 +189,6 @@
       "improvement_over_random_best": 0.0,
       "n_polish_converged": 32,
       "n_slsqp_converged": 64,
-      "n_refine_converged": 64
-    },
-    "uncapped": {
-      "method": "random_search + slsqp_polish",
-      "n_random": 50000,
-      "n_polish": 32,
-      "n_slsqp_starts": 64,
-      "n_refine_perturbations": 64,
-      "random_best_predicted_macro": 1.833120333602927,
-      "final_predicted_macro": 1.8315571069985712,
-      "improvement_over_random_best": 0.0015632266043557053,
-      "n_polish_converged": 32,
-      "n_slsqp_converged": 66,
       "n_refine_converged": 64
     }
   },
@@ -685,19 +659,6 @@
     }
   },
   "optimization": {
-    "pilot_caps": {
-      "weights": {
-        "dclm": 0.3535523630958204,
-        "arxiv": 0.08258103220869503,
-        "starcoder": 0.06097028282811779,
-        "pes2o": 0.44105401687834367,
-        "open-web-math": 0.030275293611903353,
-        "algebraic-stack": 0.022489373486615883,
-        "wiki": 0.009077637890503795
-      },
-      "predicted_macro": 1.8315571069985712,
-      "max_w": 0.44105401687834367
-    },
     "min1pct": {
       "weights": {
         "dclm": 0.5528505096102141,
@@ -710,19 +671,6 @@
       },
       "predicted_macro": 1.8334661603708213,
       "max_w": 0.5528505096102141
-    },
-    "uncapped": {
-      "weights": {
-        "dclm": 0.35355236309582044,
-        "arxiv": 0.08258103220869505,
-        "starcoder": 0.0609702828281178,
-        "pes2o": 0.4410540168783437,
-        "open-web-math": 0.030275293611903356,
-        "algebraic-stack": 0.022489373486615886,
-        "wiki": 0.009077637890503797
-      },
-      "predicted_macro": 1.8315571069985712,
-      "max_w": 0.4410540168783437
     }
   },
   "pilot_ranked": [

@@ -42,7 +42,7 @@
         "std": 0.07904798906002836
       },
       "n_eligible": 128,
-      "best_unconstrained_rmse_proxy": 0.04587153998201886
+      "best_rmse_before_c_bound": 0.04587153998201886
     },
     "arc_easy": {
       "c": 1.8107575392852042,
@@ -66,7 +66,7 @@
         "std": 0.08778151353870506
       },
       "n_eligible": 128,
-      "best_unconstrained_rmse_proxy": 0.08865279840161831
+      "best_rmse_before_c_bound": 0.08865279840161831
     },
     "mmlu_humanities": {
       "c": 1.6022235993265075,
@@ -90,7 +90,7 @@
         "std": 0.06781711665992014
       },
       "n_eligible": 128,
-      "best_unconstrained_rmse_proxy": 0.01626435447039305
+      "best_rmse_before_c_bound": 0.01626435447039305
     },
     "mmlu_other": {
       "c": 2.133584978728996,
@@ -114,7 +114,7 @@
         "std": 0.1330620140689267
       },
       "n_eligible": 128,
-      "best_unconstrained_rmse_proxy": 0.09459985228255588
+      "best_rmse_before_c_bound": 0.09459985228255588
     },
     "mmlu_social_sciences": {
       "c": 1.2571109641520561,
@@ -138,7 +138,7 @@
         "std": 0.060817594697315555
       },
       "n_eligible": 128,
-      "best_unconstrained_rmse_proxy": 0.019777549179958005
+      "best_rmse_before_c_bound": 0.019777549179958005
     },
     "mmlu_stem": {
       "c": 2.142691816756387,
@@ -162,7 +162,7 @@
         "std": 0.08048994315042676
       },
       "n_eligible": 128,
-      "best_unconstrained_rmse_proxy": 0.04328282101265928
+      "best_rmse_before_c_bound": 0.04328282101265928
     }
   },
   "candidates": {
@@ -690,32 +690,6 @@
     ]
   },
   "optimization": {
-    "uncapped": {
-      "weights": {
-        "dclm": 0.5680183567101345,
-        "arxiv": 2.993279038690257e-17,
-        "starcoder": 4.115711244784343e-18,
-        "pes2o": 0.09666474469552455,
-        "open-web-math": 0.035316898594340805,
-        "algebraic-stack": 6.567930568428362e-17,
-        "wiki": 0.3
-      },
-      "predicted_macro": 1.7964724019038514,
-      "max_w": 0.5680183567101345
-    },
-    "pilot_caps": {
-      "weights": {
-        "dclm": 0.5680183567101345,
-        "arxiv": 2.993279038690257e-17,
-        "starcoder": 4.115711244784343e-18,
-        "pes2o": 0.09666474469552455,
-        "open-web-math": 0.035316898594340805,
-        "algebraic-stack": 6.567930568428362e-17,
-        "wiki": 0.3
-      },
-      "predicted_macro": 1.7964724019038514,
-      "max_w": 0.5680183567101345
-    },
     "min1pct": {
       "weights": {
         "dclm": 0.5556731665754618,

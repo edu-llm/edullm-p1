@@ -1,0 +1,84 @@
+{
+  "description": "Figure III: whether, and where, the MixLaw 1%-floor mixture reaches the Olmo-mix-1124 control's loss, and the converse crossing for the control.",
+  "estimator": "y = a + b/step**alpha on steps >= 1000; alpha-free residual bootstrap; paired draws; same estimator as Table II",
+  "n_boot": 200000,
+  "seed": 0,
+  "final_step": 2384,
+  "alpha_grid": {
+    "lo": 0.05,
+    "hi": 3.0,
+    "n": 400
+  },
+  "control": "Olmo-mix-1124 control, average of data seeds 42 and 69",
+  "crossing_exists": false,
+  "crossing_definition": "the MixLaw fitted curve reaches the control's final fitted loss at or before the final step",
+  "fitted_final": {
+    "control_average": 1.614767,
+    "control_average_table_ii_mean_of_seed_fits": 1.614751,
+    "mixlaw": 1.643326,
+    "control_s42": 1.619998,
+    "control_s69": 1.609505
+  },
+  "fitted_final_ci95": {
+    "control_average": [
+      1.610102,
+      1.618797
+    ],
+    "mixlaw": [
+      1.640445,
+      1.646299
+    ]
+  },
+  "fitted_asymptote": {
+    "control_average": 1.574765,
+    "mixlaw": 1.627466
+  },
+  "fitted_alpha": {
+    "control_average": 1.757895,
+    "mixlaw": 2.452882
+  },
+  "mixlaw_minus_control_final": {
+    "mean_diff_bpb": 0.028561,
+    "ci95": [
+      0.023497,
+      0.034043
+    ],
+    "p_value": 5e-06,
+    "p_display": "p < 5e-06"
+  },
+  "mixlaw_reaches_control_final": {
+    "target": 1.614767,
+    "point_estimate_step": null,
+    "reaches_within_run_point_estimate": false,
+    "probability_within_run": 0.0,
+    "fraction_of_draws_that_cross_at_any_step": 0.00986,
+    "extrapolated_crossing_step_over_finite_draws": {
+      "fraction_finite": 0.00986,
+      "median": 9764.4,
+      "ci95": [
+        5196.8,
+        40886.6
+      ]
+    }
+  },
+  "control_reaches_mixlaw_final": {
+    "target": 1.643326,
+    "point_estimate_step": 1754.7,
+    "steps_before_end_of_run": 629.3,
+    "fraction_of_run": 0.736024,
+    "bootstrap_step": {
+      "fraction_finite": 1.0,
+      "median": 1755.5,
+      "ci95": [
+        1698.6,
+        1813.4
+      ]
+    },
+    "probability_before_end_of_run": 1.0
+  },
+  "pilot_flops": {
+    "pilot_grid_24": 4.168081677798605e+18,
+    "one_370m_arm": 2.6300230038032744e+19,
+    "pilot_grid_over_one_370m_arm": 0.158481
+  }
+}

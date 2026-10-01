@@ -1,51 +1,60 @@
 """Figure II: Task loss curves for the dynamic-reweighting arms (Probe, Derivative)
-compared with the Olmo-mix-1124 control (the average of its two seeds) and with
-the static LightGBM 1%-floor mixture both arms start from. The static mixture
-is drawn twice: the original 8xA100 run and the 4xL40S rerun with dynamic
-reweighting disabled (FarmShare job 1744338), which shares the dynamic arms'
-hardware, initialization, data seed and training code. The two static runs
-finish 0.0158 bpb apart, more than either dynamic arm's advantage over the
-matched rerun, so the figure shows the run-to-run variation the dynamic arms
-have to be read against.
+compared with the Olmo-mix-1124 control (the average of its two data seeds, 42
+and 69) and with the static LightGBM 1%-floor mixture both arms start from.
 
-Regenerated using the completed FarmShare probe rerun (job 1730368), the
-existing derivative/control runs and the 4xL40S static rerun. The stale third
-arm ("Probe with optimized start", from the superseded RunPod-era run set) has
-been dropped.
+Every arm in the figure is a 370M run on FarmShare 4xL40S with the vendored
+Skill-It trainer, so the curves share hardware, initialization and training
+code. The static LightGBM mixture is the run with dynamic reweighting
+disabled; it shares the dynamic arms' initialization, data seed and training
+code, which makes it the matched reference for the Probe and Derivative arms.
 
-The curve data lives alongside this script in `figure_ii_curves.py` so the
-figure is reproducible from the repository rather than from a scratch
-directory.
+Data comes from the single committed curve file
+`../mixlaw/skill_dag_370m_wandb_curves.json` (written by
+`../mixlaw/pull_370m_curves.py`); the script runs offline.
 
-Three revisions to the originally published panel:
-
-* The palette no longer pairs red against green. Red-green is the most
-  common form of color vision deficiency, and the two arms that the figure
-  most wants the reader to tell apart (the LightGBM static mixture and the
-  derivative arm) were exactly that pair. Each series now also carries its
-  own dash pattern and marker, so the panel survives grayscale printing.
-* The control is drawn as the envelope of its two seeds rather than as a
-  bare average line. That band is the only uncertainty in this figure that
-  the data actually supports: the control was run at two seeds (12536 and
-  12345), while every reweighting arm was run once. The band therefore sets
-  the scale against which the single-seed arms should be read, and no band
-  is drawn for those arms because none was measured.
-* The two LightGBM static runs share the purple hue so they read as one
-  mixture trained twice: the 8xA100 run keeps its dotted line and filled
-  diamonds, and the 4xL40S rerun is a lighter violet dashed line with hollow
-  diamonds, so the two still separate in grayscale.
+* The palette does not pair red against green. Red-green is the most common
+  form of color vision deficiency, and the two arms the figure most wants the
+  reader to tell apart (the LightGBM static mixture and the derivative arm)
+  must stay distinguishable. Each series also carries its own dash pattern
+  and marker, so the panel survives grayscale printing.
+* The control is drawn as the average of its two seeds with the envelope of the
+  two seeds shaded. That band is the only uncertainty in this figure that the
+  data directly supports: the control was run at two data seeds, while every
+  other arm was run once. The band sets the scale against which the
+  single-seed arms should be read, and no band is drawn for those arms because
+  none was measured.
 """
 from __future__ import annotations
-import sys
+import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from figure_ii_curves import CURVES, OLMO_SEED12536, OLMO_SEED12345  # noqa: E402
-
 SKILLIT = Path(__file__).resolve().parent
+CURVES_PATH = SKILLIT.parent / "mixlaw" / "skill_dag_370m_wandb_curves.json"
+_data = json.loads(CURVES_PATH.read_text(encoding="utf-8"))
+RUNS = _data["runs"]
+
+SEED_KEYS = ("olmo-mix-1124-s42", "olmo-mix-1124-s69")
+OLMO_S42 = {"steps": RUNS[SEED_KEYS[0]]["steps"], "curve": RUNS[SEED_KEYS[0]]["macro_bpb"]}
+OLMO_S69 = {"steps": RUNS[SEED_KEYS[1]]["steps"], "curve": RUNS[SEED_KEYS[1]]["macro_bpb"]}
+if OLMO_S42["steps"] != OLMO_S69["steps"]:
+    raise SystemExit("the two control seeds are not evaluated at the same steps")
+
+CURVES = {
+    "olmo_average": {
+        "steps": OLMO_S42["steps"],
+        "curve": [0.5 * (a + b) for a, b in zip(OLMO_S42["curve"], OLMO_S69["curve"])],
+    },
+    "lgbm_static": {"steps": RUNS["lightgbm-l40s"]["steps"],
+                    "curve": RUNS["lightgbm-l40s"]["macro_bpb"]},
+    "probe": {"steps": RUNS["skillit-probe"]["steps"],
+              "curve": RUNS["skillit-probe"]["macro_bpb"]},
+    "derivative": {"steps": RUNS["skillit-derivative"]["steps"],
+                   "curve": RUNS["skillit-derivative"]["macro_bpb"]},
+}
+
 # Committed alongside the experiment, next to the data it reads.
 OUT_DIRS = [SKILLIT / "figures"]
 
@@ -57,20 +66,14 @@ plt.rcParams.update({
     "axes.linewidth": 0.9,
 })
 
-# Colorblind-safe: grey control, then blue / orange / purple (two shades for the
-# two LightGBM static runs). No red-green pair.
+# Colorblind-safe: grey control, then purple / blue / orange. No red-green pair.
 # Distinct dash patterns and markers so the series also separate in grayscale.
 SERIES = [
-    ("olmo_average", "Olmo-mix-1124 average (control)", "#6B7280", (0, (5, 2)), "s"),
-    ("lgbm_control", "LightGBM static (8\u00d7A100)", "#7C3AED", (0, (1, 1.6)), "D"),
-    ("lgbm_static_l40s", "LightGBM static (4\u00d7L40S)", "#A78BFA", (0, (3, 1.4)), "D"),
-    ("probe", "Probe", "#2563EB", "-", "o"),
-    ("derivative", "Derivative", "#D97706", (0, (6, 1.6, 1.4, 1.6)), "^"),
+    ("olmo_average", "Olmo-mix-1124 control (2-seed avg)", "#6B7280", (0, (5, 2)), "s"),
+    ("lgbm_static", "LightGBM static (1% floor)", "#7C3AED", (0, (1, 1.6)), "D"),
+    ("probe", "Skill-It probe", "#2563EB", "-", "o"),
+    ("derivative", "Skill-It derivative", "#D97706", (0, (6, 1.6, 1.4, 1.6)), "^"),
 ]
-# Hollow markers for the 4xL40S static rerun, so the two LightGBM static runs
-# differ in marker fill as well as in shade and dash.
-MARKER_FACE = {"lgbm_static_l40s": "white"}
-
 CONTROL_BAND_COLOR = "#9CA3AF"
 X_LEFT = 700
 
@@ -109,8 +112,8 @@ def seed_envelope(steps_a, y_a, steps_b, y_b):
 
 def control_band(min_step: int) -> tuple[list[int], list[float], list[float]]:
     """Per-step envelope of the two control seeds, on their shared steps."""
-    a = dict(zip(OLMO_SEED12536["steps"], OLMO_SEED12536["curve"]))
-    b = dict(zip(OLMO_SEED12345["steps"], OLMO_SEED12345["curve"]))
+    a = dict(zip(OLMO_S42["steps"], OLMO_S42["curve"]))
+    b = dict(zip(OLMO_S69["steps"], OLMO_S69["curve"]))
     steps = [s for s in sorted(set(a) & set(b)) if s >= min_step]
     lo = [min(a[s], b[s]) for s in steps]
     hi = [max(a[s], b[s]) for s in steps]
@@ -123,10 +126,10 @@ ax.set_title("Task loss for dynamic reweighting and static mixtures",
 MIN_STEP = 700
 
 BAND_ST, BAND_LO, BAND_HI = seed_envelope(
-    np.array(OLMO_SEED12536["steps"], dtype=float),
-    np.array(OLMO_SEED12536["curve"], dtype=float),
-    np.array(OLMO_SEED12345["steps"], dtype=float),
-    np.array(OLMO_SEED12345["curve"], dtype=float),
+    np.array(OLMO_S42["steps"], dtype=float),
+    np.array(OLMO_S42["curve"], dtype=float),
+    np.array(OLMO_S69["steps"], dtype=float),
+    np.array(OLMO_S69["curve"], dtype=float),
 )
 
 band_steps, band_lo, band_hi = control_band(MIN_STEP)
@@ -139,7 +142,6 @@ for key, label, color, ls, marker in SERIES:
     steps = [s for s in d["steps"] if s >= MIN_STEP]
     vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= MIN_STEP]
     ax.plot(steps, vals, color=color, linestyle=ls, marker=marker,
-            markerfacecolor=MARKER_FACE.get(key, color),
             markersize=3.5, linewidth=1.8, label=label, zorder=3)
 
 # This panel leaves its y-limits to autoscale, so freeze them before adding the
@@ -167,8 +169,6 @@ ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, \u2193 lower is better)")
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
-# Spacing tightened slightly for the sixth entry so the box stays below the
-# curves passing over its top-right corner near step 1350.
 ax.legend(loc="lower left", fontsize=10, frameon=True, framealpha=0.92,
           edgecolor="none", facecolor="white", borderpad=0.4, labelspacing=0.3,
           borderaxespad=0.3)
@@ -183,16 +183,15 @@ fig.subplots_adjust(left=0.115, right=0.97, top=0.90, bottom=0.13)
 # Top at 0.88 of the axes, not 0.98: restoring the full axes box left the
 # inset title with no clearance and it collided with the top spine.
 axins = ax.inset_axes([0.52, 0.46, 0.46, 0.42])
-ins_steps, ins_lo, ins_hi = control_band(1900)
+ins_steps, ins_lo, ins_hi = control_band(1700)
 axins.fill_between(ins_steps, ins_lo, ins_hi, color=CONTROL_BAND_COLOR, alpha=0.38,
                    linewidth=0, zorder=1)
 for key, label, color, ls, marker in SERIES:
     d = CURVES[key]
-    steps = [s for s in d["steps"] if s >= 1900]
-    vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= 1900]
+    steps = [s for s in d["steps"] if s >= 1700]
+    vals = [v for s, v in zip(d["steps"], d["curve"]) if s >= 1700]
     axins.plot(steps, vals, color=color, linestyle=ls, marker=marker, markersize=3,
-               markerfacecolor=MARKER_FACE.get(key, color),
-               linewidth=1.5, zorder=3)
+                  linewidth=1.5, zorder=3)
 # Same lead-in treatment in the inset. Both of its axes are autoscaled, so
 # capture the limits first and restore them after, then extend each curve to
 # the left spine at the slope implied by the checkpoint before the zoom window.
@@ -200,12 +199,12 @@ _ins_xlim, _ins_ylim = axins.get_xlim(), axins.get_ylim()
 for key, label, color, ls, marker in SERIES:
     d = CURVES[key]
     _seg = lead_in(np.array(d["steps"], dtype=float), np.array(d["curve"], dtype=float),
-                   1900, _ins_xlim[0])
+                   1700, _ins_xlim[0])
     if _seg is not None:
         axins.plot(_seg[0], _seg[1], color=color, linestyle=ls, linewidth=1.5, zorder=3)
 
-_ilo_seg = lead_in(BAND_ST, BAND_LO, 1900, _ins_xlim[0])
-_ihi_seg = lead_in(BAND_ST, BAND_HI, 1900, _ins_xlim[0])
+_ilo_seg = lead_in(BAND_ST, BAND_LO, 1700, _ins_xlim[0])
+_ihi_seg = lead_in(BAND_ST, BAND_HI, 1700, _ins_xlim[0])
 if _ilo_seg is not None and _ihi_seg is not None:
     axins.fill_between(_ilo_seg[0], _ilo_seg[1], _ihi_seg[1],
                        color=CONTROL_BAND_COLOR, alpha=0.38, linewidth=0, zorder=1)

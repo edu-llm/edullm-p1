@@ -8,16 +8,16 @@ on ``experiments/token-selection/fit_and_plot.py``'s ``load_curves_from_wandb``.
 Arms and where they log
 ------------------------
 Two dynamic (Skill-It) arms log to ``eduLLM/skillit``, unchanged since they
-predate this rerun. The five static arms -- the matched 4x L40S LightGBM
-rerun and the four new all-L40S validation runs -- all log to
-``eduLLM/mixlaw-new``. The four new runs are resolved by their exact W&B
-display name rather than a hardcoded run ID, since their IDs are assigned by
-W&B at creation and are not known until each run starts:
+predate the four newer runs. The five static arms -- the 4x L40S LightGBM
+run and the four new all-L40S validation runs -- all log to
+``eduLLM/mixlaw-new``. Every run is pinned by its W&B run ID (display names
+are editable and some were shortened after the fact), and each new run's
+logged ``arm_id`` and ``data_seed`` are checked against the expected values:
 
-    static-olmo-mix-1124-s42-farmshare-1745704
-    static-olmo-mix-1124-s69-farmshare-1745710
-    static-mix01-s42-farmshare-1745708
-    static-ml-min1pct-s42-farmshare-1745706
+    i9z1vtbt  static-olmo-mix-1124-s42  seed 42  (Slurm job 1745704)
+    3vbmxzmg  static-olmo-mix-1124-s69  seed 69  (Slurm job 1760339)
+    z0alta8r  static-mix01-s42          seed 42  (Slurm job 1745708)
+    nm6i8hxy  static-ml-min1pct-s42     seed 42  (Slurm job 1745706)
 
 Per-run quirks handled here
 ----------------------------
@@ -26,7 +26,8 @@ Per-run quirks handled here
   row was appended to the run's own history after the fact (see
   ``artifacts/probe_arm/step2384_task_loss.json`` and the PROVENANCE note on
   ``eduLLM/mixlaw-new``'s "Added after vendoring" section); this script reads
-  it from W&B like any other row and does not need a file fallback.
+  it from W&B (``scan_history`` does not return it; ``run.history()`` does,
+  see ``pull_arm``) and does not need a file fallback.
 - The probe run's history additionally contains exact duplicate rows for
   steps 2000-2383 after that append (a resume side effect). Every arm is
   de-duplicated by step, keeping the last logged row for a given step.
@@ -82,26 +83,26 @@ HISTORY_KEYS = ["_step", "eval/macro_bpb"] + [f"eval/bpb/{label}" for label in A
 # ``SeedSequence(seed).spawn(N)`` that fit_and_bootstrap_370m.py draws this
 # arm's resample stream from -- NOT the arm's position in this dict. The three
 # already-reported arms (probe, derivative, lightgbm-l40s) keep the stream
-# indices (5, 6, 7) they held in the discarded 8-arm curve file, so their own
-# fitted-final CIs stay bit-identical; only their comparisons against the new
-# control change. Index 4, the discarded 8xA100 LightGBM run's old stream, is
-# deliberately left unused rather than reassigned. The four new arms, which
-# have no prior reported numbers to preserve, take indices 0-3.
+# indices (5, 6, 7) they held in earlier committed versions of the curve file,
+# so their own fitted-final CIs stay bit-identical; only their comparisons
+# against the control change. Index 4 is deliberately left unused rather than
+# reassigned. The four newer arms, which have no prior reported numbers to
+# preserve, take indices 0-3.
 RUNS = {
-    "olmo-mix-1124-s42": ("mixlaw-new", None, "static-olmo-mix-1124-s42-farmshare-1745704",
+    "olmo-mix-1124-s42": ("mixlaw-new", "i9z1vtbt", None,
                            "Olmo-mix-1124 control, data seed 42", 0),
-    "olmo-mix-1124-s69": ("mixlaw-new", None, "static-olmo-mix-1124-s69-farmshare-1745710",
+    "olmo-mix-1124-s69": ("mixlaw-new", "3vbmxzmg", None,
                            "Olmo-mix-1124 control, data seed 69", 1),
-    "data-mixing-laws-paper": ("mixlaw-new", None, "static-mix01-s42-farmshare-1745708",
+    "data-mixing-laws-paper": ("mixlaw-new", "z0alta8r", None,
                                 "Data Mixing Laws paper mixture", 2),
-    "mixlaw-fit": ("mixlaw-new", None, "static-ml-min1pct-s42-farmshare-1745706",
+    "mixlaw-fit": ("mixlaw-new", "nm6i8hxy", None,
                     "MixLaw fit (ours), 1%-floor optimum", 3),
     "skillit-probe": ("skillit", "87ad0201c4b5781a3df50d7bb394776c", None,
                        "Skill-It offline probe", 5),
     "skillit-derivative": ("skillit", "c0844ce36f24d6773c7f45cb31d810f4", None,
                             "Skill-It online derivative", 6),
     "lightgbm-l40s": ("mixlaw-new", "zgmte13g", None,
-                       "LightGBM fit (ours), 4x L40S rerun", 7),
+                       "LightGBM fit (ours, 1% floor)", 7),
 }
 BOOTSTRAP_STREAM_COUNT = 8  # spawn() width; index 4 is intentionally unused
 
@@ -128,15 +129,42 @@ def _resolve_run(api, project: str, run_id: str | None, display_name: str | None
     return matches[0]
 
 
+# arm_id and data_seed each new run must have logged in its W&B config.
+EXPECTED_IDENTITY = {
+    "olmo-mix-1124-s42": ("static-olmo-mix-1124-s42", 42),
+    "olmo-mix-1124-s69": ("static-olmo-mix-1124-s69", 69),
+    "data-mixing-laws-paper": ("static-mix01-s42", 42),
+    "mixlaw-fit": ("static-ml-min1pct-s42", 42),
+}
+
+
 def pull_arm(api, key: str) -> dict:
     project, run_id, display_name, label, bootstrap_stream = RUNS[key]
     run = _resolve_run(api, project, run_id, display_name)
+    if key in EXPECTED_IDENTITY:
+        want_arm, want_seed = EXPECTED_IDENTITY[key]
+        got = (run.config.get("arm_id"), run.config.get("data_seed"))
+        if got != (want_arm, want_seed):
+            raise SystemExit(f"{key} ({run.id}): W&B config says {got}, expected {(want_arm, want_seed)}")
     by_step: dict[int, dict] = {}
     for row in run.scan_history(keys=HISTORY_KEYS):
         if row.get("eval/macro_bpb") is None:
             continue
         step = int(row["_step"])
         by_step[step] = row  # last write wins -- de-dupes resume-repeated rows
+
+    if any(s not in by_step for s in EVAL_LADDER):
+        # scan_history reads the run's exported history stream, which omits rows
+        # appended after the run finished (the probe's step-2384 row, see the
+        # module docstring). run.history() queries the live history store and
+        # includes them. It only fills ladder steps scan_history lacks, so every
+        # other row keeps its scan_history value.
+        for row in run.history(keys=HISTORY_KEYS, samples=10_000, pandas=False):
+            if row.get("eval/macro_bpb") is None:
+                continue
+            if any(row.get(f"eval/bpb/{lbl}") is None for lbl in ALL_LABELS):
+                continue
+            by_step.setdefault(int(row["_step"]), row)
 
     missing = [s for s in EVAL_LADDER if s not in by_step]
     if missing:
@@ -181,12 +209,6 @@ def build_curves_payload(arms: dict[str, dict]) -> dict:
             "eduLLM/skillit."
         ),
         "final_step": 2384,
-        "excluded_steps": [2375],
-        "excluded_steps_note": (
-            "Step 2375 is a near-duplicate checkpoint 9 steps before the true "
-            "final step (2384). Keeping both double-weights the end of the run, "
-            "so it is excluded from every power-law fit and from these series."
-        ),
         "fit_window": {"min_step": 1000, "form": "y = a + b / step**alpha"},
         "bootstrap_stream_count": BOOTSTRAP_STREAM_COUNT,
         "runs": {

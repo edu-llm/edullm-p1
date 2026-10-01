@@ -29,7 +29,6 @@ curves = json.loads((MIXLAW / "heldout_label_curves.json").read_text(encoding="u
 # bit-identical (that breakdown is new for every arm), so a plain positional
 # spawn is fine, unlike fit_and_bootstrap_370m.py's Table II/III streams.
 ORDER = ["olmo_s42", "olmo_s69", "dml_paper", "mixlaw", "lightgbm", "probe", "derivative"]
-EXCLUDE = {2375}          # the paper excludes the off-cadence eval
 FINAL_STEP = 2384
 N_BOOT = 200_000
 
@@ -38,8 +37,6 @@ def series(arm, field):
     steps, vals = [], []
     for s, rec in sorted(rows.items(), key=lambda kv: int(kv[0])):
         st = int(s)
-        if st in EXCLUDE:
-            continue
         steps.append(st)
         vals.append(rec[field])
     return steps, vals

@@ -2,8 +2,7 @@
 
 Same method as the paper (imported from fit_and_bootstrap_370m): power-law fit
 on steps >= 1000, alpha-free residual bootstrap, n_boot = 200000, seed = 0, one
-stream per arm, step 2375 excluded, control = element-wise mean of the two
-control seeds' draws.
+stream per arm, control = element-wise mean of the two control seeds' draws.
 """
 import json
 import pathlib
@@ -25,14 +24,11 @@ LABELS = [
 ]
 SHORT = {l: l.replace("_rc_5shot_bpb", "") for l in LABELS}
 ARMS = ["olmo_s42", "olmo_s69", "mixlaw", "lightgbm"]
-EXCLUDE = {2375}
 FINAL, NB = 2384, 200_000
 
 def series(arm, label):
     st, v = [], []
     for s, rec in sorted(data[arm].items(), key=lambda kv: int(kv[0])):
-        if int(s) in EXCLUDE:
-            continue
         st.append(int(s)); v.append(rec[label])
     return st, v
 

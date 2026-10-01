@@ -5,12 +5,10 @@ Reproduces Tables II and III of the paper from the committed curve file
 ``skill_dag_370m_wandb_curves.json``. No network or W&B access required.
 
 Every arm is a static or dynamic 370M run on FarmShare 4xL40S with the
-vendored Skill-It trainer: the discarded 8xA100 campaign and the mismatched-
-trainer seed-12345 control no longer appear anywhere in this file or the
-curve JSON it reads. Table III compares the two dynamic-reweighting
-(Skill-It) arms against the single static 1%-floor LightGBM mixture
-(``lightgbm-l40s``) they start from and share hardware, initialization, data
-seed and training code with.
+vendored Skill-It trainer, so all comparisons share hardware, initialization
+and training code. Table III compares the two dynamic-reweighting (Skill-It)
+arms against the single static 1%-floor LightGBM mixture (``lightgbm-l40s``)
+they start from and share data seed with.
 
 Method
 ------
@@ -41,13 +39,12 @@ probe arm's -0.43, shrinking one difference interval and inflating the other.
 
 Each run's stream index is fixed explicitly by its ``bootstrap_stream`` field
 in the curve JSON (``SeedSequence(seed).spawn(bootstrap_stream_count)[index]``),
-not by its position in the file or in ``VS_CONTROL``/``VS_STATIC`` below. That
-is what let the discarded 8xA100 LightGBM arm's stream (index 4) retire
-unused, and the four new all-L40S arms take fresh indices, while probe,
-derivative and lightgbm-l40s keep the exact stream indices (5, 6, 7) they held
-in the discarded 8-arm file -- so their own fitted-final CIs are bit-identical
-to every previously reported number; only their comparisons against the new
-control change.
+not by its position in the file or in ``VS_CONTROL``/``VS_STATIC`` below.
+Probe, derivative and lightgbm-l40s keep the stream indices (5, 6, 7) they held
+in earlier committed versions of this file, so their own fitted-final CIs are
+bit-identical to every previously reported number; index 4 is intentionally
+unused, and the four newer arms take indices 0-3. Only comparisons against the
+control changed.
 
 The Olmo-mix-1124 control is the *average of the two data seeds*: its
 bootstrap distribution is the element-by-element mean of the two seeds' own

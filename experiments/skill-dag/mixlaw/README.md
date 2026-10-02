@@ -479,11 +479,14 @@ variation. HellaSwag is worse under both mixtures
 of 0.0053 bpb; PIQA is worse under both (+0.0382 and +0.0415, $p < 5\times10^{-6}$)
 against a seed spread of 0.0282.
 
-### Compute (Figure III)
+### Compute
 
-[`plot_figure_iii_compute_savings.py`](plot_figure_iii_compute_savings.py) asks how
-many steps each arm needs to reach the other's final loss, using the same fitted
-power laws and paired bootstrap draws (results in
+[`plot_figure_iii_compute_savings.py`](plot_figure_iii_compute_savings.py) draws
+Figure III, which compares the two Skill-It arms against the LightGBM static run
+(see [`../skillit/README.md`](../skillit/README.md#compute-savings-figure-iii)).
+It also asks how many steps the MixLaw mixture and the control need to reach each
+other's final loss, using the same fitted power laws and paired bootstrap draws
+(results under `mixlaw_vs_control` in
 [`compute_savings_results.json`](compute_savings_results.json)). The MixLaw mixture
 **never reaches the control's final loss** (1.6148): its fitted asymptote is 1.6275,
 above that target, and none of the 200,000 bootstrap draws crosses it within the

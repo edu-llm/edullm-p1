@@ -318,6 +318,32 @@ only power-law-fit uncertainty within a run, not run-to-run variation. The
 probe's 0.0126 bpb advantage over the LightGBM static run is 1.2× the
 control-seed difference; the derivative's 0.0072 bpb is 0.7× it.
 
+### Compute savings (Figure III)
+
+[`../mixlaw/plot_figure_iii_compute_savings.py`](../mixlaw/plot_figure_iii_compute_savings.py)
+asks how many steps each Skill-It arm needs to reach the LightGBM static run's
+final fitted loss (1.6238), using the same fitted power laws and paired bootstrap
+draws (results under `dynamic_vs_lightgbm` in
+[`../mixlaw/compute_savings_results.json`](../mixlaw/compute_savings_results.json)).
+Training FLOPs are linear in steps, so the step saving is also the FLOP saving as
+a fraction of one \(2.63\times10^{19}\)-FLOP arm. The net saving charges each arm
+for the 60M runs it depends on (\(1.74\times10^{17}\) FLOPs each): 8 for the probe
+arm (the seven one-hot probes and the mix01 probe, 5.28% of one arm) and 24 for
+the derivative arm (the MixLaw pilot grid its derivatives come from, 15.85%).
+
+| Arm | Reaches 1.6238 at step | Step saving | Net of overhead | P(net > 0) |
+|-----|-----------------------:|------------:|----------------:|-----------:|
+| Offline probe | 2070 [1957, 2193] | 13.2% [8.0, 17.9] | +7.9% [+2.7, +12.6] | 0.999 |
+| Online derivative | 2216 [2087, 2421] | 7.0% [-1.5, 12.5] | -8.8% [-17.4, -3.4] | 0.0003 |
+
+Step intervals are the bootstrap 95% intervals around the point crossing; 100% of
+the probe's draws and 95.6% of the derivative's cross within the run. Conversely,
+LightGBM's fitted curve would reach the probe arm's final loss only at 1.46× the
+run (95% CI [1.13×, 3.50×]; 10.6% of draws never do) and the derivative's at
+1.20× ([0.98×, 2.26×]). As in the MixLaw analysis, this reads each run's fitted
+curve at an intermediate step, so it assumes the power law holds up to the end of
+its LR schedule.
+
 ### Takeaways
 
 1. **No reliable evidence that dynamic reweighting beats the control.** Against
@@ -332,10 +358,13 @@ control-seed difference; the derivative's 0.0072 bpb is 0.7× it.
    control-seed difference; the derivative arm by 0.0072 bpb
    (\(p = 0.087\)), 0.7× it. Both comparisons are single runs against a single
    run.
-4. **Run-to-run variation is of the same size as these gaps.** The control
+4. **Only the probe arm saves compute against its starting mixture.** It reaches
+   the LightGBM static final loss 13.2% of the run early, 7.9% net of its 8 probes;
+   the derivative arm's 7.0% does not cover its 24 pilots (-8.8% net).
+5. **Run-to-run variation is of the same size as these gaps.** The control
    seeds differ by 0.0105 bpb (95% CI [+0.0023, +0.0193], \(p = 0.0095\)), and
    matched runs on this stack are not bit-reproducible.
-5. **Cost.** Two Skill-It trains \(\approx 5.26\times10^{19}\) FLOPs on 4×L40S,
+6. **Cost.** Two Skill-It trains \(\approx 5.26\times10^{19}\) FLOPs on 4×L40S,
    plus \(2.63\times10^{19}\) for the LightGBM static run and
    \(\approx 1.22\times10^{18}\) FLOPs for the 60M probes.
 

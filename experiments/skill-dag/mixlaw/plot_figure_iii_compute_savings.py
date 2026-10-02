@@ -1,24 +1,31 @@
-"""Figure III: does the MixLaw mixture reach the control's performance sooner?
+"""Figure III: do the dynamic-reweighting arms reach the LightGBM static loss sooner?
 
-The figure asks how many training steps the MixLaw 1%-floor mixture needs to
-reach the Olmo-mix-1124 control's final loss, and conversely how long the
-control needs to reach MixLaw's. Both answers come from one estimator, the same
-one behind Table II: the power law ``y = a + b / step**alpha`` fitted on steps
->= 1000 over the shared ``ALPHA_GRID``, with the alpha-free residual bootstrap
-of ``fit_and_bootstrap_370m.py``. The control is the average of its two data
-seeds (42 and 69); its envelope is shaded because the control is the only arm
-run twice, so no band is drawn for the single-seed MixLaw arm.
+The figure asks how many training steps each Skill-It arm (offline probe,
+online derivative) needs to reach the final loss of the static 1%-floor
+LightGBM mixture it starts from, and what that saving is worth once the 60M
+runs each arm depends on are charged against it. Every number comes from one
+estimator, the same one behind Tables II and III: the power law
+``y = a + b / step**alpha`` fitted on steps >= 1000 over the shared
+``ALPHA_GRID``, with the alpha-free residual bootstrap of
+``fit_and_bootstrap_370m.py``. Each arm keeps its own bootstrap stream from the
+curve file, so the fitted finals match the committed results JSON.
 
 Crossings are bootstrapped with ``bootstrap_crossing``, pairing the draws of the
-two arms, and are reported with the fraction of draws that cross at all (a
-fitted asymptote at or above the target never reaches it).
+two arms, and are reported with the fraction of draws that cross within the run.
+The step saving is ``1 - crossing / final_step``; training FLOPs are linear in
+steps, so it is also the FLOP saving as a fraction of one 370M arm. The net
+saving subtracts each arm's overhead, counted in 60M runs (``flops.py``):
 
-Whether a crossing exists is decided from the fits, not assumed: if MixLaw's
-fitted curve does not reach the control's final fitted loss within the run, the
-script says so in its printed output, in the figure (no savings arrow) and in
-``compute_savings_results.json`` (``crossing_exists: false``). With the current
-curves MixLaw finishes above the control, so the figure instead marks the step
-at which the control's fitted curve reaches MixLaw's final loss.
+- offline probe: 8 runs (the seven one-hot probes and the mix01 probe);
+- online derivative: 24 runs (the MixLaw pilot grid its derivatives come from).
+
+The converse (the LightGBM fit extrapolated until it reaches each dynamic arm's
+final loss) is reported in the JSON, not drawn: it lies past the end of the run.
+
+The script also keeps the earlier MixLaw-vs-control comparison in
+``compute_savings_results.json`` (``mixlaw_vs_control``): the MixLaw mixture
+never reaches the control's final loss, and the control's fitted curve reaches
+MixLaw's final loss at step ~1755.
 
 Reads only ``skill_dag_370m_wandb_curves.json``; runs offline.
 
@@ -37,7 +44,7 @@ from fit_and_bootstrap_370m import (
     ALPHA_GRID, CURVES_PATH, MIN_STEP, _ols_over_alpha, bootstrap_crossing, ci,
     diff_p, fit_and_bootstrap, fmt_p,
 )
-from flops import report as flops_report
+from flops import N_PILOTS, report as flops_report
 
 MIXLAW = Path(__file__).resolve().parent
 OUT_DIRS = [MIXLAW / "figures"]
@@ -53,13 +60,25 @@ RUNS = data["runs"]
 FINAL_STEP = int(data["final_step"])
 SEED_KEYS = ("olmo-mix-1124-s42", "olmo-mix-1124-s69")
 ML_KEY = "mixlaw-fit"
+REF_KEY = "lightgbm-l40s"
 
-COL_CONTROL = "#6b7280"      # gray
-COL_MIXLAW = "#2563eb"       # blue
-COL_CONTROL_BAND = "#9ca3af"  # lighter gray, control seed envelope
-WINDOW_MIN = 700
-X_LEFT = 650
-X_RIGHT = 3000
+# Overhead per dynamic arm, in 60M runs (see the module docstring).
+DYNAMIC = {
+    "skillit-probe": {"name": "Skill-It probe", "overhead_runs": 8,
+                      "overhead_desc": "7 one-hot probes + the mix01 probe"},
+    "skillit-derivative": {"name": "Skill-It derivative", "overhead_runs": N_PILOTS,
+                           "overhead_desc": f"the {N_PILOTS}-run MixLaw pilot grid"},
+}
+
+# Colorblind-safe, matching Figure II: purple / blue / orange.
+STYLE = {
+    REF_KEY: ("LightGBM static (1% floor)", "#7C3AED", (0, (1, 1.6)), "D"),
+    "skillit-probe": ("Skill-It probe", "#2563EB", "-", "o"),
+    "skillit-derivative": ("Skill-It derivative", "#D97706", (0, (6, 1.6, 1.4, 1.6)), "^"),
+}
+WINDOW_MIN = 1000
+X_LEFT = 950
+X_RIGHT = 2450
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -110,14 +129,14 @@ def num(x, nd=6):
     return None if x is None or not np.isfinite(x) else round(float(x), nd)
 
 
-def finite_summary(x):
+def finite_summary(x, nd=1):
     """Median and 95% interval of the finite entries, plus the finite share."""
     x = np.asarray(x, dtype=float)
     finite = np.isfinite(x)
     out = {"fraction_finite": num(finite.mean())}
     if finite.any():
         lo, hi = ci(x[finite])
-        out.update(median=num(np.median(x[finite]), 1), ci95=[num(lo, 1), num(hi, 1)])
+        out.update(median=num(np.median(x[finite]), nd), ci95=[num(lo, nd), num(hi, nd)])
     else:
         out.update(median=None, ci95=None)
     return out
@@ -125,222 +144,238 @@ def finite_summary(x):
 
 # ---------------------------------------------------------------- data
 steps = np.array(RUNS[SEED_KEYS[0]]["steps"], dtype=float)
-if RUNS[SEED_KEYS[1]]["steps"] != RUNS[SEED_KEYS[0]]["steps"] or \
-        RUNS[ML_KEY]["steps"] != RUNS[SEED_KEYS[0]]["steps"]:
-    raise SystemExit("control seeds and MixLaw arm are not evaluated at the same steps")
-seed_y = [np.array(RUNS[k]["macro_bpb"], dtype=float) for k in SEED_KEYS]
-ctrl = 0.5 * (seed_y[0] + seed_y[1])
-band_lo = np.minimum(seed_y[0], seed_y[1])
-band_hi = np.maximum(seed_y[0], seed_y[1])
-ml = np.array(RUNS[ML_KEY]["macro_bpb"], dtype=float)
-
-# ----------------------------------------------------------- estimator
-# MixLaw keeps its own bootstrap stream from the curve file. The averaged
-# control curve is a different series from either seed, so it gets its own
-# independent stream (the next index after the file's streams).
+for key in (SEED_KEYS[1], ML_KEY, REF_KEY, *DYNAMIC):
+    if RUNS[key]["steps"] != RUNS[SEED_KEYS[0]]["steps"]:
+        raise SystemExit(f"{key} is not evaluated at the same steps as the control")
+curve = {k: np.array(RUNS[k]["macro_bpb"], dtype=float) for k in RUNS}
 n_streams = int(data["bootstrap_stream_count"])
 streams = np.random.SeedSequence(args.seed).spawn(n_streams + 1)
-
-fit_ml, finals_ml, a_ml, b_ml, al_ml = fit_and_bootstrap(
-    steps, ml, final_step=FINAL_STEP, n_boot=args.n_boot,
-    seed=streams[RUNS[ML_KEY]["bootstrap_stream"]], return_params=True)
-fit_ct, finals_ct, a_ct, b_ct, al_ct = fit_and_bootstrap(
-    steps, ctrl, final_step=FINAL_STEP, n_boot=args.n_boot,
-    seed=streams[n_streams], return_params=True)
-
-pt_ml = point_fit(steps, ml)
-pt_ct = point_fit(steps, ctrl)
-assert abs(powerlaw(FINAL_STEP, *pt_ml) - fit_ml) < 1e-9
-assert abs(powerlaw(FINAL_STEP, *pt_ct) - fit_ct) < 1e-9
-
-# Table II's control average is the mean of the two seeds' own fitted finals;
-# the single power law fitted to the averaged curve (used here, so that the
-# control is one curve that can be extrapolated and crossed) matches it closely.
-table2_ctrl = float(np.mean([powerlaw(FINAL_STEP, *point_fit(steps, y)) for y in seed_y]))
-
-# ------------------------------------------------- crossings, both directions
-# (1) MixLaw reaching the control's final fitted loss. Draws are paired: each
-#     MixLaw draw is crossed with the same-index control final.
-cross_ml_pt = float(bootstrap_crossing(*pt_ml, fit_ct))
-cross_ml_draws = bootstrap_crossing(a_ml, b_ml, al_ml, finals_ct)
-within = cross_ml_draws <= FINAL_STEP
-crossing_exists = bool(np.isfinite(cross_ml_pt) and cross_ml_pt <= FINAL_STEP)
-
-# (2) Converse: the step at which the control's fitted power law reaches
-#     MixLaw's final fitted loss.
-cross_ct_pt = float(bootstrap_crossing(*pt_ct, fit_ml, at_or_above=True))
-cross_ct_draws = bootstrap_crossing(a_ct, b_ct, al_ct, finals_ml, at_or_above=True)
-cross_ct_summary = finite_summary(cross_ct_draws)
-
-final_diff = finals_ml - finals_ct
-fd_lo, fd_hi = ci(final_diff)
-fd_p = diff_p(finals_ml, finals_ct)
 fl = flops_report()
+PER_ARM, PER_RUN = fl["per_370m_arm"], fl["per_60m_run"]
 
-# ------------------------------------------------------------- printout
-print("Figure III: does the MixLaw 1%-floor mixture reach the control's loss?")
+
+def fit(key, y=None, stream=None):
+    """Fit + bootstrap with the arm's own committed stream (or an explicit one)."""
+    y = curve[key] if y is None else y
+    s = streams[RUNS[key]["bootstrap_stream"]] if stream is None else stream
+    fitted, finals, a, b, al = fit_and_bootstrap(
+        steps, y, final_step=FINAL_STEP, n_boot=args.n_boot, seed=s, return_params=True)
+    pt = point_fit(steps, y)
+    assert abs(powerlaw(FINAL_STEP, *pt) - fitted) < 1e-9
+    return {"fitted": fitted, "finals": finals, "a": a, "b": b, "alpha": al, "pt": pt}
+
+
+# ------------------------------------- dynamic arms vs the LightGBM static run
+ref = fit(REF_KEY)
+print("Figure III: do the dynamic-reweighting arms reach the LightGBM static loss sooner?")
 print(f"  estimator: y = a + b/step^alpha on steps >= {MIN_STEP}, alpha grid "
       f"[{ALPHA_GRID[0]:.2f}, {ALPHA_GRID[-1]:.2f}] ({ALPHA_GRID.size} pts), "
       f"alpha-free residual bootstrap, n_boot={args.n_boot}, seed={args.seed}")
-print(f"  control (2-seed average) fitted final: {fit_ct:.4f}  "
-      f"95% CI [{ci(finals_ct)[0]:.4f}, {ci(finals_ct)[1]:.4f}]  "
-      f"(mean of per-seed fits, Table II: {table2_ctrl:.4f})")
-print(f"  MixLaw fitted final:                   {fit_ml:.4f}  "
-      f"95% CI [{ci(finals_ml)[0]:.4f}, {ci(finals_ml)[1]:.4f}]")
-print(f"  MixLaw - control at step {FINAL_STEP}: {fit_ml - fit_ct:+.4f}  "
-      f"95% CI [{fd_lo:+.4f}, {fd_hi:+.4f}]  two-sided {fmt_p(fd_p, args.n_boot)}")
-print(f"  fitted asymptotes: MixLaw {pt_ml[0]:.4f}, control {pt_ct[0]:.4f}")
-if crossing_exists:
-    print(f"  CROSSING EXISTS: MixLaw reaches the control's final fitted loss "
-          f"at step {cross_ml_pt:.0f} of {FINAL_STEP} "
-          f"({100 * (1 - cross_ml_pt / FINAL_STEP):.1f}% fewer steps); "
-          f"{100 * within.mean():.1f}% of bootstrap draws cross within the run")
-else:
-    shown = ("never reaches it (its fitted asymptote is above the control's final loss)"
-             if not np.isfinite(cross_ml_pt)
-             else f"reaches it only at step {cross_ml_pt:.0f}, beyond the {FINAL_STEP}-step run")
-    print(f"  NO CROSSING: MixLaw does not reach the control's final fitted loss "
-          f"{fit_ct:.4f} within the run; its fitted curve {shown}.")
-    print(f"    {100 * within.mean():.1f}% of bootstrap draws cross within the run; "
-          f"{100 * np.isfinite(cross_ml_draws).mean():.1f}% cross at any step.")
-print(f"  Converse: the control's fitted curve reaches MixLaw's final fitted loss "
-      f"{fit_ml:.4f} at step {cross_ct_pt:.0f} "
-      f"({100 * cross_ct_pt / FINAL_STEP:.1f}% of the run, "
-      f"{FINAL_STEP - cross_ct_pt:.0f} steps before the end)")
-if cross_ct_summary["median"] is not None:
-    print(f"    bootstrap median step {cross_ct_summary['median']:.0f}, 95% CI "
-          f"[{cross_ct_summary['ci95'][0]:.0f}, {cross_ct_summary['ci95'][1]:.0f}]; "
-          f"{100 * (cross_ct_draws < FINAL_STEP).mean():.1f}% of draws reach it before "
-          f"step {FINAL_STEP}")
-print(f"  Pilot cost (arm-independent): {fl['pilot_grid_24']:.3e} FLOPs = "
-      f"{100 * fl['pilot_grid_over_one_370m_arm']:.1f}% of one {fl['per_370m_arm']:.3e}-FLOP arm")
+print(f"  LightGBM static fitted final {ref['fitted']:.4f}  95% CI "
+      f"[{ci(ref['finals'])[0]:.4f}, {ci(ref['finals'])[1]:.4f}]")
+print(f"  FLOPs: {PER_RUN:.4e} per 60M run, {PER_ARM:.4e} per 370M arm")
+
+dyn = {}
+dyn_results = {}
+for key, meta in DYNAMIC.items():
+    arm = fit(key)
+    dyn[key] = arm
+    overhead = meta["overhead_runs"] * PER_RUN / PER_ARM
+
+    # (1) The dynamic arm reaching LightGBM's final fitted loss.
+    cross_pt = float(bootstrap_crossing(*arm["pt"], ref["fitted"]))
+    cross_draws = bootstrap_crossing(arm["a"], arm["b"], arm["alpha"], ref["finals"])
+    finite = np.isfinite(cross_draws)
+    saved_draws = 1.0 - cross_draws[finite] / FINAL_STEP
+    net_draws = saved_draws - overhead
+    saved_pt = 1.0 - cross_pt / FINAL_STEP
+    s_lo, s_hi = ci(saved_draws)
+    n_lo, n_hi = ci(net_draws)
+    within = float((cross_draws <= FINAL_STEP).mean())
+
+    # (2) Converse: LightGBM's fit extrapolated to the dynamic arm's final loss.
+    conv_pt = float(bootstrap_crossing(*ref["pt"], arm["fitted"], at_or_above=True))
+    conv_draws = bootstrap_crossing(ref["a"], ref["b"], ref["alpha"], arm["finals"],
+                                    at_or_above=True)
+    conv_mult = finite_summary(conv_draws / FINAL_STEP, nd=3)
+
+    d = arm["finals"] - ref["finals"]
+    d_lo, d_hi = ci(d)
+    print(f"\n  {meta['name']}: fitted final {arm['fitted']:.4f} "
+          f"({arm['fitted'] - ref['fitted']:+.4f} vs LightGBM, 95% CI [{d_lo:+.4f}, {d_hi:+.4f}])")
+    print(f"    reaches LightGBM's final loss at step {cross_pt:.0f} of {FINAL_STEP} "
+          f"(bootstrap median {np.median(cross_draws[finite]):.0f}, 95% CI "
+          f"[{ci(cross_draws[finite])[0]:.0f}, {ci(cross_draws[finite])[1]:.0f}]); "
+          f"{100 * within:.1f}% of draws cross within the run")
+    print(f"    gross step saving {100 * saved_pt:.1f}% [{100 * s_lo:.1f}, {100 * s_hi:.1f}] "
+          f"= {saved_pt * PER_ARM:.3e} FLOPs")
+    print(f"    overhead {meta['overhead_runs']} x 60M ({meta['overhead_desc']}) = "
+          f"{meta['overhead_runs'] * PER_RUN:.3e} FLOPs = {100 * overhead:.2f}% of one arm; "
+          f"break-even crossing step {FINAL_STEP * (1 - overhead):.0f}")
+    print(f"    net saving {100 * (saved_pt - overhead):.1f}% [{100 * n_lo:.1f}, {100 * n_hi:.1f}] "
+          f"= {(saved_pt - overhead) * PER_ARM:.3e} FLOPs; P(net > 0) = {(net_draws > 0).mean():.4f}")
+    print(f"    converse: LightGBM's fit reaches {arm['fitted']:.4f} at "
+          f"{conv_pt / FINAL_STEP:.2f}x the run ({conv_pt:.0f} steps); bootstrap "
+          f"{conv_mult['median']}x [{conv_mult['ci95'][0]}, {conv_mult['ci95'][1]}], "
+          f"{100 * (1 - conv_mult['fraction_finite']):.1f}% of draws never reach it")
+
+    dyn_results[key] = {
+        "label": meta["name"],
+        "fitted_final": num(arm["fitted"]),
+        "fitted_final_ci95": [num(v) for v in ci(arm["finals"])],
+        "fitted_asymptote": num(arm["pt"][0]),
+        "fitted_alpha": num(arm["pt"][2]),
+        "minus_lightgbm_final": {"mean_diff_bpb": num(d.mean()), "ci95": [num(d_lo), num(d_hi)]},
+        "reaches_lightgbm_final": {
+            "target": num(ref["fitted"]),
+            "point_estimate_step": num(cross_pt, 1),
+            "bootstrap_step": finite_summary(cross_draws),
+            "probability_within_run": num(within),
+        },
+        "gross_step_saving": {"point": num(saved_pt), "ci95": [num(s_lo), num(s_hi)],
+                              "flops": num(saved_pt * PER_ARM, 6)},
+        "overhead": {"runs_60m": meta["overhead_runs"], "description": meta["overhead_desc"],
+                     "flops": num(meta["overhead_runs"] * PER_RUN, 6),
+                     "fraction_of_one_370m_arm": num(overhead),
+                     "break_even_crossing_step": num(FINAL_STEP * (1 - overhead), 1)},
+        "net_saving": {"point": num(saved_pt - overhead), "ci95": [num(n_lo), num(n_hi)],
+                       "flops": num((saved_pt - overhead) * PER_ARM, 6),
+                       "probability_positive": num((net_draws > 0).mean())},
+        "converse_lightgbm_reaches_arm_final": {
+            "target": num(arm["fitted"]),
+            "point_estimate_step": num(conv_pt, 1),
+            "point_estimate_multiple_of_run": num(conv_pt / FINAL_STEP, 3),
+            "bootstrap_multiple_of_run": conv_mult,
+        },
+    }
+
+# --------------------------------------- MixLaw vs control (no crossing)
+# MixLaw keeps its own bootstrap stream from the curve file. The averaged
+# control curve is a different series from either seed, so it gets its own
+# independent stream (the next index after the file's streams).
+ctrl = 0.5 * (curve[SEED_KEYS[0]] + curve[SEED_KEYS[1]])
+ml = fit(ML_KEY)
+ct = fit(SEED_KEYS[0], y=ctrl, stream=streams[n_streams])
+table2_ctrl = float(np.mean([powerlaw(FINAL_STEP, *point_fit(steps, curve[k])) for k in SEED_KEYS]))
+cross_ml_pt = float(bootstrap_crossing(*ml["pt"], ct["fitted"]))
+cross_ml_draws = bootstrap_crossing(ml["a"], ml["b"], ml["alpha"], ct["finals"])
+ml_within = cross_ml_draws <= FINAL_STEP
+cross_ct_pt = float(bootstrap_crossing(*ct["pt"], ml["fitted"], at_or_above=True))
+cross_ct_draws = bootstrap_crossing(ct["a"], ct["b"], ct["alpha"], ml["finals"], at_or_above=True)
+fd = ml["finals"] - ct["finals"]
+fd_lo, fd_hi = ci(fd)
+fd_p = diff_p(ml["finals"], ct["finals"])
+print(f"\n  MixLaw vs control: MixLaw {ml['fitted']:.4f} vs control {ct['fitted']:.4f} "
+      f"({ml['fitted'] - ct['fitted']:+.4f} [{fd_lo:+.4f}, {fd_hi:+.4f}], {fmt_p(fd_p, args.n_boot)}); "
+      f"MixLaw asymptote {ml['pt'][0]:.4f}, {100 * ml_within.mean():.1f}% of draws reach the "
+      f"control's final within the run; the control reaches MixLaw's final at step {cross_ct_pt:.0f}")
 
 results = {
-    "description": "Figure III: whether, and where, the MixLaw 1%-floor mixture reaches the "
-                   "Olmo-mix-1124 control's loss, and the converse crossing for the control.",
+    "description": "Figure III: whether, and where, the two Skill-It dynamic-reweighting arms reach "
+                   "the static LightGBM 1%-floor mixture's final loss, the step and FLOP savings "
+                   "net of each arm's 60M-run overhead, and (mixlaw_vs_control) the MixLaw "
+                   "1%-floor mixture against the Olmo-mix-1124 control.",
     "estimator": f"y = a + b/step**alpha on steps >= {MIN_STEP}; alpha-free residual bootstrap; "
-                 "paired draws; same estimator as Table II",
+                 "paired draws; same estimator as Tables II and III",
     "n_boot": args.n_boot,
     "seed": args.seed,
     "final_step": FINAL_STEP,
     "alpha_grid": {"lo": float(ALPHA_GRID[0]), "hi": float(ALPHA_GRID[-1]), "n": int(ALPHA_GRID.size)},
-    "control": "Olmo-mix-1124 control, average of data seeds 42 and 69",
-    "crossing_exists": crossing_exists,
-    "crossing_definition": "the MixLaw fitted curve reaches the control's final fitted loss at or "
-                           "before the final step",
-    "fitted_final": {
-        "control_average": num(fit_ct),
-        "control_average_table_ii_mean_of_seed_fits": num(table2_ctrl),
-        "mixlaw": num(fit_ml),
-        "control_s42": num(powerlaw(FINAL_STEP, *point_fit(steps, seed_y[0]))),
-        "control_s69": num(powerlaw(FINAL_STEP, *point_fit(steps, seed_y[1]))),
+    "flops": {"per_60m_run": num(PER_RUN, 6), "per_370m_arm": num(PER_ARM, 6),
+              "pilot_grid_24": num(fl["pilot_grid_24"], 6),
+              "pilot_grid_over_one_370m_arm": num(fl["pilot_grid_over_one_370m_arm"])},
+    "dynamic_vs_lightgbm": {
+        "reference": REF_KEY,
+        "reference_fitted_final": num(ref["fitted"]),
+        "reference_fitted_final_ci95": [num(v) for v in ci(ref["finals"])],
+        "reference_fitted_asymptote": num(ref["pt"][0]),
+        "reference_fitted_alpha": num(ref["pt"][2]),
+        "step_saving_definition": "1 - (step at which the arm's fitted curve reaches the "
+                                  "reference's final fitted loss) / final_step; equal to the FLOP "
+                                  "saving as a fraction of one 370M arm",
+        "arms": dyn_results,
     },
-    "fitted_final_ci95": {
-        "control_average": [num(v) for v in ci(finals_ct)],
-        "mixlaw": [num(v) for v in ci(finals_ml)],
-    },
-    "fitted_asymptote": {"control_average": num(pt_ct[0]), "mixlaw": num(pt_ml[0])},
-    "fitted_alpha": {"control_average": num(pt_ct[2]), "mixlaw": num(pt_ml[2])},
-    "mixlaw_minus_control_final": {
-        "mean_diff_bpb": num(final_diff.mean()),
-        "ci95": [num(fd_lo), num(fd_hi)],
-        "p_value": num(fd_p),
-        "p_display": fmt_p(fd_p, args.n_boot),
-    },
-    "mixlaw_reaches_control_final": {
-        "target": num(fit_ct),
-        "point_estimate_step": num(cross_ml_pt, 1),
-        "reaches_within_run_point_estimate": crossing_exists,
-        "probability_within_run": num(within.mean()),
-        "fraction_of_draws_that_cross_at_any_step": num(np.isfinite(cross_ml_draws).mean()),
-        "extrapolated_crossing_step_over_finite_draws": finite_summary(cross_ml_draws),
-    },
-    "control_reaches_mixlaw_final": {
-        "target": num(fit_ml),
-        "point_estimate_step": num(cross_ct_pt, 1),
-        "steps_before_end_of_run": num(FINAL_STEP - cross_ct_pt, 1),
-        "fraction_of_run": num(cross_ct_pt / FINAL_STEP),
-        "bootstrap_step": cross_ct_summary,
-        "probability_before_end_of_run": num((cross_ct_draws < FINAL_STEP).mean()),
-    },
-    "pilot_flops": {
-        "pilot_grid_24": num(fl["pilot_grid_24"], 6),
-        "one_370m_arm": num(fl["per_370m_arm"], 6),
-        "pilot_grid_over_one_370m_arm": num(fl["pilot_grid_over_one_370m_arm"]),
+    "mixlaw_vs_control": {
+        "control": "Olmo-mix-1124 control, average of data seeds 42 and 69",
+        "crossing_exists": bool(np.isfinite(cross_ml_pt) and cross_ml_pt <= FINAL_STEP),
+        "fitted_final": {
+            "control_average": num(ct["fitted"]),
+            "control_average_table_ii_mean_of_seed_fits": num(table2_ctrl),
+            "mixlaw": num(ml["fitted"]),
+        },
+        "fitted_final_ci95": {"control_average": [num(v) for v in ci(ct["finals"])],
+                              "mixlaw": [num(v) for v in ci(ml["finals"])]},
+        "fitted_asymptote": {"control_average": num(ct["pt"][0]), "mixlaw": num(ml["pt"][0])},
+        "mixlaw_minus_control_final": {"mean_diff_bpb": num(fd.mean()), "ci95": [num(fd_lo), num(fd_hi)],
+                                       "p_value": num(fd_p), "p_display": fmt_p(fd_p, args.n_boot)},
+        "mixlaw_reaches_control_final": {
+            "target": num(ct["fitted"]),
+            "point_estimate_step": num(cross_ml_pt, 1),
+            "probability_within_run": num(ml_within.mean()),
+            "fraction_of_draws_that_cross_at_any_step": num(np.isfinite(cross_ml_draws).mean()),
+        },
+        "control_reaches_mixlaw_final": {
+            "target": num(ml["fitted"]),
+            "point_estimate_step": num(cross_ct_pt, 1),
+            "steps_before_end_of_run": num(FINAL_STEP - cross_ct_pt, 1),
+            "bootstrap_step": finite_summary(cross_ct_draws),
+        },
     },
 }
 RESULTS_PATH.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
-print(f"Wrote {RESULTS_PATH}")
+print(f"\nWrote {RESULTS_PATH}")
 
 # --------------------------------------------------------------- figure
 fig, ax = plt.subplots(figsize=(9.2, 5.8), dpi=200)
+keep = steps >= WINDOW_MIN
+for key, (label, color, ls, marker) in STYLE.items():
+    y = curve[key]
+    ax.plot(steps[keep], y[keep], color=color, linestyle=ls, marker=marker, markersize=4,
+            linewidth=2.0, zorder=3, label=f"{label}, observed")
+    seg = lead_in(steps, y, WINDOW_MIN, X_LEFT)
+    if seg is not None:
+        ax.plot(seg[0], seg[1], color=color, linestyle=ls, linewidth=2.0, zorder=3)
 
-keep = steps >= 700
-ax.fill_between(steps[keep], band_lo[keep], band_hi[keep], color=COL_CONTROL_BAND,
-                alpha=0.40, linewidth=0, zorder=1, label="Control seed range (n=2)")
-ax.plot(steps[keep], ctrl[keep], color=COL_CONTROL, linestyle="-", marker="s", markersize=4,
-        linewidth=2.0, zorder=3, label="Olmo-mix-1124 control (2-seed avg)")
-ax.plot(steps[keep], ml[keep], color=COL_MIXLAW, linestyle="-", marker="o", markersize=4,
-        linewidth=2.4, zorder=4, label="MixLaw fit (ours, observed)")
+# Fitted power laws for the two dynamic arms over the fit window, so the
+# crossing markers sit on the curves the savings are read from.
+fit_x = np.linspace(MIN_STEP, FINAL_STEP, 300)
+for key in DYNAMIC:
+    ax.plot(fit_x, powerlaw(fit_x, *dyn[key]["pt"]), color=STYLE[key][1], linestyle="-",
+            linewidth=1.0, alpha=0.55, zorder=2)
+ax.plot([], [], color="#555555", linewidth=1.0, alpha=0.55, label="Power-law fit (steps $\\geq$ 1000)")
 
-# Lead-in: extend both curves off the left edge at the slope implied by the
-# checkpoint before the window, so the panel reads as a run already under way.
-for _y, _color, _lw, _z in ((ctrl, COL_CONTROL, 2.0, 3), (ml, COL_MIXLAW, 2.4, 4)):
-    _seg = lead_in(steps, _y, WINDOW_MIN, X_LEFT)
-    if _seg is not None:
-        ax.plot(_seg[0], _seg[1], color=_color, linestyle="-", linewidth=_lw, zorder=_z)
-_lo_seg = lead_in(steps, band_lo, WINDOW_MIN, X_LEFT)
-_hi_seg = lead_in(steps, band_hi, WINDOW_MIN, X_LEFT)
-if _lo_seg is not None and _hi_seg is not None:
-    ax.fill_between(_lo_seg[0], _lo_seg[1], _hi_seg[1], color=COL_CONTROL_BAND,
-                    alpha=0.40, linewidth=0, zorder=1)
+ax.axhline(ref["fitted"], color=STYLE[REF_KEY][1], linestyle=":", linewidth=1.1, zorder=1)
+ax.text(X_LEFT + 15, ref["fitted"] + 0.0015, f"LightGBM static fitted final {ref['fitted']:.4f}",
+        ha="left", va="bottom", fontsize=9, color=STYLE[REF_KEY][1])
+ax.axvline(FINAL_STEP, color="#999999", linestyle="-", linewidth=0.8, zorder=1)
+ax.text(FINAL_STEP + 8, 1.735, "end of run", rotation=90, ha="left", va="top",
+        fontsize=9, color="#777777")
 
-# Power-law extrapolation past the end of the run: dashed gray for the control,
-# dotted blue for the MixLaw arm's own fit, so the gap between the two fitted
-# asymptotes is visible.
-ext = np.linspace(FINAL_STEP, X_RIGHT, 300)
-ax.plot(ext, powerlaw(ext, *pt_ct), color=COL_CONTROL, linestyle=(0, (2, 2)), linewidth=1.8,
-        zorder=2, label="Control, power-law extrapolation")
-ax.plot(ext, powerlaw(ext, *pt_ml), color=COL_MIXLAW, linestyle=(0, (1, 2)), linewidth=1.8,
-        zorder=2, label="MixLaw, power-law extrapolation")
-
-if crossing_exists:
-    # MixLaw's fitted curve reaches the control's final fitted loss inside the
-    # run: mark the step and the shortfall, above both curves.
-    window = (steps >= cross_ml_pt) & (steps <= FINAL_STEP)
-    local_max = max(band_hi[window].max(), ml[window].max()) if window.any() else fit_ct
-    faster_y = local_max + 0.018
-    ax.annotate("", xy=(cross_ml_pt, faster_y), xytext=(FINAL_STEP, faster_y),
-                arrowprops=dict(arrowstyle="<->", color="#111", lw=1.6))
-    ax.text((cross_ml_pt + FINAL_STEP) / 2, faster_y + 0.010,
-            f"{100 * (1 - cross_ml_pt / FINAL_STEP):.1f}% fewer steps",
-            ha="center", fontsize=11, fontweight="bold")
-    ax.axhline(fit_ct, color="#999999", linestyle=":", linewidth=1.0, zorder=1)
-    title = "MixLaw reaches the control's final loss before the end of the run"
-else:
-    # No crossing, so no savings arrow. Mark the control's fitted final (the
-    # level MixLaw does not reach) and where the control reaches MixLaw's final.
-    ax.axhline(fit_ct, color=COL_CONTROL, linestyle=":", linewidth=1.0, zorder=1)
-    ax.axhline(fit_ml, color=COL_MIXLAW, linestyle=":", linewidth=1.0, zorder=1)
-    ax.text(X_RIGHT - 25, fit_ct + 0.0045, f"control fitted final {fit_ct:.4f}",
-            ha="right", va="bottom", fontsize=9, color=COL_CONTROL)
-    ax.text(X_RIGHT - 25, fit_ml + 0.0045, f"MixLaw fitted final {fit_ml:.4f}",
-            ha="right", va="bottom", fontsize=9, color=COL_MIXLAW)
-    ax.plot([cross_ct_pt], [fit_ml], marker="s", markersize=7, markerfacecolor="white",
-            markeredgecolor=COL_CONTROL, markeredgewidth=1.6, zorder=6, linestyle="none")
-    ax.annotate(f"control's fit reaches\nMixLaw's final loss\nat step {cross_ct_pt:.0f}",
-                xy=(cross_ct_pt, fit_ml), xytext=(cross_ct_pt - 120, fit_ml + 0.075),
-                ha="center", fontsize=9.5, color="#111",
-                arrowprops=dict(arrowstyle="->", color="#111", lw=1.0))
-    title = "MixLaw does not reach the control's final loss"
+# Savings arrows below the curves: from each arm's crossing to the end of the run.
+arrow_y = {"skillit-probe": ref["fitted"] - 0.0170, "skillit-derivative": ref["fitted"] - 0.0255}
+for key, meta in DYNAMIC.items():
+    r = dyn_results[key]
+    xc = r["reaches_lightgbm_final"]["point_estimate_step"]
+    color = STYLE[key][1]
+    ax.plot([xc], [ref["fitted"]], marker="o", markersize=7, markerfacecolor="white",
+            markeredgecolor=color, markeredgewidth=1.8, zorder=6, linestyle="none")
+    y = arrow_y[key]
+    ax.plot([xc, xc], [ref["fitted"], y], color=color, linestyle=":", linewidth=1.0, zorder=2)
+    ax.annotate("", xy=(xc, y), xytext=(FINAL_STEP, y),
+                arrowprops=dict(arrowstyle="<->", color=color, lw=1.6))
+    net_txt = f"{100 * r['net_saving']['point']:+.1f}".replace("-", "−")
+    ax.text(xc - 15, y, f"{meta['name']}: {100 * r['gross_step_saving']['point']:.1f}% fewer steps "
+            f"(net of {meta['overhead_runs']} probes: {net_txt}%)",
+            ha="right", va="center", fontsize=9.5, color=color, fontweight="bold")
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")
-ax.set_title(title, fontsize=15, fontweight="bold", pad=12)
+ax.set_title("Dynamic reweighting reaches the LightGBM static loss in fewer steps",
+             fontsize=14, fontweight="bold", pad=12)
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
-ax.set_xlim(650, X_RIGHT)
-ax.set_ylim(1.565, 1.90)
+ax.set_xlim(X_LEFT, X_RIGHT)
+ax.set_ylim(1.592, 1.745)
 ax.legend(loc="upper right", frameon=False, fontsize=10)
 
 fig.subplots_adjust(left=0.115, right=0.97, top=0.90, bottom=0.13)

@@ -1,6 +1,6 @@
 {
-  "description": "Figure III: whether, and where, the MixLaw 1%-floor mixture reaches the Olmo-mix-1124 control's loss, and the converse crossing for the control.",
-  "estimator": "y = a + b/step**alpha on steps >= 1000; alpha-free residual bootstrap; paired draws; same estimator as Table II",
+  "description": "Figure III: whether, and where, the two Skill-It dynamic-reweighting arms reach the static LightGBM 1%-floor mixture's final loss, the step and FLOP savings net of each arm's 60M-run overhead, and (mixlaw_vs_control) the MixLaw 1%-floor mixture against the Olmo-mix-1124 control.",
+  "estimator": "y = a + b/step**alpha on steps >= 1000; alpha-free residual bootstrap; paired draws; same estimator as Tables II and III",
   "n_boot": 200000,
   "seed": 0,
   "final_step": 2384,
@@ -9,76 +9,208 @@
     "hi": 3.0,
     "n": 400
   },
-  "control": "Olmo-mix-1124 control, average of data seeds 42 and 69",
-  "crossing_exists": false,
-  "crossing_definition": "the MixLaw fitted curve reaches the control's final fitted loss at or before the final step",
-  "fitted_final": {
-    "control_average": 1.614767,
-    "control_average_table_ii_mean_of_seed_fits": 1.614751,
-    "mixlaw": 1.643326,
-    "control_s42": 1.619998,
-    "control_s69": 1.609505
+  "flops": {
+    "per_60m_run": 1.736700699082752e+17,
+    "per_370m_arm": 2.6300230038032744e+19,
+    "pilot_grid_24": 4.168081677798605e+18,
+    "pilot_grid_over_one_370m_arm": 0.158481
   },
-  "fitted_final_ci95": {
-    "control_average": [
-      1.610102,
-      1.618797
+  "dynamic_vs_lightgbm": {
+    "reference": "lightgbm-l40s",
+    "reference_fitted_final": 1.623822,
+    "reference_fitted_final_ci95": [
+      1.619003,
+      1.629077
     ],
-    "mixlaw": [
-      1.640445,
-      1.646299
-    ]
-  },
-  "fitted_asymptote": {
-    "control_average": 1.574765,
-    "mixlaw": 1.627466
-  },
-  "fitted_alpha": {
-    "control_average": 1.757895,
-    "mixlaw": 2.452882
-  },
-  "mixlaw_minus_control_final": {
-    "mean_diff_bpb": 0.028561,
-    "ci95": [
-      0.023497,
-      0.034043
-    ],
-    "p_value": 5e-06,
-    "p_display": "p < 5e-06"
-  },
-  "mixlaw_reaches_control_final": {
-    "target": 1.614767,
-    "point_estimate_step": null,
-    "reaches_within_run_point_estimate": false,
-    "probability_within_run": 0.0,
-    "fraction_of_draws_that_cross_at_any_step": 0.00986,
-    "extrapolated_crossing_step_over_finite_draws": {
-      "fraction_finite": 0.00986,
-      "median": 9764.4,
-      "ci95": [
-        5196.8,
-        40886.6
-      ]
+    "reference_fitted_asymptote": 1.599375,
+    "reference_fitted_alpha": 1.913158,
+    "step_saving_definition": "1 - (step at which the arm's fitted curve reaches the reference's final fitted loss) / final_step; equal to the FLOP saving as a fraction of one 370M arm",
+    "arms": {
+      "skillit-probe": {
+        "label": "Skill-It probe",
+        "fitted_final": 1.611232,
+        "fitted_final_ci95": [
+          1.607788,
+          1.614142
+        ],
+        "fitted_asymptote": 1.5273,
+        "fitted_alpha": 0.988972,
+        "minus_lightgbm_final": {
+          "mean_diff_bpb": -0.012563,
+          "ci95": [
+            -0.018795,
+            -0.006842
+          ]
+        },
+        "reaches_lightgbm_final": {
+          "target": 1.623822,
+          "point_estimate_step": 2069.8,
+          "bootstrap_step": {
+            "fraction_finite": 1.0,
+            "median": 2072.8,
+            "ci95": [
+              1956.7,
+              2193.0
+            ]
+          },
+          "probability_within_run": 1.0
+        },
+        "gross_step_saving": {
+          "point": 0.131787,
+          "ci95": [
+            0.080119,
+            0.179242
+          ],
+          "flops": 3.466015926774525e+18
+        },
+        "overhead": {
+          "runs_60m": 8,
+          "description": "7 one-hot probes + the mix01 probe",
+          "flops": 1.3893605592662016e+18,
+          "fraction_of_one_370m_arm": 0.052827,
+          "break_even_crossing_step": 2258.1
+        },
+        "net_saving": {
+          "point": 0.07896,
+          "ci95": [
+            0.027292,
+            0.126415
+          ],
+          "flops": 2.0766553675083236e+18,
+          "probability_positive": 0.998735
+        },
+        "converse_lightgbm_reaches_arm_final": {
+          "target": 1.611232,
+          "point_estimate_step": 3479.9,
+          "point_estimate_multiple_of_run": 1.46,
+          "bootstrap_multiple_of_run": {
+            "fraction_finite": 0.893545,
+            "median": 1.403,
+            "ci95": [
+              1.126,
+              3.502
+            ]
+          }
+        }
+      },
+      "skillit-derivative": {
+        "label": "Skill-It derivative",
+        "fitted_final": 1.616643,
+        "fitted_final_ci95": [
+          1.611392,
+          1.623463
+        ],
+        "fitted_asymptote": 1.512545,
+        "fitted_alpha": 0.915038,
+        "minus_lightgbm_final": {
+          "mean_diff_bpb": -0.007194,
+          "ci95": [
+            -0.014803,
+            0.001159
+          ]
+        },
+        "reaches_lightgbm_final": {
+          "target": 1.623822,
+          "point_estimate_step": 2216.4,
+          "bootstrap_step": {
+            "fraction_finite": 1.0,
+            "median": 2215.8,
+            "ci95": [
+              2086.7,
+              2420.7
+            ]
+          },
+          "probability_within_run": 0.956425
+        },
+        "gross_step_saving": {
+          "point": 0.070286,
+          "ci95": [
+            -0.01538,
+            0.124694
+          ],
+          "flops": 1.8485282735072407e+18
+        },
+        "overhead": {
+          "runs_60m": 24,
+          "description": "the 24-run MixLaw pilot grid",
+          "flops": 4.168081677798605e+18,
+          "fraction_of_one_370m_arm": 0.158481,
+          "break_even_crossing_step": 2006.2
+        },
+        "net_saving": {
+          "point": -0.088195,
+          "ci95": [
+            -0.173861,
+            -0.033787
+          ],
+          "flops": -2.3195534042913644e+18,
+          "probability_positive": 0.00028
+        },
+        "converse_lightgbm_reaches_arm_final": {
+          "target": 1.616643,
+          "point_estimate_step": 2859.0,
+          "point_estimate_multiple_of_run": 1.199,
+          "bootstrap_multiple_of_run": {
+            "fraction_finite": 0.96797,
+            "median": 1.192,
+            "ci95": [
+              0.978,
+              2.256
+            ]
+          }
+        }
+      }
     }
   },
-  "control_reaches_mixlaw_final": {
-    "target": 1.643326,
-    "point_estimate_step": 1754.7,
-    "steps_before_end_of_run": 629.3,
-    "fraction_of_run": 0.736024,
-    "bootstrap_step": {
-      "fraction_finite": 1.0,
-      "median": 1755.5,
-      "ci95": [
-        1698.6,
-        1813.4
+  "mixlaw_vs_control": {
+    "control": "Olmo-mix-1124 control, average of data seeds 42 and 69",
+    "crossing_exists": false,
+    "fitted_final": {
+      "control_average": 1.614767,
+      "control_average_table_ii_mean_of_seed_fits": 1.614751,
+      "mixlaw": 1.643326
+    },
+    "fitted_final_ci95": {
+      "control_average": [
+        1.610102,
+        1.618797
+      ],
+      "mixlaw": [
+        1.640445,
+        1.646299
       ]
     },
-    "probability_before_end_of_run": 1.0
-  },
-  "pilot_flops": {
-    "pilot_grid_24": 4.168081677798605e+18,
-    "one_370m_arm": 2.6300230038032744e+19,
-    "pilot_grid_over_one_370m_arm": 0.158481
+    "fitted_asymptote": {
+      "control_average": 1.574765,
+      "mixlaw": 1.627466
+    },
+    "mixlaw_minus_control_final": {
+      "mean_diff_bpb": 0.028561,
+      "ci95": [
+        0.023497,
+        0.034043
+      ],
+      "p_value": 5e-06,
+      "p_display": "p < 5e-06"
+    },
+    "mixlaw_reaches_control_final": {
+      "target": 1.614767,
+      "point_estimate_step": null,
+      "probability_within_run": 0.0,
+      "fraction_of_draws_that_cross_at_any_step": 0.00986
+    },
+    "control_reaches_mixlaw_final": {
+      "target": 1.643326,
+      "point_estimate_step": 1754.7,
+      "steps_before_end_of_run": 629.3,
+      "bootstrap_step": {
+        "fraction_finite": 1.0,
+        "median": 1755.5,
+        "ci95": [
+          1698.6,
+          1813.4
+        ]
+      }
+    }
   }
 }

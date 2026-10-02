@@ -71,15 +71,14 @@ DYNAMIC = {
                            "overhead_desc": f"the {N_PILOTS}-run MixLaw pilot grid"},
 }
 
-# Colorblind-safe, matching Figure II's colors: purple / blue / orange.
-STYLE = {
-    REF_KEY: ("LightGBM static (1% floor)", "#7C3AED", "-", "D"),
-    "skillit-probe": ("Skill-It probe", "#2563EB", "-", "o"),
-    "skillit-derivative": ("Skill-It derivative", "#D97706", "-", "^"),
-}
+# Colors of the original Figure III: gray reference, blue comparison arm; the
+# second Skill-It arm in orange (colorblind-safe against blue).
+COL_REF = "#6b7280"
+COL_PROBE = "#2563eb"
+COL_DERIV = "#d97706"
 WINDOW_MIN = 700
 X_LEFT = 650
-X_RIGHT = 3700
+X_RIGHT = 3600
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -327,54 +326,73 @@ RESULTS_PATH.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
 print(f"\nWrote {RESULTS_PATH}")
 
 # --------------------------------------------------------------- figure
+# Same layout as the original Figure III (control vs MixLaw), with the LightGBM
+# static run as the reference and the two Skill-It arms as the comparisons.
 fig, ax = plt.subplots(figsize=(9.2, 5.8), dpi=200)
-keep = steps >= WINDOW_MIN
-for key, (label, color, ls, marker) in STYLE.items():
-    y = curve[key]
-    ax.plot(steps[keep], y[keep], color=color, linestyle=ls, marker=marker, markersize=4,
-            linewidth=2.0, zorder=3, label=f"{label}, observed")
-    seg = lead_in(steps, y, WINDOW_MIN, X_LEFT)
-    if seg is not None:
-        ax.plot(seg[0], seg[1], color=color, linestyle=ls, linewidth=2.0, zorder=3)
 
-# LightGBM's power law extrapolated past the end of the run, out to where it
-# reaches the probe arm's final loss.
+lgb, prb, drv = curve[REF_KEY], curve["skillit-probe"], curve["skillit-derivative"]
+keep = steps >= 700
+ax.plot(steps[keep], lgb[keep], color=COL_REF, linestyle="-", marker="s", markersize=4,
+        linewidth=2.0, zorder=3, label="LightGBM static (1% floor, observed)")
+ax.plot(steps[keep], prb[keep], color=COL_PROBE, linestyle="-", marker="o", markersize=4,
+        linewidth=2.4, zorder=4, label="Skill-It probe (observed)")
+ax.plot(steps[keep], drv[keep], color=COL_DERIV, linestyle="-", marker="^", markersize=4,
+        linewidth=2.4, zorder=4, label="Skill-It derivative (observed)")
+
+# Lead-in: extend the curves off the left edge at the slope implied by the
+# checkpoint before the window, so the panel reads as a run already under way.
+for _y, _color, _lw, _z in ((lgb, COL_REF, 2.0, 3), (prb, COL_PROBE, 2.4, 4), (drv, COL_DERIV, 2.4, 4)):
+    _seg = lead_in(steps, _y, WINDOW_MIN, X_LEFT)
+    if _seg is not None:
+        ax.plot(_seg[0], _seg[1], color=_color, linestyle="-", linewidth=_lw, zorder=_z)
+
+# Power-law extrapolation past the end of the run: dashed gray for LightGBM,
+# dotted for each Skill-It arm's own fit.
 ext = np.linspace(FINAL_STEP, X_RIGHT, 300)
-ax.plot(ext, powerlaw(ext, *ref["pt"]), color=STYLE[REF_KEY][1], linestyle=(0, (2, 2)),
-        linewidth=1.8, zorder=2, label="LightGBM static, power-law extrapolation")
+ax.plot(ext, powerlaw(ext, *ref["pt"]), color=COL_REF, linestyle=(0, (2, 2)), linewidth=1.8,
+        zorder=2, label="LightGBM, power-law extrapolation")
+ax.plot(ext, powerlaw(ext, *dyn["skillit-probe"]["pt"]), color=COL_PROBE, linestyle=(0, (1, 2)),
+        linewidth=1.8, zorder=2, label="Probe, power-law extrapolation")
+ax.plot(ext, powerlaw(ext, *dyn["skillit-derivative"]["pt"]), color=COL_DERIV, linestyle=(0, (1, 2)),
+        linewidth=1.8, zorder=2, label="Derivative, power-law extrapolation")
 
-probe = dyn_results["skillit-probe"]
-for key, y0, dy, va in ((REF_KEY, ref["fitted"], 0.0030, "bottom"),
-                        ("skillit-probe", probe["fitted_final"], -0.0030, "top")):
-    ax.axhline(y0, color=STYLE[key][1], linestyle=":", linewidth=1.0, zorder=1)
-    ax.text(X_LEFT + 25, y0 + dy, f"{STYLE[key][0].split(' (')[0]} fitted final {y0:.4f}",
-            ha="left", va=va, fontsize=9, color=STYLE[key][1])
+fit_lgb = ref["fitted"]
+fit_prb = dyn_results["skillit-probe"]["fitted_final"]
+ax.axhline(fit_lgb, color=COL_REF, linestyle=":", linewidth=1.0, zorder=1)
+ax.axhline(fit_prb, color=COL_PROBE, linestyle=":", linewidth=1.0, zorder=1)
+ax.text(X_RIGHT - 300, fit_lgb + 0.0045, f"LightGBM fitted final {fit_lgb:.4f}",
+        ha="right", va="bottom", fontsize=9, color=COL_REF)
+# LightGBM's label ends short of the right edge, clear of the arrow to its crossing;
+# the probe's sits below its line, above the Skill-It extrapolations.
+ax.text(X_RIGHT - 25, fit_prb - 0.0045, f"probe fitted final {fit_prb:.4f}",
+        ha="right", va="top", fontsize=9, color=COL_PROBE)
 
-# One marker and label per crossing, as in the original figure.
-crossings = [
-    (dyn_results[k]["reaches_lightgbm_final"]["point_estimate_step"], ref["fitted"], STYLE[k][1],
-     f"{DYNAMIC[k]['name'].split()[-1]} reaches LightGBM's\nfinal loss at step "
-     f"{dyn_results[k]['reaches_lightgbm_final']['point_estimate_step']:.0f}\n"
-     f"({100 * dyn_results[k]['gross_step_saving']['point']:.1f}% fewer steps)", (dx, dy))
-    for k, (dx, dy) in (("skillit-probe", (-380, 0.075)), ("skillit-derivative", (250, 0.075)))
-]
-conv = probe["converse_lightgbm_reaches_arm_final"]
-crossings.append((conv["point_estimate_step"], probe["fitted_final"], STYLE[REF_KEY][1],
-                  f"LightGBM's fit reaches the\nprobe's final loss at step {conv['point_estimate_step']:.0f}\n"
-                  f"({conv['point_estimate_multiple_of_run']:.2f}\u00d7 the steps)", (-150, 0.070)))
-for x, y, color, text, (dx, dy) in crossings:
-    ax.plot([x], [y], marker="s", markersize=7, markerfacecolor="white", markeredgecolor=color,
-            markeredgewidth=1.6, zorder=6, linestyle="none")
-    ax.annotate(text, xy=(x, y), xytext=(x + dx, y + dy), ha="center", fontsize=9.5, color="#111",
+annotations = []
+for key, short, color, dx in (("skillit-probe", "probe", COL_PROBE, -330),
+                              ("skillit-derivative", "derivative", COL_DERIV, 230)):
+    r = dyn_results[key]
+    xc = r["reaches_lightgbm_final"]["point_estimate_step"]
+    annotations.append((xc, fit_lgb, color, dx,
+                        f"{short}'s fit reaches\nLightGBM's final loss\nat step {xc:.0f}\n"
+                        f"({100 * r['gross_step_saving']['point']:.1f}% fewer steps)"))
+conv = dyn_results["skillit-probe"]["converse_lightgbm_reaches_arm_final"]
+annotations.append((conv["point_estimate_step"], fit_prb, COL_REF, -120,
+                    f"LightGBM's fit reaches\nthe probe's final loss\nat step {conv['point_estimate_step']:.0f}\n"
+                    f"({conv['point_estimate_multiple_of_run']:.2f}\u00d7 the steps)"))
+for x, y, color, dx, text in annotations:
+    ax.plot([x], [y], marker="s", markersize=7, markerfacecolor="white",
+            markeredgecolor=color, markeredgewidth=1.6, zorder=6, linestyle="none")
+    ax.annotate(text, xy=(x, y), xytext=(x + dx, y + 0.075),
+                ha="center", fontsize=9.5, color="#111",
                 arrowprops=dict(arrowstyle="->", color="#111", lw=1.0))
+title = "Dynamic reweighting reaches LightGBM's final loss sooner"
 
 ax.set_xlabel("Training step", labelpad=8)
-ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")
-ax.set_title("Dynamic reweighting reaches the LightGBM static loss sooner",
-             fontsize=15, fontweight="bold", pad=12)
+ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\downarrow$ lower is better)")
+ax.set_title(title, fontsize=15, fontweight="bold", pad=12)
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
-ax.set_xlim(X_LEFT, X_RIGHT)
+ax.set_xlim(650, X_RIGHT)
 ax.set_ylim(1.565, 1.90)
 ax.legend(loc="upper right", frameon=False, fontsize=10)
 

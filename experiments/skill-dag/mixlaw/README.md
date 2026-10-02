@@ -482,8 +482,8 @@ against a seed spread of 0.0282.
 ### Compute
 
 [`plot_figure_iii_compute_savings.py`](plot_figure_iii_compute_savings.py) draws
-Figure III, which compares the two Skill-It arms against the LightGBM static run
-(see [`../skillit/README.md`](../skillit/README.md#compute-savings-figure-iii)).
+Figure III, which compares the Skill-It probe arm against the LightGBM static run
+(both Skill-It arms' numbers are in [`../skillit/README.md`](../skillit/README.md#compute-savings-figure-iii)).
 It also asks how many steps the MixLaw mixture and the control need to reach each
 other's final loss, using the same fitted power laws and paired bootstrap draws
 (results under `mixlaw_vs_control` in

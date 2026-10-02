@@ -19,9 +19,10 @@ saving subtracts each arm's overhead, counted in 60M runs (``flops.py``):
 - offline probe: 8 runs (the seven one-hot probes and the mix01 probe);
 - online derivative: 24 runs (the MixLaw pilot grid its derivatives come from).
 
-The figure shows the gross step savings and the converse for the probe arm: the
-LightGBM fit extrapolated until it reaches the probe arm's final loss. The net
-savings and the derivative arm's converse are in the JSON.
+The figure compares only the probe arm with LightGBM: its gross step saving and
+the converse (the LightGBM fit extrapolated until it reaches the probe arm's
+final loss). The derivative arm, the net savings and the derivative's converse
+are in the JSON.
 
 The script also keeps the earlier MixLaw-vs-control comparison in
 ``compute_savings_results.json`` (``mixlaw_vs_control``): the MixLaw mixture
@@ -71,14 +72,11 @@ DYNAMIC = {
                            "overhead_desc": f"the {N_PILOTS}-run MixLaw pilot grid"},
 }
 
-# Colors of the original Figure III: gray reference, blue comparison arm; the
-# second Skill-It arm in orange (colorblind-safe against blue).
+# Colors of the original Figure III: gray reference, blue comparison arm.
 COL_REF = "#6b7280"
 COL_PROBE = "#2563eb"
-COL_DERIV = "#d97706"
 WINDOW_MIN = 700
 X_LEFT = 650
-X_RIGHT = 3600
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -327,27 +325,26 @@ print(f"\nWrote {RESULTS_PATH}")
 
 # --------------------------------------------------------------- figure
 # Same drawing code as the original Figure III (MixLaw vs the control), with the
-# LightGBM static run in the control's place and the two Skill-It arms in
-# MixLaw's. Each "fewer steps" arrow takes its arm's color.
+# LightGBM static run in the control's place and the Skill-It probe in MixLaw's.
 fig, ax = plt.subplots(figsize=(9.2, 5.8), dpi=200)
 
-lgb, prb, drv = curve[REF_KEY], curve["skillit-probe"], curve["skillit-derivative"]
+lgb, prb = curve[REF_KEY], curve["skillit-probe"]
 keep = steps >= 700
 ax.plot(steps[keep], lgb[keep], color=COL_REF, linestyle="-", marker="s", markersize=4,
         linewidth=2.0, zorder=3, label="LightGBM static (1% floor)")
 ax.plot(steps[keep], prb[keep], color=COL_PROBE, linestyle="-", marker="o", markersize=4,
         linewidth=2.4, zorder=4, label="Skill-It probe (observed)")
-ax.plot(steps[keep], drv[keep], color=COL_DERIV, linestyle="-", marker="^", markersize=4,
-        linewidth=2.4, zorder=4, label="Skill-It derivative (observed)")
 
-# Lead-in: extend the curves off the left edge at the slope implied by the
+# Lead-in: extend both curves off the left edge at the slope implied by the
 # checkpoint before the window, so the panel reads as a run already under way.
-for _y, _color, _lw, _z in ((lgb, COL_REF, 2.0, 3), (prb, COL_PROBE, 2.4, 4), (drv, COL_DERIV, 2.4, 4)):
+for _y, _color, _lw, _z in ((lgb, COL_REF, 2.0, 3), (prb, COL_PROBE, 2.4, 4)):
     _seg = lead_in(steps, _y, WINDOW_MIN, X_LEFT)
     if _seg is not None:
         ax.plot(_seg[0], _seg[1], color=_color, linestyle="-", linewidth=_lw, zorder=_z)
 
 probe = dyn_results["skillit-probe"]
+cross_step = probe["reaches_lightgbm_final"]["point_estimate_step"]
+pct_faster = 100 * probe["gross_step_saving"]["point"]
 conv = probe["converse_lightgbm_reaches_arm_final"]
 cross_step2 = conv["point_estimate_step"]
 times_longer = conv["point_estimate_multiple_of_run"]
@@ -359,27 +356,16 @@ ax.plot(ext, powerlaw(ext, *ref["pt"]), color=COL_REF, linestyle=(0, (2, 2)), li
 
 ax.axhline(prb_final_fitted, color="#999999", linestyle=":", linewidth=1.0, zorder=1)
 
-# "Fewer steps" arrows sit above all curves over each arm's [crossing, final
-# step] span; the derivative's (shorter) arrow is stacked above the probe's.
-def window_max(start):
-    window = (steps >= start) & (steps <= FINAL_STEP)
-    return max(lgb[window].max(), prb[window].max(), drv[window].max())
-
-prev_text_top = None
-for key, color in (("skillit-probe", COL_PROBE), ("skillit-derivative", COL_DERIV)):
-    r = dyn_results[key]
-    cross_step = r["reaches_lightgbm_final"]["point_estimate_step"]
-    pct_faster = 100 * r["gross_step_saving"]["point"]
-    local_max = window_max(cross_step)
-    faster_y = local_max + 0.018 if prev_text_top is None else prev_text_top + 0.014
-    tick_bottom = local_max + 0.002 if prev_text_top is None else prev_text_top + 0.002
-    ax.annotate("", xy=(cross_step, faster_y), xytext=(FINAL_STEP, faster_y),
-                arrowprops=dict(arrowstyle="<->", color=color, lw=1.6))
-    ax.plot([cross_step, cross_step], [faster_y - 0.004, tick_bottom], color=color, lw=0.8, ls=":")
-    ax.plot([FINAL_STEP, FINAL_STEP], [faster_y - 0.004, tick_bottom], color=color, lw=0.8, ls=":")
-    ax.text((cross_step + FINAL_STEP) / 2, faster_y + 0.010, f"{pct_faster:.1f}% fewer steps",
-            ha="center", fontsize=11, fontweight="bold", color=color)
-    prev_text_top = faster_y + 0.010 + 0.009
+# "Fewer steps" arrow sits above both curves for the whole [cross_step, FINAL_STEP] span.
+window = (steps >= cross_step) & (steps <= FINAL_STEP)
+local_max = max(lgb[window].max(), prb[window].max()) if window.any() else ref["fitted"]
+faster_y = local_max + 0.018
+ax.annotate("", xy=(cross_step, faster_y), xytext=(FINAL_STEP, faster_y),
+            arrowprops=dict(arrowstyle="<->", color="#111", lw=1.6))
+ax.plot([cross_step, cross_step], [faster_y - 0.004, local_max + 0.002], color="#111", lw=0.8, ls=":")
+ax.plot([FINAL_STEP, FINAL_STEP], [faster_y - 0.004, local_max + 0.002], color="#111", lw=0.8, ls=":")
+ax.text((cross_step + FINAL_STEP) / 2, faster_y + 0.010, f"{pct_faster:.1f}% fewer steps",
+        ha="center", fontsize=11, fontweight="bold")
 
 ax.annotate("", xy=(FINAL_STEP, prb_final_fitted), xytext=(cross_step2, prb_final_fitted),
             arrowprops=dict(arrowstyle="<->", color="#111", lw=1.6))
@@ -388,7 +374,7 @@ ax.text((FINAL_STEP + cross_step2) / 2, prb_final_fitted - 0.016, f"{times_longe
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\downarrow$ lower is better)")
-ax.set_title("Skill-It arms and the LightGBM static power-law extrapolation", fontsize=15,
+ax.set_title("Skill-It probe and the LightGBM static power-law extrapolation", fontsize=15,
              fontweight="bold", pad=12)
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)

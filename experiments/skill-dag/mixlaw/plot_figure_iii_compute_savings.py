@@ -19,8 +19,9 @@ saving subtracts each arm's overhead, counted in 60M runs (``flops.py``):
 - offline probe: 8 runs (the seven one-hot probes and the mix01 probe);
 - online derivative: 24 runs (the MixLaw pilot grid its derivatives come from).
 
-The converse (the LightGBM fit extrapolated until it reaches each dynamic arm's
-final loss) is reported in the JSON, not drawn: it lies past the end of the run.
+The figure shows the gross step savings and the converse for the probe arm: the
+LightGBM fit extrapolated until it reaches the probe arm's final loss. The net
+savings and the derivative arm's converse are in the JSON.
 
 The script also keeps the earlier MixLaw-vs-control comparison in
 ``compute_savings_results.json`` (``mixlaw_vs_control``): the MixLaw mixture
@@ -70,15 +71,15 @@ DYNAMIC = {
                            "overhead_desc": f"the {N_PILOTS}-run MixLaw pilot grid"},
 }
 
-# Colorblind-safe, matching Figure II: purple / blue / orange.
+# Colorblind-safe, matching Figure II's colors: purple / blue / orange.
 STYLE = {
-    REF_KEY: ("LightGBM static (1% floor)", "#7C3AED", (0, (1, 1.6)), "D"),
+    REF_KEY: ("LightGBM static (1% floor)", "#7C3AED", "-", "D"),
     "skillit-probe": ("Skill-It probe", "#2563EB", "-", "o"),
-    "skillit-derivative": ("Skill-It derivative", "#D97706", (0, (6, 1.6, 1.4, 1.6)), "^"),
+    "skillit-derivative": ("Skill-It derivative", "#D97706", "-", "^"),
 }
-WINDOW_MIN = 1000
-X_LEFT = 950
-X_RIGHT = 2450
+WINDOW_MIN = 700
+X_LEFT = 650
+X_RIGHT = 3700
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -336,46 +337,59 @@ for key, (label, color, ls, marker) in STYLE.items():
     if seg is not None:
         ax.plot(seg[0], seg[1], color=color, linestyle=ls, linewidth=2.0, zorder=3)
 
-# Fitted power laws for the two dynamic arms over the fit window, so the
-# crossing markers sit on the curves the savings are read from.
-fit_x = np.linspace(MIN_STEP, FINAL_STEP, 300)
-for key in DYNAMIC:
-    ax.plot(fit_x, powerlaw(fit_x, *dyn[key]["pt"]), color=STYLE[key][1], linestyle="-",
-            linewidth=1.0, alpha=0.55, zorder=2)
-ax.plot([], [], color="#555555", linewidth=1.0, alpha=0.55, label="Power-law fit (steps $\\geq$ 1000)")
+# LightGBM's power law extrapolated past the end of the run, out to where it
+# reaches the probe arm's final loss.
+ext = np.linspace(FINAL_STEP, X_RIGHT, 300)
+ax.plot(ext, powerlaw(ext, *ref["pt"]), color=STYLE[REF_KEY][1], linestyle=(0, (2, 2)),
+        linewidth=1.8, zorder=2, label="LightGBM static, power-law extrapolation")
 
-ax.axhline(ref["fitted"], color=STYLE[REF_KEY][1], linestyle=":", linewidth=1.1, zorder=1)
-ax.text(X_LEFT + 15, ref["fitted"] + 0.0015, f"LightGBM static fitted final {ref['fitted']:.4f}",
-        ha="left", va="bottom", fontsize=9, color=STYLE[REF_KEY][1])
-ax.axvline(FINAL_STEP, color="#999999", linestyle="-", linewidth=0.8, zorder=1)
-ax.text(FINAL_STEP + 8, 1.735, "end of run", rotation=90, ha="left", va="top",
-        fontsize=9, color="#777777")
+probe = dyn_results["skillit-probe"]
+for key, y0 in ((REF_KEY, ref["fitted"]), ("skillit-probe", probe["fitted_final"])):
+    ax.axhline(y0, color=STYLE[key][1], linestyle=":", linewidth=1.0, zorder=1)
+    above = key == REF_KEY
+    ax.text(X_LEFT + 20, y0 + (0.0015 if above else -0.0015),
+            f"{STYLE[key][0].split(' (')[0]} fitted final {y0:.4f}",
+            ha="left", va="bottom" if above else "top", fontsize=9, color=STYLE[key][1])
 
-# Savings arrows below the curves: from each arm's crossing to the end of the run.
-arrow_y = {"skillit-probe": ref["fitted"] - 0.0170, "skillit-derivative": ref["fitted"] - 0.0255}
-for key, meta in DYNAMIC.items():
+# Gross step savings: where each dynamic arm's fitted curve reaches LightGBM's
+# final fitted loss, with an arrow (below the curves) to the end of the run.
+for key, y in (("skillit-probe", 1.6000), ("skillit-derivative", 1.5875)):
     r = dyn_results[key]
     xc = r["reaches_lightgbm_final"]["point_estimate_step"]
     color = STYLE[key][1]
     ax.plot([xc], [ref["fitted"]], marker="o", markersize=7, markerfacecolor="white",
             markeredgecolor=color, markeredgewidth=1.8, zorder=6, linestyle="none")
-    y = arrow_y[key]
     ax.plot([xc, xc], [ref["fitted"], y], color=color, linestyle=":", linewidth=1.0, zorder=2)
     ax.annotate("", xy=(xc, y), xytext=(FINAL_STEP, y),
                 arrowprops=dict(arrowstyle="<->", color=color, lw=1.6))
-    net_txt = f"{100 * r['net_saving']['point']:+.1f}".replace("-", "−")
-    ax.text(xc - 15, y, f"{meta['name']}: {100 * r['gross_step_saving']['point']:.1f}% fewer steps "
-            f"(net of {meta['overhead_runs']} probes: {net_txt}%)",
-            ha="right", va="center", fontsize=9.5, color=color, fontweight="bold")
+    ax.text(xc - 20, y, f"{100 * r['gross_step_saving']['point']:.1f}% fewer steps",
+            ha="right", va="center", fontsize=11, fontweight="bold", color=color)
+
+# Converse: LightGBM's extrapolation reaches the probe arm's final loss.
+conv = probe["converse_lightgbm_reaches_arm_final"]
+xs = conv["point_estimate_step"]
+y_arrow = probe["fitted_final"] + 0.040
+ax.plot([xs], [probe["fitted_final"]], marker="D", markersize=7, markerfacecolor="white",
+        markeredgecolor=STYLE[REF_KEY][1], markeredgewidth=1.8, zorder=6, linestyle="none")
+ax.plot([xs, xs], [probe["fitted_final"], y_arrow], color=STYLE[REF_KEY][1], linestyle=":",
+        linewidth=1.0, zorder=2)
+ax.plot([FINAL_STEP, FINAL_STEP], [ref["fitted"], y_arrow], color=STYLE[REF_KEY][1],
+        linestyle=":", linewidth=1.0, zorder=2)
+ax.annotate("", xy=(FINAL_STEP, y_arrow), xytext=(xs, y_arrow),
+            arrowprops=dict(arrowstyle="<->", color="#111", lw=1.6))
+ax.text((FINAL_STEP + xs) / 2, y_arrow + 0.008,
+        f"LightGBM needs {conv['point_estimate_multiple_of_run']:.2f}× the steps\n"
+        "to reach the probe's final loss",
+        ha="center", va="bottom", fontsize=10.5, fontweight="bold", color="#111")
 
 ax.set_xlabel("Training step", labelpad=8)
 ax.set_ylabel("Validation macro bits-per-byte\n(20-task OLMES avg, $\\downarrow$ lower is better)")
-ax.set_title("Dynamic reweighting reaches the LightGBM static loss in fewer steps",
-             fontsize=14, fontweight="bold", pad=12)
+ax.set_title("Dynamic reweighting reaches the LightGBM static loss sooner",
+             fontsize=15, fontweight="bold", pad=12)
 ax.grid(True, linestyle=":", linewidth=0.7, color="#c9c9c9", alpha=0.9)
 ax.set_axisbelow(True)
 ax.set_xlim(X_LEFT, X_RIGHT)
-ax.set_ylim(1.592, 1.745)
+ax.set_ylim(1.572, 1.90)
 ax.legend(loc="upper right", frameon=False, fontsize=10)
 
 fig.subplots_adjust(left=0.115, right=0.97, top=0.90, bottom=0.13)

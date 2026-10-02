@@ -100,7 +100,7 @@ from mixlaw_common import (
     TOKENS_PER_STEP,
     VOCAB_SIZE,
     ladder_warmup_steps,
-    normalize_eval_key,
+    parse_trainer_log_record,
 )
 from mixlaw_wandb import (
     add_wandb_args,
@@ -336,7 +336,9 @@ def build_config(
         "scheduler": "cos_with_warmup_and_decay",
         "eval_metric": "task_loss_bpb",
         "eval_interval": args.eval_interval,
+        "device_eval_batch_size": args.device_eval_batch_size,
         "eval_subset_batches": args.eval_subset_batches,
+        "eval_subset_items_per_rank": args.device_eval_batch_size * args.eval_subset_batches,
         "curve_task_labels": curve_labels,
         "seed": args.seed,
         "data_seed": args.data_seed,
@@ -466,6 +468,15 @@ class TaskLossHandler(logging.Handler):
         self.curve_path = progress_dir / "task_loss.jsonl"
         self.progress_path = progress_dir / "progress.json"
         self.wb_run = wb_run
+        self._last_step: Optional[int] = None
+        # step -> {label: bpb}; one curve row per step even when the labels arrive in
+        # separate log records. Rows from an earlier attempt are kept on resume.
+        self._curve: dict[int, dict[str, float]] = {}
+        if self.curve_path.exists():
+            for line in self.curve_path.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    row = json.loads(line)
+                    self._curve.setdefault(int(row["step"]), {}).update(row["task_loss_bpb"])
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
@@ -473,31 +484,19 @@ class TaskLossHandler(logging.Handler):
             if "step=" not in msg and "eval/" not in msg:
                 return
 
-            step: Optional[int] = None
-            train_loss: Optional[float] = None
-            task_losses: dict[str, float] = {}
-            for token in msg.replace(",", " ").split():
-                if "=" not in token:
-                    continue
-                key, _, raw = token.partition("=")
-                try:
-                    value = float(raw)
-                except ValueError:
-                    continue
-                if key == "step":
-                    step = int(value)
-                elif key in ("train/CrossEntropyLoss", "loss"):
-                    train_loss = value
-                else:
-                    label = normalize_eval_key(key)
-                    if label is not None:
-                        task_losses[label] = value
-
+            step, train_loss, task_losses = parse_trainer_log_record(msg, self._last_step)
             if step is None:
                 return
+            self._last_step = step
             if task_losses:
-                with self.curve_path.open("a", encoding="utf-8") as fh:
-                    fh.write(json.dumps({"step": step, "task_loss_bpb": task_losses}) + "\n")
+                self._curve.setdefault(step, {}).update(task_losses)
+                self.curve_path.write_text(
+                    "".join(
+                        json.dumps({"step": s, "task_loss_bpb": row}) + "\n"
+                        for s, row in sorted(self._curve.items())
+                    ),
+                    encoding="utf-8",
+                )
                 if self.wb_run is not None:
                     wandb_log_eval(
                         self.wb_run,

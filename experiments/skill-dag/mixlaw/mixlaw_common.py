@@ -17,6 +17,7 @@ recipe mix fits. Deprecated ``build_mixture_data.py`` slice materialization is
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -270,6 +271,40 @@ def normalize_eval_key(key: str) -> Optional[str]:
         return None
     label = tail.removesuffix("_bpb")
     return label if label in LADDER_TASK_LOSS_LABELS else None
+
+
+_STEP_RE = re.compile(r"\bstep=(\d+)")
+
+
+def parse_trainer_log_record(
+    msg: str, last_step: Optional[int] = None
+) -> tuple[Optional[int], Optional[float], dict[str, float]]:
+    """Pull (step, train loss, {label: task-loss bpb}) out of one trainer log record.
+
+    ai2-olmo 0.6.0 writes the step (``[step=N/T,epoch=E]``) and each evaluator's metric
+    (``<label>`` then ``eval/downstream_bpb/<label>_bpb_bpb=<v>``) as separate records, so
+    a record without ``step=`` takes ``last_step``: the eval for step N runs right after
+    the step-N record. Older versions put both in one record; that still parses.
+    """
+    match = _STEP_RE.search(msg)
+    step = int(match.group(1)) if match else last_step
+    train_loss: Optional[float] = None
+    task_losses: dict[str, float] = {}
+    for token in msg.replace(",", " ").split():
+        key, sep, raw = token.partition("=")
+        if not sep:
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            continue
+        if key in ("train/CrossEntropyLoss", "loss"):
+            train_loss = value
+        else:
+            label = normalize_eval_key(key)
+            if label is not None:
+                task_losses[label] = value
+    return step, train_loss, task_losses
 
 
 @dataclass(frozen=True)

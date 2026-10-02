@@ -36,7 +36,10 @@ PROGRESS_DIR="${PROGRESS_DIR:-$(cd "$(dirname "${SAVE_FOLDER}")" && pwd)/progres
 DEVICE_BATCH_SIZE="${DEVICE_BATCH_SIZE:-32}"
 DEVICE_EVAL_BATCH_SIZE="${DEVICE_EVAL_BATCH_SIZE:-32}"
 EVAL_INTERVAL=120
-EVAL_SUBSET_BATCHES=4
+# In-run evals score DEVICE_EVAL_BATCH_SIZE x EVAL_SUBSET_BATCHES items per label. Keep that at 128
+# (32 x 4 by default) so every probe is read on the same first 128 items as the pilots; on a small
+# GPU use e.g. DEVICE_EVAL_BATCH_SIZE=8 EVAL_SUBSET_BATCHES=16.
+EVAL_SUBSET_BATCHES="${EVAL_SUBSET_BATCHES:-4}"
 NUM_WORKERS="${NUM_WORKERS:-6}"
 DATASET_ID="${DATASET_ID:-pretrain/olmo-127b}"
 DATASET_VERSION="${DATASET_VERSION:-v1}"

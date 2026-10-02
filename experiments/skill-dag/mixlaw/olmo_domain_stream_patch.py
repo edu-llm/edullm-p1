@@ -65,7 +65,7 @@ def apply_olmo_domain_stream_patch(
         domains=domains,
     )
 
-    def _build(_cfg: Any, _data_cfg: Any) -> DomainStreamOlmoDataset:
+    def _build(_cfg: Any, _data_cfg: Any, **_kwargs: Any) -> DomainStreamOlmoDataset:  # ai2-olmo 0.6.0 also passes include_instance_metadata
         return dataset
 
     import olmo.data as od

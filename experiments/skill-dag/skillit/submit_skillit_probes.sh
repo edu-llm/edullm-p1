@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Submit 7 Skill-It DataDecide-60M one-hot probes as one Slurm array (1 GPU per task).
+# Submit the 8 Skill-It DataDecide-60M probes as one Slurm array (1 GPU per task): the
+# 7 one-hot probes plus the reference probe trained on the LightGBM starting mixture.
+#
+# Every probe's in-run eval must score the same 128 items per skill (see launch_probe.sh).
+# On a 48 GB L40S, with one GPU per task:
+#   DEVICE_BATCH_SIZE=4 DEVICE_EVAL_BATCH_SIZE=8 EVAL_SUBSET_BATCHES=16 NUM_WORKERS=2
+# (host RSS grows with (workers + 1) x pool size, so keep NUM_WORKERS small).
 #
 # Prereq: edullm-data pool (../mixlaw/stage_working_pool_from_edullm_data.py) +
 # recipe sidecars (prepare_skillit_probe_data.py).
@@ -33,7 +39,7 @@ POOL_DIR="${POOL_DIR:-}"
 SKILLIT_ROOT="${SKILLIT_ROOT:-${SCRIPT_DIR}}"
 TRAIN_VENV="${TRAIN_VENV:-${VENV:-${LADDER_VENV:-}}}"
 MAX_PARALLEL="${MAX_PARALLEL:-}"
-ARRAY_TASKS="${ARRAY_TASKS:-0-6}"
+ARRAY_TASKS="${ARRAY_TASKS:-0-7}"
 RECIPE_WORK="${RECIPE_WORK:-${RUN_DIR}/recipe}"
 DATASET_ID="${DATASET_ID:-pretrain/olmo-127b}"
 DATASET_VERSION="${DATASET_VERSION:-v1}"
@@ -78,6 +84,7 @@ if [[ "${ALLOW_LOCAL_ONLY}" != "1" && "${WANDB_MODE}" != "online" ]]; then
 fi
 
 cat > "${RUN_DIR}/probe_ids.txt" <<'EOF'
+probe_lgb_start
 probe_dclm
 probe_arxiv
 probe_starcoder
@@ -89,7 +96,7 @@ EOF
 
 N_PROBES="$(wc -l < "${RUN_DIR}/probe_ids.txt" | tr -d ' ')"
 LAST_IDX=$((N_PROBES - 1))
-if [[ "${ARRAY_TASKS}" == "0-6" && "${N_PROBES}" -ne 7 ]]; then
+if [[ "${ARRAY_TASKS}" == "0-7" && "${N_PROBES}" -ne 8 ]]; then
   ARRAY_TASKS="0-${LAST_IDX}"
 fi
 

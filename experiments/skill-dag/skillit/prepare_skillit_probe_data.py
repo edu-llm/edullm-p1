@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Prepare per-probe recipe sidecars for Skill-It 60M one-hot probes.
+"""Prepare per-probe recipe sidecars for the Skill-It 60M probes (seven one-hot
+probes plus the reference probe at the LightGBM starting mixture).
 
 Writes ``mix_weights.json`` under ``<work>/<probe_id>/``. Training streams from
-a working pool staged from published ``edullm-data`` at one-hot weights (no
+a working pool staged from published ``edullm-data`` at the probe's weights (no
 materialized slices). Does **not** read ``s3://edullm-datasets/``.
 """
 from __future__ import annotations

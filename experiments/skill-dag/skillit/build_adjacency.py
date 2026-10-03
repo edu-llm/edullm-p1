@@ -7,9 +7,12 @@ Pipeline:
      120–1440); ``task_loss_final.json`` at 1451 is not appended (see mixlaw README).
   2. Chinchilla-extrapolate each curve family to step 5806 (tpp=20) via
      ``mixlaw/extrapolate_chinchilla.py`` logic.
-  3. ``A_ij = max(0, L_j(r_RegMix) - L_i_j)`` for domains i and families j,
-     with ``L_j(r_RegMix)`` the MixLaw fit's prediction (``mixlaw_fit_chinchilla.json``)
-     at the Data Mixing Laws paper mixture, which this code calls ``regmix``.
+  3. ``A_ij = max(0, L_j(ref) - L_i_j)`` for domains i and families j. By default
+     ``L_j(ref)`` is the MixLaw fit's prediction (``mixlaw_fit_chinchilla.json``) at the
+     Data Mixing Laws paper mixture, which this code calls ``regmix``. With
+     ``--reference-run probe_lgb_start`` it is instead the extrapolated loss of the 60M
+     probe trained on the LightGBM starting mixture, extrapolated by the same step law
+     as the seven one-hot probes (every probe is read on the same 128 eval items).
   4. Write ``artifacts/A_offline.npy`` plus named JSON on runtime scratch and
      upload the directory to W&B.
 """
@@ -49,21 +52,25 @@ from skillit_math import (  # noqa: E402
 
 CHINCHILLA_STEP = 5806  # token_budget(20) → 5806
 LEGACY_UNI_RUN = "probe_uni"
+LGB_START_RUN = "probe_lgb_start"  # the reference probe: trained at the starting mixture
 
 
 def _is_onehot_probe(run_name: str, tag: str) -> bool:
-    if run_name == LEGACY_UNI_RUN or tag == "uniform":
+    if run_name in (LEGACY_UNI_RUN, LGB_START_RUN) or tag in ("uniform", "lgb-start"):
         return False
     return run_name.startswith("probe_")
 
 
-def collect_probe_runs(runs_dir: Path, mixtures_json: Path) -> dict:
-    """Gather one-hot probe progress into a mixlaw_data-compatible payload."""
+def collect_probe_runs(
+    runs_dir: Path, mixtures_json: Path, reference_run: str | None = None
+) -> dict:
+    """Gather one-hot probe progress (plus the reference probe, if named) into a
+    mixlaw_data-compatible payload."""
     mixtures = {m.id: m for m in load_mixtures(mixtures_json)}
     runs = []
     missing = []
     for mix_id, mix in sorted(mixtures.items()):
-        if not _is_onehot_probe(mix.run_name, mix.tag):
+        if not (_is_onehot_probe(mix.run_name, mix.tag) or mix.run_name == reference_run):
             continue
         progress = runs_dir / mix.run_name / "progress"
         final = progress / "task_loss_final.json"
@@ -138,14 +145,15 @@ def build_A_from_extrapolated(
     L_reg: dict[str, float],
     *,
     chinchilla_step: int | None = None,
+    reference_label: str = "regmix",
 ) -> tuple[np.ndarray, dict]:
-    """Construct A (7×6) vs RegMix reference losses."""
+    """Construct A (7×6) vs the reference losses (RegMix fit unless named otherwise)."""
     return offline_A_from_extrapolated(
         report,
         L_reg,
         domains=DOMAINS,
         families=CURVE_FAMILIES,
-        reference_label="regmix",
+        reference_label=reference_label,
         chinchilla_step=chinchilla_step or report.get("chinchilla_steps", CHINCHILLA_STEP),
     )
 
@@ -175,6 +183,14 @@ def main() -> None:
         type=Path,
         default=None,
         help="Mixlaw fit for L_j(r_RegMix) (default: mixlaw/mixlaw_fit_chinchilla.json)",
+    )
+    ap.add_argument(
+        "--reference-run",
+        default=None,
+        help=(
+            "Use this probe run (e.g. probe_lgb_start) as the reference L_j instead of the "
+            "MixLaw fit; it is extrapolated to the Chinchilla step like the one-hot probes"
+        ),
     )
     ap.add_argument(
         "--out-dir",
@@ -210,21 +226,38 @@ def main() -> None:
         )
 
     fit_path = args.fit_json or default_mixlaw_fit_path()
-    fit = load_fit_json(fit_path)
-    L_reg = regmix_family_losses_from_fit(fit, domains=DOMAINS, families=CURVE_FAMILIES)
+    L_reg = None
+    if args.reference_run is None:
+        fit = load_fit_json(fit_path)
+        L_reg = regmix_family_losses_from_fit(fit, domains=DOMAINS, families=CURVE_FAMILIES)
 
     if args.data is not None:
         data = json.loads(args.data.read_text(encoding="utf-8"))
     else:
         if args.runs_dir is None:
             raise SystemExit("provide --runs-dir or --data")
-        data = collect_probe_runs(args.runs_dir, args.mixtures_json)
+        data = collect_probe_runs(args.runs_dir, args.mixtures_json, args.reference_run)
 
     _, default_chin_step, _ = token_budget(20.0)
     target_step = int(args.step) if args.step is not None else default_chin_step
     report = extrapolate_runs(data, target_step, seed=args.seed)
-    A, detail = build_A_from_extrapolated(report, L_reg, chinchilla_step=target_step)
-    detail["fit_json"] = str(fit_path)
+    reference_label = "regmix"
+    if args.reference_run is not None:
+        reference_label = args.reference_run
+        ref = next((r for r in report["runs"] if r["run_name"] == reference_label), None)
+        if ref is None:
+            raise SystemExit(f"reference run {reference_label!r} is not in the collected probe data")
+        L_reg = {}
+        for fam in CURVE_FAMILIES:
+            loss = ref["families"][fam].get("chinchilla")
+            if loss is None:
+                raise SystemExit(f"{reference_label}::{fam}: no Chinchilla extrapolation ({ref['families'][fam].get('note')})")
+            L_reg[fam] = float(loss)
+    A, detail = build_A_from_extrapolated(
+        report, L_reg, chinchilla_step=target_step, reference_label=reference_label
+    )
+    if args.reference_run is None:
+        detail["fit_json"] = str(fit_path)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     npy_path = args.out_dir / "A_offline.npy"
@@ -284,7 +317,7 @@ def main() -> None:
     elif not args.allow_local_only:
         raise SystemExit("W&B cannot be disabled for production artifact publication")
 
-    print("\nA (rows=domains, cols=families); positive = domain beats RegMix @ Chinchilla:")
+    print("\nA (rows=domains, cols=families); positive = domain beats the reference @ Chinchilla:")
     hdr = " ".join(f"{f[:8]:>8}" for f in CURVE_FAMILIES)
     print(f"{'domain':<18} {hdr}")
     for i, d in enumerate(DOMAINS):

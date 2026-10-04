@@ -28,67 +28,67 @@
     "arms": {
       "skillit-probe": {
         "label": "Skill-It probe",
-        "fitted_final": 1.611232,
+        "fitted_final": 1.624686,
         "fitted_final_ci95": [
-          1.607788,
-          1.614142
+          1.620414,
+          1.629173
         ],
-        "fitted_asymptote": 1.5273,
-        "fitted_alpha": 0.988972,
+        "fitted_asymptote": 1.586879,
+        "fitted_alpha": 1.528697,
         "minus_lightgbm_final": {
-          "mean_diff_bpb": -0.012563,
+          "mean_diff_bpb": 0.000875,
           "ci95": [
-            -0.018795,
-            -0.006842
+            -0.005931,
+            0.007498
           ]
         },
         "reaches_lightgbm_final": {
           "target": 1.623822,
-          "point_estimate_step": 2069.8,
+          "point_estimate_step": 2420.4,
           "bootstrap_step": {
-            "fraction_finite": 1.0,
-            "median": 2072.8,
+            "fraction_finite": 0.999975,
+            "median": 2421.2,
             "ci95": [
-              1956.7,
-              2193.0
+              2187.4,
+              2879.2
             ]
           },
-          "probability_within_run": 1.0
+          "probability_within_run": 0.39686
         },
         "gross_step_saving": {
-          "point": 0.131787,
+          "point": -0.015249,
           "ci95": [
-            0.080119,
-            0.179242
+            -0.207728,
+            0.082453
           ],
-          "flops": 3.466015926774525e+18
+          "flops": -4.0105320487648934e+17
         },
         "overhead": {
           "runs_60m": 8,
-          "description": "7 one-hot probes + the mix01 probe",
+          "description": "7 one-hot probes + the LightGBM-start probe",
           "flops": 1.3893605592662016e+18,
           "fraction_of_one_370m_arm": 0.052827,
           "break_even_crossing_step": 2258.1
         },
         "net_saving": {
-          "point": 0.07896,
+          "point": -0.068076,
           "ci95": [
-            0.027292,
-            0.126415
+            -0.260555,
+            0.029626
           ],
-          "flops": 2.0766553675083236e+18,
-          "probability_positive": 0.998735
+          "flops": -1.7904137641426908e+18,
+          "probability_positive": 0.098777
         },
         "converse_lightgbm_reaches_arm_final": {
-          "target": 1.611232,
-          "point_estimate_step": 3479.9,
-          "point_estimate_multiple_of_run": 1.46,
+          "target": 1.624686,
+          "point_estimate_step": 2341.1,
+          "point_estimate_multiple_of_run": 0.982,
           "bootstrap_multiple_of_run": {
-            "fraction_finite": 0.893545,
-            "median": 1.403,
+            "fraction_finite": 0.9993,
+            "median": 0.982,
             "ci95": [
-              1.126,
-              3.502
+              0.884,
+              1.236
             ]
           }
         }

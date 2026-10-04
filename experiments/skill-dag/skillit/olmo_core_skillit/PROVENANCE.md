@@ -60,7 +60,7 @@ excluded" below.)
 
 | Arm | W&B run (`eduLLM/skillit`) | Slurm job | How it ended |
 | --- | --- | --- | --- |
-| Offline probe | `87ad0201c4b5781a3df50d7bb394776c` | 1730368 | Cancelled after the step-2384 checkpoint and eval were saved; see `../../mixlaw/skill_dag_370m_wandb_curves.json` for where that eval is recorded |
+| Offline probe | `iy441nc7` | 1771665 | Trained all 2,384 steps and saved the final checkpoint; ran the static-validation bundle (arms 0-6, with the W&B `finish` fix) with only its offline matrix and the two checksum pins that guard it replaced, by `farmshare/patch_probe_matrix.py` |
 | Online derivative | `c0844ce36f24d6773c7f45cb31d810f4` | 1728144 | Trained all 2,384 steps and saved the final checkpoint; the job then exited with an error from a W&B `finish(quiet=...)` call |
 
 The W&B run metadata for both names `.edullm/runpod/entrypoint.py` in these run
@@ -74,9 +74,11 @@ folders as the program.
 - **Derivative fit:** `experiments/skill-dag/mixlaw/mixlaw_fit_chinchilla.json`.
   The pinned SHA-256 matches the file in this repository.
 - **Offline adjacency:** `experiments/skill-dag/skillit/artifacts/probes_full/A_offline.json`.
-  The embedded matrix is numerically identical to that file's `A`. The pinned
-  file hash does not match either committed version of the file, because its
-  other fields differ from the copy that was hashed.
+  The vendored recipe's embedded matrix is not the one the reported probe arm used:
+  `farmshare/patch_probe_matrix.py` replaces it, in a copy of the bundle, with that
+  file's `A` (LF SHA-256 of the file
+  `b0f99a7310ee18dd1d25976f835fe19b56a45cfb4e518dc666e994dd45f6f762`, which the
+  patched recipe's `offline_a_source_sha256` records).
 
 ## What is included, and why
 
@@ -245,6 +247,29 @@ replaces, including `RECIPE_SHA256 = "28506e7c…"` in `skillit_math.py`, occurs
 exactly once in the files here. The two shell scripts preflighted, submitted
 and ran that patched copy. The vendored files themselves were left unmodified,
 and their hashes above still hold.
+
+Four more files in `farmshare/` run the probe arm with its offline matrix rebuilt
+against the probe trained on the LightGBM starting mixture (Slurm job 1771665, W&B
+`eduLLM/skillit/iy441nc7`):
+
+- `patch_probe_matrix.py`: on a copy of the bundle that
+  `patch_static_validation_arms.py` has patched, replaces `skillit.offline_a` in the
+  recipe with the `A` of `A_offline.json`, records that file's hash as the recipe's
+  `offline_a_source_sha256`, and updates `RECIPE_SHA256` and
+  `OFFLINE_A_SOURCE_SHA256` in `skillit_math.py` to match. It refuses a copy whose
+  recipe does not hash to its own pin, and every string it rewrites occurs exactly
+  once. Nothing else changes.
+- `stage_probe_rerun.sh`: copies the staged static-validation bundle to a new run
+  folder, applies the patch, and checks that exactly the recipe and `skillit_math.py`
+  differ from the source bundle.
+- `farmshare_probe_rerun_l40s.sbatch` and
+  `farmshare_preflight_submit_probe_rerun.sh`: train arm 0 on one 4×L40S node (the
+  preflight also checks that the recipe's matrix equals the staged `A_offline.json`)
+  and submit it.
+
+The trainer and controller files of that run are those of the patched
+static-validation copy, so their hashes are the staged copy's, not the vendored values
+above.
 
 Three more files in `farmshare/` run the four static validation arms on
 4×L40S (Slurm jobs 1745704, 1745706, 1745708, 1760339; W&B

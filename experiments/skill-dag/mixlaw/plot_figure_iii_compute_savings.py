@@ -16,7 +16,7 @@ The step saving is ``1 - crossing / final_step``; training FLOPs are linear in
 steps, so it is also the FLOP saving as a fraction of one 370M arm. The net
 saving subtracts each arm's overhead, counted in 60M runs (``flops.py``):
 
-- offline probe: 8 runs (the seven one-hot probes and the mix01 probe);
+- offline probe: 8 runs (the seven one-hot probes and the probe at the LightGBM starting mixture);
 - online derivative: 24 runs (the MixLaw pilot grid its derivatives come from).
 
 The figure compares only the probe arm with LightGBM: its gross step saving and
@@ -67,7 +67,7 @@ REF_KEY = "lightgbm-l40s"
 # Overhead per dynamic arm, in 60M runs (see the module docstring).
 DYNAMIC = {
     "skillit-probe": {"name": "Skill-It probe", "overhead_runs": 8,
-                      "overhead_desc": "7 one-hot probes + the mix01 probe"},
+                      "overhead_desc": "7 one-hot probes + the LightGBM-start probe"},
     "skillit-derivative": {"name": "Skill-It derivative", "overhead_runs": N_PILOTS,
                            "overhead_desc": f"the {N_PILOTS}-run MixLaw pilot grid"},
 }

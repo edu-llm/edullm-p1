@@ -4,12 +4,12 @@
 Each panel shows the cumulative domain-weight mixture Skill-It was training on
 at each point in the run, as a discrete (step-function) stacked area so it's
 clear the mixture only changes at update boundaries. Probe data reflects the
-FarmShare arm 0 (job 1730368, run "probe" in eduLLM/skillit); the
+FarmShare arm 0 (job 1771665, run "probe-lgbref-farmshare-1771665" in eduLLM/skillit); the
 Derivative panel uses arm 1's update history unchanged.
 
-Update data is read directly from each arm's `skillit_updates.jsonl` (written
-by the Skill-It controller under `<run_dir>/runs/<arm>/progress/`); paste in
-new `p_after` snapshots there if this is ever regenerated for a different run.
+The Probe update data is read from `contamination/skillit_updates_offline-probe.jsonl`
+(`step` and `p_after` copied from the arm's own `skillit_updates.jsonl` under
+`<run_dir>/runs/<arm>/progress/`); the Derivative panel's snapshots are pasted below.
 
 Revisions to the originally published panel: the bands now carry thin white
 separators, so the three ~1% domains at the bottom of the stack (wiki,
@@ -19,6 +19,7 @@ panels and the legend has also been removed.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -41,15 +42,14 @@ COLORS = {
 LEGEND_ORDER = ["wiki", "algebraic-stack", "open-web-math", "pes2o", "starcoder", "arxiv", "dclm"]
 
 
-# Probe: FarmShare arm 0, job 1730368 (skillit_updates.jsonl p_after).
-PROBE_UPDATES = [
-    (0,    {"dclm": 0.5528505096102141, "arxiv": 0.21178482308348512, "starcoder": 0.08723935826031831, "pes2o": 0.08163337756774411, "open-web-math": 0.041786239404329344, "algebraic-stack": 0.013571059505826967, "wiki": 0.01113463256808213}),
-    (500,  {"dclm": 0.6459461253946372, "arxiv": 0.16781238139729543, "starcoder": 0.05665913498302511, "pes2o": 0.07727008631788466, "open-web-math": 0.03104617306715885, "algebraic-stack": 0.010195690011512803, "wiki": 0.011070408828485898}),
-    (875,  {"dclm": 0.7198701613362318, "arxiv": 0.1312047624368636, "starcoder": 0.036709905129594864, "pes2o": 0.07116631617229063, "open-web-math": 0.022842108444754147, "algebraic-stack": 0.0075794641199737394, "wiki": 0.010627282360291075}),
-    (1250, {"dclm": 0.7794252168264567, "arxiv": 0.10092269002172854, "starcoder": 0.023489361157397377, "pes2o": 0.06409198604905098, "open-web-math": 0.016554981127748933, "algebraic-stack": 0.005548523013975088, "wiki": 0.00996724180364266}),
-    (1625, {"dclm": 0.8268532718926198, "arxiv": 0.07654112577077739, "starcoder": 0.014866343692070724, "pes2o": 0.056702142661858995, "open-web-math": 0.011842439816005683, "algebraic-stack": 0.004008018883345155, "wiki": 0.009186657283322052}),
-    (2000, {"dclm": 0.8640046143237808, "arxiv": 0.05748684666307869, "starcoder": 0.009327972256629744, "pes2o": 0.049564753592122174, "open-web-math": 0.00839236464681183, "algebraic-stack": 0.0028678558874201884, "wiki": 0.008355592630156597}),
-]
+# Probe: FarmShare arm 0, job 1771665 (skillit_updates.jsonl p_after), read from the committed
+# per-update log that the contamination analysis also uses.
+def _load_updates(path):
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [(int(r["step"]), r["p_after"]) for r in rows]
+
+
+PROBE_UPDATES = _load_updates(SKILLIT / "contamination" / "skillit_updates_offline-probe.jsonl")
 
 # Derivative: arm 1, job 1728144 (run "derivative" in eduLLM/skillit).
 DERIVATIVE_UPDATES = [

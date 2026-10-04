@@ -49,7 +49,7 @@ Where each reported 370M run ran, as recorded in its W&B run metadata
 | Data Mixing Laws paper | 1745708 | `eduLLM/mixlaw-new/z0alta8r` | 42 | 4.4728 |
 | MixLaw | 1745706 | `eduLLM/mixlaw-new/nm6i8hxy` | 42 | 4.4728 |
 | LightGBM | 1744338 | `eduLLM/mixlaw-new/zgmte13g` | 42 | 4.4728 |
-| Skill-It offline probe | 1730368 | `eduLLM/skillit/87ad0201c4b5781a3df50d7bb394776c` | 42 | 4.4728 |
+| Skill-It offline probe (matrix rebuilt against the LightGBM-start probe) | 1771665 | `eduLLM/skillit/iy441nc7` | 42 | 4.4728 |
 | Skill-It online derivative | 1728144 | `eduLLM/skillit/c0844ce36f24d6773c7f45cb31d810f4` | 42 | 4.4728 |
 
 The step-0 value is 4.47281289100647 in all seven runs. All seven ran the vendored

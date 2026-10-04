@@ -1,29 +1,4 @@
 {
-  "probe_reference": {
-    "reference_losses_fit_prediction": {
-      "arc_challenge": 1.5458269048205122,
-      "arc_easy": 2.0008992830994505,
-      "mmlu_humanities": 1.7311722777495324,
-      "mmlu_other": 2.4672482040889805,
-      "mmlu_social_sciences": 1.3052671211137565,
-      "mmlu_stem": 2.2974182141071533
-    },
-    "reference_losses_mix01_extrapolated": {
-      "arc_challenge": 1.5378618095540513,
-      "arc_easy": 1.962216866603639,
-      "mmlu_humanities": 1.7189504947465175,
-      "mmlu_other": 2.512776685184055,
-      "mmlu_social_sciences": 1.3765220124438238,
-      "mmlu_stem": 2.2267560187253017
-    },
-    "mix01_vs_committed": {
-      "pearson_r": 0.9869820474542182,
-      "density": 0.40476190476190477,
-      "reference_density": 0.40476190476190477,
-      "edge_disagreements": 2,
-      "max_abs_diff": 0.07125489133006724
-    }
-  },
   "simplex_derivative": {
     "per_update": {
       "500": {

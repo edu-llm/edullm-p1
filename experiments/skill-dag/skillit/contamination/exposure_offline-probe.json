@@ -6,93 +6,93 @@
    "step": 0,
    "length_steps": 500,
    "weights": {
-    "dclm": 0.5528505096102141,
-    "arxiv": 0.21178482308348515,
-    "starcoder": 0.08723935826031831,
-    "pes2o": 0.08163337756774411,
-    "open-web-math": 0.041786239404329344,
     "algebraic-stack": 0.013571059505826967,
+    "arxiv": 0.21178482308348512,
+    "dclm": 0.5528505096102141,
+    "open-web-math": 0.041786239404329344,
+    "pes2o": 0.08163337756774411,
+    "starcoder": 0.08723935826031831,
     "wiki": 0.01113463256808213
    },
    "matched_span_word_rate": 1.4942132640290685e-05,
-   "matched_document_rate": 0.0006545431793154429
+   "matched_document_rate": 0.0006545431793154428
   },
   {
    "step": 500,
    "length_steps": 375,
    "weights": {
-    "algebraic-stack": 0.010195690011512803,
-    "arxiv": 0.16781238139729543,
-    "dclm": 0.6459461253946372,
-    "open-web-math": 0.03104617306715885,
-    "pes2o": 0.07727008631788466,
-    "starcoder": 0.05665913498302511,
-    "wiki": 0.011070408828485898
+    "algebraic-stack": 0.013101545154874867,
+    "arxiv": 0.20445775965790267,
+    "dclm": 0.5497751832472936,
+    "open-web-math": 0.05021192677024732,
+    "pes2o": 0.08705446229683085,
+    "starcoder": 0.08422116129098926,
+    "wiki": 0.01117796158186142
    },
-   "matched_span_word_rate": 1.6101961599346083e-05,
-   "matched_document_rate": 0.0006748467113206141
+   "matched_span_word_rate": 1.489412922129362e-05,
+   "matched_document_rate": 0.000652993069174415
   },
   {
    "step": 875,
    "length_steps": 375,
    "weights": {
-    "algebraic-stack": 0.00757946411997374,
-    "arxiv": 0.13120476243686363,
-    "dclm": 0.7198701613362319,
-    "open-web-math": 0.02284210844475415,
-    "pes2o": 0.07116631617229065,
-    "starcoder": 0.03670990512959487,
-    "wiki": 0.010627282360291077
+    "algebraic-stack": 0.012669834221291644,
+    "arxiv": 0.19772064206934067,
+    "dclm": 0.5456025825344172,
+    "open-web-math": 0.059297600479709514,
+    "pes2o": 0.0920689695244849,
+    "starcoder": 0.08144597746812028,
+    "wiki": 0.011194393702635844
    },
-   "matched_span_word_rate": 1.6977602921555282e-05,
-   "matched_document_rate": 0.0006889205811790595
+   "matched_span_word_rate": 1.48352637815479e-05,
+   "matched_document_rate": 0.0006515008589160207
   },
   {
    "step": 1250,
    "length_steps": 375,
    "weights": {
-    "algebraic-stack": 0.005548523013975087,
-    "arxiv": 0.10092269002172852,
-    "dclm": 0.7794252168264565,
-    "open-web-math": 0.01655498112774893,
-    "pes2o": 0.06409198604905096,
-    "starcoder": 0.02348936115739737,
-    "wiki": 0.009967241803642658
+    "algebraic-stack": 0.012232961135817656,
+    "arxiv": 0.19090296589031294,
+    "dclm": 0.5403230925658284,
+    "open-web-math": 0.06966453380350093,
+    "pes2o": 0.09705709408200147,
+    "starcoder": 0.07863760958780917,
+    "wiki": 0.011181742934729493
    },
-   "matched_span_word_rate": 1.765315537784422e-05,
-   "matched_document_rate": 0.000699134974292024
+   "matched_span_word_rate": 1.4764198713888473e-05,
+   "matched_document_rate": 0.000649986784875144
   },
   {
    "step": 1625,
    "length_steps": 375,
    "weights": {
-    "algebraic-stack": 0.004008018883345156,
-    "arxiv": 0.0765411257707774,
-    "dclm": 0.82685327189262,
-    "open-web-math": 0.011842439816005686,
-    "pes2o": 0.05670214266185901,
-    "starcoder": 0.014866343692070728,
-    "wiki": 0.009186657283322054
+    "algebraic-stack": 0.011790047585304752,
+    "arxiv": 0.18399102449794202,
+    "dclm": 0.5339618719991018,
+    "open-web-math": 0.08135775792534787,
+    "pes2o": 0.10196725603712789,
+    "starcoder": 0.07579041155622188,
+    "wiki": 0.011141630398953785
    },
-   "matched_span_word_rate": 1.8169544706900104e-05,
-   "matched_document_rate": 0.0007066836910260717
+   "matched_span_word_rate": 1.4681823257919076e-05,
+   "matched_document_rate": 0.0006484783766389936
   },
   {
    "step": 2000,
    "length_steps": 384,
    "weights": {
-    "algebraic-stack": 0.0028678558874201884,
-    "arxiv": 0.05748684666307869,
-    "dclm": 0.8640046143237808,
-    "open-web-math": 0.00839236464681183,
-    "pes2o": 0.049564753592122174,
-    "starcoder": 0.009327972256629744,
-    "wiki": 0.008355592630156597
+    "algebraic-stack": 0.011341191459403993,
+    "arxiv": 0.1769863455211079,
+    "dclm": 0.5263819838559176,
+    "open-web-math": 0.0945505931562953,
+    "pes2o": 0.10676085238355178,
+    "starcoder": 0.07290501264112749,
+    "wiki": 0.011074020982596043
    },
-   "matched_span_word_rate": 1.855747486867246e-05,
-   "matched_document_rate": 0.0007123412844816713
+   "matched_span_word_rate": 1.4587210462903444e-05,
+   "matched_document_rate": 0.0006469887604273264
   }
  ],
- "time_weighted_avg_matched_span_word_rate": 1.6961193748671433e-05,
- "time_weighted_avg_matched_document_rate": 0.000687670040721622
+ "time_weighted_avg_matched_span_word_rate": 1.4791667681792646e-05,
+ "time_weighted_avg_matched_document_rate": 0.0006509332769561786
 }

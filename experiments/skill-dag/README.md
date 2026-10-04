@@ -5,7 +5,7 @@ Domain-mixture levers under a shared Mixing Laws Dataset / OLMoHQ × OLMo-2 370M
 | Experiment | Question | Outcome |
 |------------|----------|---------|
 | MixLaw | Can a mixing law from short runs beat fixed mixtures? | **No** — none of the three optimized static mixtures beats the Olmo-mix-1124 control average (fitted final 1.6148 bpb): LightGBM 1.6238 (\(+0.0091\), \(p = 0.0048\)), Data Mixing Laws 1.6411 (\(+0.0264\), \(p < 5\times10^{-6}\)) and MixLaw 1.6433 (\(+0.0286\), \(p < 5\times10^{-6}\)) all finish behind it |
-| Skill-It | Can mid-run Skill-It reweighting beat the fixed mixture it starts from? | **No reliable evidence** — against the control average, probe \(-0.0035\) bpb (\(p = 0.20\)) and derivative \(+0.0019\) (\(p = 0.66\)) are indistinguishable from it. The probe arm does finish ahead of its own static starting mixture (LightGBM, \(-0.0126\), \(p < 5\times10^{-6}\); derivative \(-0.0072\), \(p = 0.087\)), but that gap is about the size of the 0.0105 bpb difference between the two control seeds |
+| Skill-It | Can mid-run Skill-It reweighting beat the fixed mixture it starts from? | **No** — against the control average, the probe arm is worse (\(+0.0099\) bpb, \(p = 0.0010\) two-sided) and the derivative arm indistinguishable (\(+0.0019\), \(p = 0.66\)). Against its own static starting mixture (LightGBM) the probe arm is indistinguishable (\(+0.0009\), \(p = 0.79\)) and the derivative arm finishes \(0.0072\) ahead (two-sided \(p = 0.087\), one-sided \(0.044\)), less than the 0.0105 bpb difference between the two control seeds |
 
 All seven reported 370M runs (the Olmo-mix-1124 control at data seeds 42 and 69,
 Data Mixing Laws, MixLaw, LightGBM, and the two Skill-It arms) ran the vendored

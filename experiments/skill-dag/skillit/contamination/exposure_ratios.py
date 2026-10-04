@@ -11,7 +11,7 @@ Reads the committed outputs only; recomputes nothing upstream:
 
 For each arm it prints the ratio of the time-weighted average to the
 baseline and to the arm's own start, for both rates. These are the
-"0.89x baseline; 1.14x its own start"-style figures in `README.md`.
+"0.78x baseline; 0.99x its own start"-style figures in `README.md`.
 """
 
 from __future__ import annotations

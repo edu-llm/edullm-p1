@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Plot Chinchilla-extrapolated probe task-loss curves and build offline A vs RegMix."""
+"""Plot Chinchilla-extrapolated probe task-loss curves and build offline A.
+
+Two modes. The original rebuilds everything from per-probe logs against the RegMix fit
+(``--runs-dir/--logs-dir/--out-dir``). ``--artifacts-dir`` instead re-plots a finished
+``artifacts/probes_full`` (as written by ``build_adjacency.py --reference-run``), labeling
+the reference by the probe it was measured on.
+"""
 from __future__ import annotations
 
 import argparse
@@ -109,7 +115,9 @@ def family_series(curve: list[dict], family: str) -> tuple[list[int], list[float
     return steps, vals
 
 
-def plot_chinchilla_curves(report: dict, L_reg: dict[str, float], out_path: Path) -> None:
+def plot_chinchilla_curves(
+    report: dict, L_reg: dict[str, float], out_path: Path, ref_label: str = "RegMix"
+) -> None:
     cmap = plt.get_cmap("tab10")
     colors = {run["run_name"]: cmap(i) for i, run in enumerate(report["runs"])}
 
@@ -147,7 +155,7 @@ def plot_chinchilla_curves(report: dict, L_reg: dict[str, float], out_path: Path
     fig.tight_layout(rect=[0, 0, 1, 0.86])
     fig.suptitle(
         "Skill-It one-hot probes: measured evals (solid) + Chinchilla extrapolation "
-        f"(dashed → step {chin_step}); dotted = RegMix reference",
+        f"(dashed → step {chin_step}); dotted = {ref_label} reference",
         fontsize=11,
         y=0.99,
     )
@@ -165,7 +173,9 @@ def plot_chinchilla_curves(report: dict, L_reg: dict[str, float], out_path: Path
     print(f"wrote {out_path}")
 
 
-def plot_chinchilla_macro(report: dict, L_reg: dict[str, float], out_path: Path) -> None:
+def plot_chinchilla_macro(
+    report: dict, L_reg: dict[str, float], out_path: Path, ref_label: str = "RegMix"
+) -> None:
     cmap = plt.get_cmap("tab10")
     fig, ax = plt.subplots(figsize=(10, 5))
     reg_macro = float(np.mean([L_reg[f] for f in CURVE_FAMILIES]))
@@ -205,7 +215,7 @@ def plot_chinchilla_macro(report: dict, L_reg: dict[str, float], out_path: Path)
                 ax.plot(smooth[: len(ext_y)], ext_y, "--", lw=1.0, color=color, alpha=0.75)
             ax.scatter([chin_step], [chin_macro], marker="*", s=70, color=color, zorder=5)
 
-    ax.axhline(reg_macro, color="0.35", ls=":", lw=1.2, label="RegMix (chin)")
+    ax.axhline(reg_macro, color="0.35", ls=":", lw=1.2, label=f"{ref_label} (chin)")
     ax.set_xlabel("training step")
     ax.set_ylabel("macro mean task loss (bpb)")
     ax.set_title(f"Macro mean over 6 families (Chinchilla @ step {chin_step})")
@@ -231,11 +241,27 @@ def print_A(A: np.ndarray, L_reg: dict[str, float]) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--runs-dir", type=Path, required=True)
-    ap.add_argument("--logs-dir", type=Path, required=True)
-    ap.add_argument("--out-dir", type=Path, required=True)
+    ap.add_argument("--runs-dir", type=Path)
+    ap.add_argument("--logs-dir", type=Path)
+    ap.add_argument("--out-dir", type=Path)
+    ap.add_argument(
+        "--artifacts-dir",
+        type=Path,
+        help="re-plot an existing probes_full directory (probe_chinchilla_extrapolated.json + A_offline.json)",
+    )
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
+
+    if args.artifacts_dir is not None:
+        report = json.loads((args.artifacts_dir / "probe_chinchilla_extrapolated.json").read_text(encoding="utf-8"))
+        detail = json.loads((args.artifacts_dir / "A_offline.json").read_text(encoding="utf-8"))
+        L_ref = {fam: float(v) for fam, v in detail["reference_losses"].items()}
+        label = {"probe_lgb_start": "LightGBM-start probe"}.get(detail["reference"], detail["reference"])
+        plot_chinchilla_curves(report, L_ref, args.artifacts_dir / "task_loss_chinchilla_by_family.png", label)
+        plot_chinchilla_macro(report, L_ref, args.artifacts_dir / "task_loss_chinchilla_macro.png", label)
+        return
+    if args.runs_dir is None or args.logs_dir is None or args.out_dir is None:
+        ap.error("--runs-dir, --logs-dir and --out-dir are required unless --artifacts-dir is given")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     data = {

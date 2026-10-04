@@ -56,7 +56,7 @@ and the realized post-update mixture `p_after`.
 **Provenance of these six-row files.** Each is `step` and `p_after` read
 directly off the raw per-step Skill-It update log (`skillit_updates.jsonl`)
 written by that arm's own FarmShare training run --
-`skillit-370m-probe-rerun-20260918-011120` for offline probe,
+`probe-lgbref-20261003` for offline probe,
 `skillit-370m-deriv-20260916-124719` for online derivative -- not
 transcribed from a table. Both logs' step-0 `p_after` matches
 `LGB-min1pct`'s published weight vector in
@@ -75,15 +75,15 @@ doc rate 6.545e-04 -- `LGB-min1pct`'s own exposure
 | Step | Length (steps) | `weight[dclm]` | `weight[wiki]` | Span rate | Doc rate |
 | --- | --- | --- | --- | --- | --- |
 | 0 | 500 | 0.553 | 0.011 | 1.494e-05 | 6.545e-04 |
-| 500 | 375 | 0.646 | 0.011 | 1.610e-05 | 6.748e-04 |
-| 875 | 375 | 0.720 | 0.011 | 1.698e-05 | 6.889e-04 |
-| 1250 | 375 | 0.779 | 0.010 | 1.765e-05 | 6.991e-04 |
-| 1625 | 375 | 0.827 | 0.009 | 1.817e-05 | 7.067e-04 |
-| 2000 | 384 | 0.864 | 0.008 | 1.856e-05 | 7.123e-04 |
+| 500 | 375 | 0.550 | 0.011 | 1.489e-05 | 6.530e-04 |
+| 875 | 375 | 0.546 | 0.011 | 1.484e-05 | 6.515e-04 |
+| 1250 | 375 | 0.540 | 0.011 | 1.476e-05 | 6.500e-04 |
+| 1625 | 375 | 0.534 | 0.011 | 1.468e-05 | 6.485e-04 |
+| 2000 | 384 | 0.526 | 0.011 | 1.459e-05 | 6.470e-04 |
 
-**Time-weighted average: span rate 1.696e-05 (0.89x the `olmo-mix-1124`
-baseline; 1.14x the LightGBM-optimized mixture it actually starts from),
-doc rate 6.877e-04 (0.96x baseline; 1.05x its own start).**
+**Time-weighted average: span rate 1.479e-05 (0.78x the `olmo-mix-1124`
+baseline; 0.99x the LightGBM-optimized mixture it actually starts from),
+doc rate 6.509e-04 (0.91x baseline; 0.99x its own start).**
 
 ### Online derivative
 
@@ -101,31 +101,29 @@ start), doc rate 6.575e-04 (0.92x baseline; 1.00x its own start).**
 
 ### Reading these together
 
-Both arms start at the identical LightGBM-optimized mixture but diverge
-sharply in how they move. Offline probe's fixed adjacency drives `dclm`
-weight up monotonically -- 0.553 to 0.864 by step 2000 -- squeezing every
-other domain down, `wiki` included (0.011 to 0.008). Online derivative's
-recomputed adjacency does the opposite on `wiki`: it more than quadruples
-that share (0.011 to 0.047) while leaving `dclm` close to where it started
-(0.553 to 0.549).
+Both arms start at the identical LightGBM-optimized mixture but move
+differently. Offline probe's sparse adjacency (8 nonzero cells) moves the mixture
+only slowly: `dclm` weight drifts down from 0.553 to 0.526 by step 2000, `arxiv`
+and `starcoder` fall, `open-web-math` (0.042 to 0.095) and `pes2o` (0.082 to
+0.107) rise, and `wiki` stays at 0.011. Online derivative's recomputed adjacency
+instead more than quadruples the `wiki` share (0.011 to 0.047) while leaving `dclm`
+close to where it started (0.553 to 0.549).
 
-Despite moving in opposite directions on the highest-rate domain, both
-arms end up *more* exposed than their own starting mixture. `dclm`'s own
-span rate (1.965e-05) already sits above the LightGBM blend's average
-(1.494e-05), so offline probe's concentration into `dclm` raises exposure
-by itself, with no help from `wiki` -- exposure rises even as the arm
-moves away from the single highest-rate domain. Online derivative's rise
-comes from the opposite mechanism: `wiki`'s span rate (9.504e-05) is 4.8x
-`dclm`'s, so even a modest reallocation onto it (1.1% to 4.7% of the
-mixture) is enough to lift the time-weighted average while `dclm` barely
-moves.
+The two arms end up on opposite sides of their own starting exposure. Offline
+probe's exposure falls slightly (0.99x its start in both rates): `dclm`'s own
+span rate (1.965e-05) sits above the LightGBM blend's average (1.494e-05), so
+the small shift away from `dclm` lowers exposure. Online derivative's rise comes
+from the opposite mechanism: `wiki`'s span rate (9.504e-05) is 4.8x `dclm`'s, so
+even a modest reallocation onto it (1.1% to 4.7% of the mixture) is enough to
+lift the time-weighted average while `dclm` barely moves.
 
-Span rate and document rate agree in direction for both arms here (both
-rise relative to each arm's own start), unlike the mixlaw arms in
-`../../mixlaw/contamination/README.md`, where a large realized shift onto
-`wiki` specifically is what pulls the two metrics apart. Neither arm here
-moves enough onto (or away from) `wiki` on its own to produce that split at
-the level of the time-weighted average.
+Span rate and document rate agree in direction for the offline probe (both
+fall slightly relative to its start), but for the online derivative the span
+rate rises (1.08x its start) while the document rate is unchanged (1.00x), as in
+the mixlaw arms in `../../mixlaw/contamination/README.md`, where a large
+realized shift onto `wiki` specifically is what pulls the two metrics apart.
+Neither arm here moves enough onto (or away from) `wiki` on its own to produce
+a large split at the level of the time-weighted average.
 
 This directory reports exposure only -- it does not compare either arm's
 task-loss outcome, since a same-scale contamination comparison depends on
@@ -178,7 +176,7 @@ python "$CONTAM/exposure_ratios.py"
 
 To reproduce the `skillit_updates_<arm>.jsonl` files themselves from source,
 pull the raw `skillit_updates.jsonl` progress log written by each arm's own
-FarmShare run (`skillit-370m-probe-rerun-20260918-011120` for offline probe,
+FarmShare run (`probe-lgbref-20261003` for offline probe,
 `skillit-370m-deriv-20260916-124719` for online derivative) and extract each
 row's `step` and `p_after` fields; the rest of that log (`A`, `losses`,
 `p_before`, `r`, ...) is not needed here.

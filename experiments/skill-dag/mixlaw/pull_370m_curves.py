@@ -7,33 +7,27 @@ on ``experiments/token-selection/fit_and_plot.py``'s ``load_curves_from_wandb``.
 
 Arms and where they log
 ------------------------
-Two dynamic (Skill-It) arms log to ``eduLLM/skillit``, unchanged since they
-predate the four newer runs. The five static arms -- the 4x L40S LightGBM
-run and the four new all-L40S validation runs -- all log to
+Two dynamic (Skill-It) arms log to ``eduLLM/skillit``. The five static arms -- the
+4x L40S LightGBM run and the four all-L40S validation runs -- all log to
 ``eduLLM/mixlaw-new``. Every run is pinned by its W&B run ID (display names
-are editable and some were shortened after the fact), and each new run's
-logged ``arm_id`` and ``data_seed`` are checked against the expected values:
+are editable), and each run's logged ``arm_id`` and ``data_seed`` are checked
+against the expected values:
 
     i9z1vtbt  static-olmo-mix-1124-s42  seed 42  (Slurm job 1745704)
     3vbmxzmg  static-olmo-mix-1124-s69  seed 69  (Slurm job 1760339)
     z0alta8r  static-mix01-s42          seed 42  (Slurm job 1745708)
     nm6i8hxy  static-ml-min1pct-s42     seed 42  (Slurm job 1745706)
+    iy441nc7  probe                     seed 42  (Slurm job 1771665; offline matrix
+                                                  rebuilt against the LightGBM-start probe)
 
 Per-run quirks handled here
 ----------------------------
-- The probe run's W&B history stops at step 2383 (job 1730368 was cancelled
-  right after the step-2384 checkpoint and eval were saved). Its step-2384
-  row was appended to the run's own history after the fact (see
-  ``artifacts/probe_arm/step2384_task_loss.json`` and the PROVENANCE note on
-  ``eduLLM/mixlaw-new``'s "Added after vendoring" section); this script reads
-  it from W&B (``scan_history`` does not return it; ``run.history()`` does,
-  see ``pull_arm``) and does not need a file fallback.
-- The probe run's history additionally contains exact duplicate rows for
-  steps 2000-2383 after that append (a resume side effect). Every arm is
-  de-duplicated by step, keeping the last logged row for a given step.
+- Every arm is de-duplicated by step, keeping the last logged row for a given
+  step (a resume repeats rows). A run whose exported history stream lacks a
+  ladder step has it filled from ``run.history()`` (see ``pull_arm``).
 - Summary values differ from history values by one ULP on some keys (a W&B
-  serialization quirk observed on zgmte13g, the probe run, and its clone).
-  This script reads only ``scan_history``, never ``run.summary``.
+  serialization quirk). This script reads only ``scan_history`` and
+  ``run.history()``, never ``run.summary``.
 
 Every macro value is checked against the mean of its own 20 per-label values,
 and the whole ladder (0, 125, ..., 2250, 2384) is required for every arm.
@@ -97,7 +91,7 @@ RUNS = {
                                 "Data Mixing Laws paper mixture", 2),
     "mixlaw-fit": ("mixlaw-new", "nm6i8hxy", None,
                     "MixLaw fit (ours), 1%-floor optimum", 3),
-    "skillit-probe": ("skillit", "87ad0201c4b5781a3df50d7bb394776c", None,
+    "skillit-probe": ("skillit", "iy441nc7", None,
                        "Skill-It offline probe", 5),
     "skillit-derivative": ("skillit", "c0844ce36f24d6773c7f45cb31d810f4", None,
                             "Skill-It online derivative", 6),
@@ -135,6 +129,7 @@ EXPECTED_IDENTITY = {
     "olmo-mix-1124-s69": ("static-olmo-mix-1124-s69", 69),
     "data-mixing-laws-paper": ("static-mix01-s42", 42),
     "mixlaw-fit": ("static-ml-min1pct-s42", 42),
+    "skillit-probe": ("probe", 42),
 }
 
 
@@ -154,11 +149,10 @@ def pull_arm(api, key: str) -> dict:
         by_step[step] = row  # last write wins -- de-dupes resume-repeated rows
 
     if any(s not in by_step for s in EVAL_LADDER):
-        # scan_history reads the run's exported history stream, which omits rows
-        # appended after the run finished (the probe's step-2384 row, see the
-        # module docstring). run.history() queries the live history store and
-        # includes them. It only fills ladder steps scan_history lacks, so every
-        # other row keeps its scan_history value.
+        # scan_history reads the run's exported history stream, which can omit rows
+        # appended after the run finished. run.history() queries the live history
+        # store and includes them. It only fills ladder steps scan_history lacks,
+        # so every other row keeps its scan_history value.
         for row in run.history(keys=HISTORY_KEYS, samples=10_000, pandas=False):
             if row.get("eval/macro_bpb") is None:
                 continue

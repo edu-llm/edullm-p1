@@ -47,11 +47,11 @@
     },
     "skillit-probe": {
       "label": "Skill-It offline probe",
-      "fitted_final": 1.611232,
-      "observed_final": 1.612357,
+      "fitted_final": 1.624686,
+      "observed_final": 1.624605,
       "ci95": [
-        1.607788,
-        1.614142
+        1.620414,
+        1.629173
       ]
     },
     "skillit-derivative": {
@@ -90,7 +90,9 @@
         0.032513
       ],
       "p_value": 5e-06,
-      "p_display": "p < 5e-06"
+      "p_display": "p < 5e-06",
+      "p_one_sided": 1.0,
+      "p_one_sided_display": "\u2014"
     },
     "mixlaw-fit_vs_olmo_average": {
       "mean_diff_bpb": 0.028601,
@@ -99,16 +101,20 @@
         0.033841
       ],
       "p_value": 5e-06,
-      "p_display": "p < 5e-06"
+      "p_display": "p < 5e-06",
+      "p_one_sided": 1.0,
+      "p_one_sided_display": "\u2014"
     },
     "skillit-probe_vs_olmo_average": {
-      "mean_diff_bpb": -0.003494,
+      "mean_diff_bpb": 0.009945,
       "ci95": [
-        -0.008923,
-        0.001749
+        0.003924,
+        0.016146
       ],
-      "p_value": 0.19897,
-      "p_display": "p = 0.1990"
+      "p_value": 0.00096,
+      "p_display": "p = 0.0010",
+      "p_one_sided": 0.99952,
+      "p_one_sided_display": "\u2014"
     },
     "skillit-derivative_vs_olmo_average": {
       "mean_diff_bpb": 0.001876,
@@ -117,7 +123,9 @@
         0.009901
       ],
       "p_value": 0.65548,
-      "p_display": "p = 0.6555"
+      "p_display": "p = 0.6555",
+      "p_one_sided": 0.67226,
+      "p_one_sided_display": "\u2014"
     },
     "lightgbm-l40s_vs_olmo_average": {
       "mean_diff_bpb": 0.00907,
@@ -126,16 +134,20 @@
         0.015847
       ],
       "p_value": 0.00476,
-      "p_display": "p = 0.0048"
+      "p_display": "p = 0.0048",
+      "p_one_sided": 0.99762,
+      "p_one_sided_display": "\u2014"
     },
     "skillit-probe_vs_lightgbm-l40s": {
-      "mean_diff_bpb": -0.012563,
+      "mean_diff_bpb": 0.000875,
       "ci95": [
-        -0.018795,
-        -0.006842
+        -0.005931,
+        0.007498
       ],
-      "p_value": 5e-06,
-      "p_display": "p < 5e-06"
+      "p_value": 0.79372,
+      "p_display": "p = 0.7937",
+      "p_one_sided": 0.60314,
+      "p_one_sided_display": "\u2014"
     },
     "skillit-derivative_vs_lightgbm-l40s": {
       "mean_diff_bpb": -0.007194,
@@ -144,7 +156,9 @@
         0.001159
       ],
       "p_value": 0.08715,
-      "p_display": "p = 0.0872"
+      "p_display": "p = 0.0872",
+      "p_one_sided": 0.043575,
+      "p_one_sided_display": "p = 0.0436"
     }
   },
   "seed_variance_estimate": {

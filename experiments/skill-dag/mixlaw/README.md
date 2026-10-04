@@ -407,7 +407,7 @@ Task-loss is evaluated on the shared 20-label suite every 125 of the 2384 steps 
 1. Fit $y = a + b / \mathrm{step}^{\alpha}$ on all eval points with step ≥ 1000 ($\alpha$ on a grid in $[0.05, 3]$).
 2. Take the fitted value at the final step as the point estimate.
 3. Alpha-free residual bootstrap (200,000 draws, $\alpha$ re-selected on every draw) for a 95% CI on that fitted final.
-4. Pairwise $\Delta = \mathrm{arm} - \mathrm{control}$ from independent bootstraps (control = the two-seed Olmo-mix-1124 average); two-sided $p$ is floored at the bootstrap resolution, $5\times10^{-6}$. Positive $\Delta$ means the arm finishes worse than the control.
+4. Pairwise $\Delta = \mathrm{arm} - \mathrm{control}$ from independent bootstraps (control = the two-seed Olmo-mix-1124 average); two-sided $p$ is floored at the bootstrap resolution, $5\times10^{-6}$. Positive $\Delta$ means the arm finishes worse than the control. The results JSON also carries a one-sided $p$ (`p_one_sided`: the fraction of draws of $\Delta$ that are $\ge 0$, half the two-sided $p$ when the arm is better), which is the convention the paper quotes for "arm beats reference", with an em dash for an arm that did not beat it; the seed-variance estimate stays two-sided. The $p$ values in the tables below are two-sided unless marked one-sided.
 
 Each arm is a single run, so these intervals cover power-law-fit uncertainty within a run only. The two control seeds are the only run-to-run estimate.
 
@@ -474,7 +474,7 @@ MixLaw is significantly worse than the control on 7 of the 8 never-targeted labe
 LightGBM on 6 (all but WinoGrande and BoolQ). BoolQ is the only label where either
 is significantly better (MixLaw -0.2253 bpb, LightGBM -0.1580), against a 0.3578 bpb
 seed spread on that label, so that difference cannot be separated from run-to-run
-variation. HellaSwag is worse under both mixtures
+variation. (The same subsets and per-label comparison for the two Skill-It arms, against both the control and the LightGBM mixture they start from, are in [`dynamic_arm_labels.py`](dynamic_arm_labels.py); [`mmlu_stem_combined.py`](mmlu_stem_combined.py) averages the MMLU STEM validation and test labels for the static arms.) HellaSwag is worse under both mixtures
 (MixLaw +0.0274, LightGBM +0.0280, both $p < 5\times10^{-6}$) against a seed spread
 of 0.0053 bpb; PIQA is worse under both (+0.0382 and +0.0415, $p < 5\times10^{-6}$)
 against a seed spread of 0.0282.

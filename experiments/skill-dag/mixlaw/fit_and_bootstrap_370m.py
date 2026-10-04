@@ -224,9 +224,26 @@ def diff_p(a: np.ndarray, b: np.ndarray) -> float:
     return float(max(min(p, 1.0), 1.0 / n))
 
 
+def diff_p_one_sided(a: np.ndarray, b: np.ndarray) -> float:
+    """One-sided bootstrap p-value that arm ``a`` has lower loss than ``b``, floored at 1/n.
+
+    The fraction of draws of ``a - b`` that are >= 0 (same independent-draws
+    construction as ``diff_p``). It equals half the two-sided ``diff_p`` whenever the
+    mean difference is negative; an arm that is not better has no one-sided p-value
+    worth quoting (``fmt_p_one_sided`` prints an em dash for it).
+    """
+    d = a - b
+    return float(max((d >= 0).mean(), 1.0 / d.size))
+
+
 def fmt_p(p: float, n_boot: int) -> str:
     floor = 1.0 / n_boot
     return f"p < {floor:g}" if p <= floor else f"p = {p:.4f}"
+
+
+def fmt_p_one_sided(p: float, mean_diff: float, n_boot: int) -> str:
+    """Table form of a one-sided p: an em dash when the arm did not beat the reference."""
+    return "—" if mean_diff >= 0 else fmt_p(p, n_boot)
 
 
 def main() -> None:
@@ -294,13 +311,17 @@ def main() -> None:
         d = finals[key] - ctrl
         p = diff_p(finals[key], ctrl)
         lo, hi = ci(d)
+        p1 = diff_p_one_sided(finals[key], ctrl)
         out["comparisons"][f"{key}_vs_olmo_average"] = {
             "mean_diff_bpb": round(float(d.mean()), 6),
             "ci95": [round(lo, 6), round(hi, 6)],
             "p_value": p,
             "p_display": fmt_p(p, args.n_boot),
+            "p_one_sided": p1,
+            "p_one_sided_display": fmt_p_one_sided(p1, float(d.mean()), args.n_boot),
         }
-        print(f"{key:28s} vs olmo avg: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
+        print(f"{key:28s} vs olmo avg: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  "
+              f"{fmt_p(p, args.n_boot)} two-sided, {fmt_p_one_sided(p1, float(d.mean()), args.n_boot)} one-sided")
 
     # Dynamic arms against the static LightGBM mixture they start from.
     print()
@@ -308,13 +329,17 @@ def main() -> None:
         d = finals[key] - finals[ref]
         p = diff_p(finals[key], finals[ref])
         lo, hi = ci(d)
+        p1 = diff_p_one_sided(finals[key], finals[ref])
         out["comparisons"][f"{key}_vs_{ref}"] = {
             "mean_diff_bpb": round(float(d.mean()), 6),
             "ci95": [round(lo, 6), round(hi, 6)],
             "p_value": p,
             "p_display": fmt_p(p, args.n_boot),
+            "p_one_sided": p1,
+            "p_one_sided_display": fmt_p_one_sided(p1, float(d.mean()), args.n_boot),
         }
-        print(f"{key:20s} vs {ref:14s}: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  {fmt_p(p, args.n_boot)}")
+        print(f"{key:20s} vs {ref:14s}: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}]  "
+              f"{fmt_p(p, args.n_boot)} two-sided, {fmt_p_one_sided(p1, float(d.mean()), args.n_boot)} one-sided")
 
     # Seed-variance estimate quoted in the paper.
     d = finals[s1] - finals[s2]

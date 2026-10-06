@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""Shared constants and helpers for the 24-mixture DataDecide-60M mixing-law probe.
+"""Shared constants and helpers for the DataDecide-60M mixing-law and probe analyses.
 
 Single source of truth for:
   * the exact DataDecide 60M geometry / optimizer / batch schedule,
-  * the 7 RegMix domains and edullm-data corpus id / durable S3 layout,
-  * how a mixture weight vector becomes a peak per-domain *sequence* count
-    (largest-remainder) when sizing a shared working pool,
-  * the OLMo-ladder task-loss (bits-per-byte) evaluation set.
+  * the 7 RegMix domains and the edullm-data corpus id,
+  * the OLMo-ladder task-loss (bits-per-byte) evaluation set,
+  * mixture and token-budget helpers used by the fits.
 
-Training realizes mixture weights **only** via ``DomainMixtureStream``
-(domain-stratified sampling over a shared peak-sized pool staged from
-``edullm-data``). Peak pool sizes still use ``allocate_sequences`` so every
-recipe mix fits. Deprecated ``build_mixture_data.py`` slice materialization is
-**not supported** for new runs (kept only for historical / preflight helpers).
+The 60M runs themselves are trained by ``../domain_probes/train_60m.py``.
 """
 from __future__ import annotations
 
@@ -111,12 +106,6 @@ EDULLM_DATA_DATASET_ID = "pretrain/olmo-127b"
 EDULLM_DATA_SOURCE_LABEL = "source"
 POOL_PROVENANCE_NAME = "edullm_data_source.json"
 
-# Legacy raw-shard inventory URI for pre-edullm-data helpers only
-# (``select_and_fetch_shards.py``). DataDecide-60M must not read this.
-OLMOHQ_S3 = "s3://edullm-datasets/olmo100b/olmo-mix-1124-30b"
-OLMOHQ_DATA_PREFIX = "data"
-# Local layout after stage: tokenized/<domain>/<domain>.npy
-TOKENIZED_PREFIX = "tokenized"
 
 # Tokens available per domain in the olmohq upsample (user inventory / plan summary).
 # These bound r_max for a 30B target; they are *not* the per-run training budget.
@@ -256,57 +245,6 @@ def macro_curve(task_loss_families: dict[str, float]) -> float:
     return sum(float(task_loss_families[f]) for f in CURVE_FAMILIES) / len(CURVE_FAMILIES)
 
 
-def normalize_eval_key(key: str) -> Optional[str]:
-    """Recover the ladder label from an OLMo metric key, or None if it is not a bpb metric.
-
-    ``Evaluator.compute_metrics`` builds ``eval/downstream_bpb/{label}_{metric_type}``,
-    and because every task-loss label already ends in ``_bpb`` the emitted key ends in
-    ``_bpb_bpb``. Normalizing here keeps the in-run curve keyed by the same labels the
-    final evaluation writes, so ``fit_mixing_law.py`` does not need two spellings.
-    """
-    if not key.startswith("eval/"):
-        return None
-    tail = key.rsplit("/", 1)[-1]
-    if not tail.endswith("_bpb_bpb"):
-        return None
-    label = tail.removesuffix("_bpb")
-    return label if label in LADDER_TASK_LOSS_LABELS else None
-
-
-_STEP_RE = re.compile(r"\bstep=(\d+)")
-
-
-def parse_trainer_log_record(
-    msg: str, last_step: Optional[int] = None
-) -> tuple[Optional[int], Optional[float], dict[str, float]]:
-    """Pull (step, train loss, {label: task-loss bpb}) out of one trainer log record.
-
-    ai2-olmo 0.6.0 writes the step (``[step=N/T,epoch=E]``) and each evaluator's metric
-    (``<label>`` then ``eval/downstream_bpb/<label>_bpb_bpb=<v>``) as separate records, so
-    a record without ``step=`` takes ``last_step``: the eval for step N runs right after
-    the step-N record. Older versions put both in one record; that still parses.
-    """
-    match = _STEP_RE.search(msg)
-    step = int(match.group(1)) if match else last_step
-    train_loss: Optional[float] = None
-    task_losses: dict[str, float] = {}
-    for token in msg.replace(",", " ").split():
-        key, sep, raw = token.partition("=")
-        if not sep:
-            continue
-        try:
-            value = float(raw)
-        except ValueError:
-            continue
-        if key in ("train/CrossEntropyLoss", "loss"):
-            train_loss = value
-        else:
-            label = normalize_eval_key(key)
-            if label is not None:
-                task_losses[label] = value
-    return step, train_loss, task_losses
-
-
 @dataclass(frozen=True)
 class Mixture:
     id: int
@@ -366,100 +304,6 @@ def token_budget(tokens_per_param: float) -> tuple[int, int, int]:
         raise SystemExit(f"tokens_per_param={tokens_per_param} yields 0 steps")
     total_seqs = total_steps * GLOBAL_BATCH_SEQS
     return total_seqs, total_steps, total_seqs * SEQ_LEN
-
-
-def token_budget_fixed(total_tokens: int) -> tuple[int, int, int]:
-    """Return (total_sequences, approx_370m_steps, total_tokens) for a fixed token budget.
-
-    Sequences are rounded down to ``SEQ_LEN``. The step count assumes the 370M
-    global batch (4_194_304 tokens) used by the RegMix control trainer.
-    """
-    if total_tokens <= 0:
-        raise SystemExit("total_tokens must be > 0")
-    total_seqs = int(total_tokens) // SEQ_LEN
-    if total_seqs < 1:
-        raise SystemExit(f"total_tokens={total_tokens} yields 0 sequences")
-    realized = total_seqs * SEQ_LEN
-    gbs = 4_194_304
-    total_steps = realized // gbs
-    return total_seqs, total_steps, realized
-
-
-def allocate_sequences(weights: dict[str, float], total_seqs: int) -> dict[str, int]:
-    """Largest-remainder split of ``total_seqs`` across domains.
-
-    Guarantees the counts sum to ``total_seqs`` exactly, so the realized mixture
-    is the closest achievable point to ``weights`` at sequence granularity. A
-    domain with weight 0 always gets 0 sequences (deliberate ablations stay
-    exact ablations).
-    """
-    if total_seqs <= 0:
-        raise SystemExit("total_seqs must be > 0")
-
-    raw = {d: weights.get(d, 0.0) * total_seqs for d in DOMAINS}
-    counts = {d: int(raw[d]) for d in DOMAINS}
-    remainder = total_seqs - sum(counts.values())
-
-    # Hand out leftover sequences to the largest fractional parts, skipping
-    # domains the mixture excludes entirely.
-    eligible = [d for d in DOMAINS if weights.get(d, 0.0) > 0.0]
-    order = sorted(eligible, key=lambda d: (raw[d] - int(raw[d]), raw[d]), reverse=True)
-    i = 0
-    while remainder > 0 and order:
-        counts[order[i % len(order)]] += 1
-        remainder -= 1
-        i += 1
-    return counts
-
-
-def realized_weights(counts: dict[str, int]) -> dict[str, float]:
-    total = sum(counts.values())
-    if total <= 0:
-        raise SystemExit("empty sequence allocation")
-    return {d: counts.get(d, 0) / total for d in DOMAINS}
-
-
-def domain_npy_name(domain: str) -> str:
-    return f"{domain}.npy"
-
-
-def memmap_tokens(path: Path) -> int:
-    """Token count of a raw uint32 memmap (these files have no NumPy header)."""
-    return path.stat().st_size // BYTES_PER_TOKEN
-
-
-def ladder_warmup_steps() -> int:
-    """OLMo-ladder heuristic: warm up over roughly one model-size worth of tokens."""
-    return round(DATADECIDE_MODEL_SIZE / TOKENS_PER_STEP)  # 290
-
-
-def peak_domain_tokens(tokens_per_param: float) -> dict[str, int]:
-    """Largest per-domain token demand across the 24 mixtures at this budget."""
-    total_seqs, _, _ = token_budget(tokens_per_param)
-    peak = {d: 0 for d in DOMAINS}
-    for mix in load_mixtures():
-        counts = allocate_sequences(mix.weights, total_seqs)
-        for d in DOMAINS:
-            peak[d] = max(peak[d], counts[d] * SEQ_LEN)
-    return peak
-
-
-def max_data_feasible_tokens() -> tuple[int, str, float]:
-    """Largest one-mix token budget the olmohq pool can supply without repeats.
-
-    Returns (max_tokens, binding_domain, max_weight_of_that_domain).
-    """
-    mixes = load_mixtures()
-    best = None
-    for d in DOMAINS:
-        w = max(m.weights[d] for m in mixes)
-        if w <= 0:
-            continue
-        cap = int(DOMAIN_AVAILABLE_TOKENS[d] / w)
-        if best is None or cap < best[0]:
-            best = (cap, d, w)
-    assert best is not None
-    return best
 
 
 def gpu_hours_for_budget(

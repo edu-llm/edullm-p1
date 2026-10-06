@@ -9,8 +9,7 @@ import pytest
 
 _SKILLIT = Path(__file__).resolve().parents[1]
 _PREPARE = _SKILLIT / "prepare_skillit_370m_data.py"
-_PROBE_LAUNCHER = _SKILLIT / "launch_probe.sh"
-_PROBE_SUBMITTER = _SKILLIT / "submit_skillit_probes.sh"
+_PROBE_LAUNCHER = _SKILLIT.parent / "domain_probes" / "launch.sbatch"
 _WANDB = _SKILLIT / "wandb_logging.py"
 _BUILD_ADJACENCY = _SKILLIT / "build_adjacency.py"
 _RECIPE = _SKILLIT / "skillit_train_recipe.json"
@@ -85,13 +84,11 @@ def test_pool_provenance_rejects_wrong_or_conflicting_identity(tmp_path: Path) -
 
 
 def test_launchers_never_write_artifacts_to_s3() -> None:
-    for path in (_PROBE_LAUNCHER, _PROBE_SUBMITTER):
-        text = path.read_text(encoding="utf-8")
-        assert "aws s3 sync" not in text
-        assert "RESULTS_S3" not in text
-        assert "S3_EXPORT" not in text
-        assert "ALLOW_LOCAL_ONLY" in text
-        assert "WANDB_MODE" in text
+    text = _PROBE_LAUNCHER.read_text(encoding="utf-8")
+    assert "aws s3 sync" not in text
+    assert "RESULTS_S3" not in text
+    assert "S3_EXPORT" not in text
+    assert "WANDB_MODE" in text
     build_text = _BUILD_ADJACENCY.read_text(encoding="utf-8")
     assert "sync_to_s3" not in build_text
     assert "edullm-checkpoints" not in build_text

@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Build offline Skill-It adjacency A from 7 DataDecide-60M one-hot probe runs.
+"""Build offline Skill-It adjacency A from the seven one-hot DataDecide-60M probe runs.
 
 Pipeline:
-  1. Collect per-probe ``task_loss.jsonl`` + ``task_loss_final.json`` (same schema
-     as mixlaw ``fit_mixing_law.py collect``). Step-law fits use **jsonl only** (steps
-     120–1440); ``task_loss_final.json`` at 1451 is not appended (see mixlaw README).
+  1. Collect each ``../domain_probes/runs/onehot_<domain>/task_loss.jsonl`` (the in-run test
+     curves, steps 120-1440, every item of each test label; the last point is the final loss).
   2. Chinchilla-extrapolate each curve family to step 5806 (tpp=20) via
      ``mixlaw/extrapolate_chinchilla.py`` logic.
   3. ``A_ij = max(0, L_j(ref) - L_i_j)`` for domains i and families j. By default
      ``L_j(ref)`` is the MixLaw fit's prediction (``mixlaw_fit_chinchilla.json``) at the
      Data Mixing Laws paper mixture, which this code calls ``regmix``. With
-     ``--reference-run probe_lgb_start`` it is instead the extrapolated loss of the 60M
-     probe trained on the LightGBM starting mixture, extrapolated by the same step law
-     as the seven one-hot probes (every probe is read on the same 128 eval items).
+     ``--reference-run <name>`` it is instead the extrapolated loss of that 60M run (for
+     example one trained at the LightGBM starting mixture), under the same protocol as the
+     one-hot probes.
   4. Write ``artifacts/A_offline.npy`` plus named JSON on runtime scratch and
      upload the directory to W&B.
 """
@@ -36,11 +35,10 @@ for p in (_MIXLAW, _SKILLIT, _TS_ROOT):
 from extrapolate_chinchilla import extrapolate_runs  # noqa: E402
 from mixlaw_common import (  # noqa: E402
     CURVE_FAMILIES,
-    CURVE_TASK_LOSS_LABELS,
+    DOMAIN_PROBES_DIR,
     DOMAINS,
-    load_mixtures,
+    load_probe_run,
     macro_curve,
-    task_family,
     token_budget,
 )
 from skillit_math import (  # noqa: E402
@@ -51,88 +49,35 @@ from skillit_math import (  # noqa: E402
 )
 
 CHINCHILLA_STEP = 5806  # token_budget(20) → 5806
-LEGACY_UNI_RUN = "probe_uni"
-LGB_START_RUN = "probe_lgb_start"  # the reference probe: trained at the starting mixture
 
 
-def _is_onehot_probe(run_name: str, tag: str) -> bool:
-    if run_name in (LEGACY_UNI_RUN, LGB_START_RUN) or tag in ("uniform", "lgb-start"):
-        return False
-    return run_name.startswith("probe_")
-
-
-def collect_probe_runs(
-    runs_dir: Path, mixtures_json: Path, reference_run: str | None = None
-) -> dict:
-    """Gather one-hot probe progress (plus the reference probe, if named) into a
-    mixlaw_data-compatible payload."""
-    mixtures = {m.id: m for m in load_mixtures(mixtures_json)}
-    runs = []
-    missing = []
-    for mix_id, mix in sorted(mixtures.items()):
-        if not (_is_onehot_probe(mix.run_name, mix.tag) or mix.run_name == reference_run):
+def collect_probe_runs(runs_dir: Path, reference_run: str | None = None) -> dict:
+    """Gather the seven one-hot runs (plus the reference run, if named) into a
+    mixlaw_data-compatible payload. One-hot runs are keyed ``probe_<domain>`` downstream."""
+    registry = json.loads((DOMAIN_PROBES_DIR / "runs.json").read_text(encoding="utf-8"))
+    weights_by_name = {r["name"]: r["weights"] for r in registry["runs"]}
+    names = [f"onehot_{d}" for d in DOMAINS] + ([reference_run] if reference_run else [])
+    runs, missing = [], []
+    for i, name in enumerate(names):
+        run_dir = runs_dir / name
+        if not (run_dir / "task_loss.jsonl").is_file():
+            missing.append(name)
             continue
-        progress = runs_dir / mix.run_name / "progress"
-        final = progress / "task_loss_final.json"
-        if not final.is_file():
-            alt = runs_dir / mix.run_name / "task_loss_final.json"
-            if alt.is_file():
-                final = alt
-                progress = runs_dir / mix.run_name
-            else:
-                missing.append(mix.run_name)
-                continue
-
-        payload = json.loads(final.read_text(encoding="utf-8"))
-        label_src = payload.get("labels") or payload.get("task_loss_bpb") or {}
-        labels = {
-            k: float(v)
-            for k, v in label_src.items()
-            if k in CURVE_TASK_LOSS_LABELS
-        }
-        fam_src = payload.get("task_families") or {}
-        if fam_src:
-            families = {
-                k: float(v) for k, v in fam_src.items() if k in CURVE_FAMILIES
-            }
-        else:
-            families = {}
-            for label, value in labels.items():
-                fam = task_family(label)
-                if fam in CURVE_FAMILIES:
-                    families[fam] = float(value)
-        if set(families) != set(CURVE_FAMILIES):
-            raise SystemExit(
-                f"{mix.run_name}: expected curve families {CURVE_FAMILIES}, "
-                f"got {sorted(families)}"
-            )
-
-        curve = []
-        curve_path = progress / "task_loss.jsonl"
-        if curve_path.is_file():
-            for line in curve_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line:
-                    curve.append(json.loads(line))
-
+        run = load_probe_run(run_dir)
         runs.append(
             {
-                "id": mix_id,
-                "tag": mix.tag,
-                "run_name": mix.run_name,
-                "weights": mix.weights,
-                "task_loss_labels": labels,
-                "task_loss_families": families,
-                "macro_mean": macro_curve(families),
-                "curve": curve,
+                "id": i,
+                "tag": name,
+                "run_name": f"probe_{name.removeprefix('onehot_')}" if name.startswith("onehot_") else name,
+                "weights": weights_by_name.get(name) or (run["meta"] or {}).get("weights", []),
+                "task_loss_labels": run["task_loss_labels"],
+                "task_loss_families": run["task_loss_families"],
+                "macro_mean": macro_curve(run["task_loss_families"]),
+                "curve": run["curve"],
             }
         )
-
     if missing:
-        raise SystemExit(
-            f"missing task_loss_final.json for probes: {missing}. "
-            f"Expected under {runs_dir}/<probe_id>/progress/"
-        )
+        raise SystemExit(f"missing finished runs under {runs_dir}: {missing}")
     return {
         "domain_order": list(DOMAINS),
         "curve_families": list(CURVE_FAMILIES),
@@ -163,14 +108,8 @@ def main() -> None:
     ap.add_argument(
         "--runs-dir",
         type=Path,
-        default=None,
-        help="Root with <probe_id>/progress/task_loss_*.json (required unless --data)",
-    )
-    ap.add_argument(
-        "--mixtures-json",
-        type=Path,
-        default=_SKILLIT / "probes.json",
-        help="Probe mixture definitions (default: skillit/probes.json)",
+        default=DOMAIN_PROBES_DIR / "runs",
+        help="Root with <run_name>/task_loss.jsonl (default: ../domain_probes/runs)",
     )
     ap.add_argument(
         "--data",
@@ -188,8 +127,9 @@ def main() -> None:
         "--reference-run",
         default=None,
         help=(
-            "Use this probe run (e.g. probe_lgb_start) as the reference L_j instead of the "
-            "MixLaw fit; it is extrapolated to the Chinchilla step like the one-hot probes"
+            "Use this run (a directory under --runs-dir, e.g. one trained at the LightGBM "
+            "starting mixture) as the reference L_j instead of the MixLaw fit; it is "
+            "extrapolated to the Chinchilla step like the one-hot probes"
         ),
     )
     ap.add_argument(
@@ -234,9 +174,7 @@ def main() -> None:
     if args.data is not None:
         data = json.loads(args.data.read_text(encoding="utf-8"))
     else:
-        if args.runs_dir is None:
-            raise SystemExit("provide --runs-dir or --data")
-        data = collect_probe_runs(args.runs_dir, args.mixtures_json, args.reference_run)
+        data = collect_probe_runs(args.runs_dir, args.reference_run)
 
     _, default_chin_step, _ = token_budget(20.0)
     target_step = int(args.step) if args.step is not None else default_chin_step

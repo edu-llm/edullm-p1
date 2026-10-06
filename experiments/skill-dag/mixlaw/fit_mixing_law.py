@@ -32,7 +32,7 @@ measure of whether the pilot bought enough signal, and it is the number to look 
 before trusting the recommended mixture.
 
 Subcommands:
-    collect   gather per-run task_loss_final.json / task_loss.jsonl into one file
+    collect   gather the pilots' task_loss.jsonl (domain_probes/runs/mixNN) into one file
     fit       fit the mixing law, cross-validate, and optimize over the simplex
 """
 from __future__ import annotations
@@ -45,7 +45,15 @@ from typing import Callable, Optional, Sequence
 
 import numpy as np
 
-from mixlaw_common import CURVE_FAMILIES, CURVE_TASK_LOSS_LABELS, DOMAINS, load_mixtures, macro_curve, task_family
+from mixlaw_common import (
+    CURVE_FAMILIES,
+    DOMAIN_PROBES_DIR,
+    DOMAINS,
+    load_mixtures,
+    load_probe_run,
+    macro_curve,
+    task_family,
+)
 
 DATA_NAME = "mixlaw_data.json"
 
@@ -60,51 +68,31 @@ def cmd_collect(args: argparse.Namespace) -> None:
     missing = []
     for mix_id, mix in sorted(mixtures.items()):
         run_dir = args.runs_dir / mix.run_name
-        final = run_dir / "task_loss_final.json"
-        if not final.is_file():
+        if not (run_dir / "task_loss.jsonl").is_file():
             missing.append(mix.run_name)
             continue
-
-        payload = json.loads(final.read_text(encoding="utf-8"))
-        labels = {
-            k: float(v)
-            for k, v in payload["labels"].items()
-            if k in CURVE_TASK_LOSS_LABELS
-        }
-        families = {
-            k: float(v) for k, v in payload["task_families"].items() if k in CURVE_FAMILIES
-        }
-        if set(families) != set(CURVE_FAMILIES):
+        run = load_probe_run(run_dir)
+        if set(run["task_loss_families"]) != set(CURVE_FAMILIES):
             raise SystemExit(
-                f"{mix.run_name}: expected curve families {CURVE_FAMILIES}, got {sorted(families)}"
+                f"{mix.run_name}: expected curve families {CURVE_FAMILIES}, "
+                f"got {sorted(run['task_loss_families'])}"
             )
-        curve = []
-        curve_path = run_dir / "task_loss.jsonl"
-        if curve_path.is_file():
-            for line in curve_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line:
-                    curve.append(json.loads(line))
-
-        meta_path = run_dir / "run_meta.json"
         runs.append(
             {
                 "id": mix_id,
                 "tag": mix.tag,
                 "run_name": mix.run_name,
                 "weights": mix.weights,
-                "task_loss_labels": labels,
-                "task_loss_families": families,
-                "macro_mean": macro_curve(families),
-                "curve": curve,
-                "meta": json.loads(meta_path.read_text(encoding="utf-8"))
-                if meta_path.is_file()
-                else None,
+                "task_loss_labels": run["task_loss_labels"],
+                "task_loss_families": run["task_loss_families"],
+                "macro_mean": macro_curve(run["task_loss_families"]),
+                "curve": run["curve"],
+                "meta": run["meta"],
             }
         )
 
     if missing:
-        print(f"warning: {len(missing)} runs have no final eval yet: {' '.join(missing)}")
+        print(f"warning: {len(missing)} runs are not finished: {' '.join(missing)}")
     if not runs:
         raise SystemExit("no completed runs found")
 
@@ -533,7 +521,7 @@ def main() -> None:
 
     c = sub.add_parser("collect", help="gather per-run results into one file")
     c.set_defaults(func=cmd_collect)
-    c.add_argument("--runs-dir", type=Path, required=True)
+    c.add_argument("--runs-dir", type=Path, default=DOMAIN_PROBES_DIR / "runs")
     c.add_argument("--out", type=Path, default=Path(DATA_NAME))
 
     f = sub.add_parser("fit", help="fit the mixing law, cross-validate, optimize")

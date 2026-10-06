@@ -240,6 +240,41 @@ CURVE_FAMILIES: tuple[str, ...] = tuple(
 )
 
 
+# --- The 31 DataDecide-60M domain runs (../domain_probes) -----------------------
+# One trainer scores every item of the six ARC/MMLU *test* labels every 120 steps of a
+# 1440-step run; the fits and the probe matrix read those curves.
+DOMAIN_PROBES_DIR = Path(__file__).resolve().parents[1] / "domain_probes"
+_PROBE_SETTINGS = json.loads((DOMAIN_PROBES_DIR / "runs.json").read_text(encoding="utf-8"))["settings"]
+PROBE_TASK_LOSS_LABELS: tuple[str, ...] = tuple(_PROBE_SETTINGS["eval_labels"])
+PROBE_STEPS: int = int(_PROBE_SETTINGS["steps"])
+
+
+def load_probe_run(run_dir: Path) -> dict:
+    """Curve, final losses and metadata of one finished domain run.
+
+    The final losses are the in-run eval at the last step, so there is no separate
+    post-hoc evaluation. Raises if the run did not reach ``PROBE_STEPS`` or a label is missing.
+    """
+    curve_path = run_dir / "task_loss.jsonl"
+    if not curve_path.is_file():
+        raise FileNotFoundError(curve_path)
+    curve = [json.loads(ln) for ln in curve_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not curve or int(curve[-1]["step"]) != PROBE_STEPS:
+        last = curve[-1]["step"] if curve else None
+        raise SystemExit(f"{run_dir.name}: last eval is step {last}, expected {PROBE_STEPS}")
+    labels = {k: float(v) for k, v in curve[-1]["task_loss_bpb"].items() if k in PROBE_TASK_LOSS_LABELS}
+    if set(labels) != set(PROBE_TASK_LOSS_LABELS):
+        raise SystemExit(f"{run_dir.name}: final eval is missing labels {sorted(set(PROBE_TASK_LOSS_LABELS) - set(labels))}")
+    families = {task_family(k): v for k, v in labels.items()}
+    meta_path = run_dir / "run_meta.json"
+    return {
+        "curve": curve,
+        "task_loss_labels": labels,
+        "task_loss_families": families,
+        "meta": json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.is_file() else None,
+    }
+
+
 def macro_curve(task_loss_families: dict[str, float]) -> float:
     """Mean task loss over the six curve families."""
     return sum(float(task_loss_families[f]) for f in CURVE_FAMILIES) / len(CURVE_FAMILIES)

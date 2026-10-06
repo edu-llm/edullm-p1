@@ -43,3 +43,34 @@ def test_build_A_uses_regmix_minus_onehot_and_clips_negative_values():
     assert detail["reference"] == "regmix"
     assert detail["domain_order"] == list(DOMAINS)
     assert detail["family_order"] == list(CURVE_FAMILIES)
+
+
+def test_collect_probe_runs_reads_domain_probes_layout(tmp_path):
+    import json
+
+    from build_adjacency import collect_probe_runs
+    from mixlaw_common import PROBE_STEPS, PROBE_TASK_LOSS_LABELS
+
+    def write(name: str, offset: float) -> None:
+        d = tmp_path / name
+        d.mkdir()
+        rows = [
+            {"step": s, "task_loss_bpb": {lb: 3.0 - s / 1000 + offset for lb in PROBE_TASK_LOSS_LABELS}}
+            for s in range(120, PROBE_STEPS + 1, 120)
+        ]
+        (d / "task_loss.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+    for i, domain in enumerate(DOMAINS):
+        write(f"onehot_{domain}", 0.01 * i)
+    write("ref", 0.5)
+    data = collect_probe_runs(tmp_path, reference_run="ref")
+    names = [r["run_name"] for r in data["runs"]]
+    assert names == [f"probe_{d}" for d in DOMAINS] + ["ref"]
+    assert data["runs"][0]["weights"] == [1.0, 0, 0, 0, 0, 0, 0]
+    assert len(data["runs"][0]["curve"]) == PROBE_STEPS // 120
+
+    import pytest
+
+    (tmp_path / "onehot_wiki" / "task_loss.jsonl").unlink()
+    with pytest.raises(SystemExit, match="missing finished runs"):
+        collect_probe_runs(tmp_path)

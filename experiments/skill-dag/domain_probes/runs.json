@@ -1,0 +1,467 @@
+{
+ "description": "31 DataDecide-60M domain-mixture runs: 7 one-hot Skill-It probes, then the 24 MixLaw pilots (weights from mixlaw/mixtures.json). One trainer (train_60m.py), one set of settings.",
+ "dataset": {
+  "id": "pretrain/olmo-127b",
+  "version": "v1"
+ },
+ "domains": [
+  "dclm",
+  "arxiv",
+  "starcoder",
+  "pes2o",
+  "open-web-math",
+  "algebraic-stack",
+  "wiki"
+ ],
+ "settings": {
+  "steps": 1440,
+  "eval_interval": 120,
+  "model_seed": 6198,
+  "data_seed": 6198,
+  "eval_labels": [
+   "arc_challenge_test_rc_5shot_bpb",
+   "arc_easy_test_rc_5shot_bpb",
+   "mmlu_stem_test_rc_5shot_bpb",
+   "mmlu_humanities_test_rc_5shot_bpb",
+   "mmlu_social_sciences_test_rc_5shot_bpb",
+   "mmlu_other_test_rc_5shot_bpb"
+  ],
+  "expected_eval_items": {
+   "arc_challenge_test_rc_5shot_bpb": 1172,
+   "arc_easy_test_rc_5shot_bpb": 2376,
+   "mmlu_stem_test_rc_5shot_bpb": 3018,
+   "mmlu_humanities_test_rc_5shot_bpb": 4705,
+   "mmlu_social_sciences_test_rc_5shot_bpb": 3077,
+   "mmlu_other_test_rc_5shot_bpb": 3242
+  }
+ },
+ "runs": [
+  {
+   "name": "onehot_dclm",
+   "kind": "onehot",
+   "weights": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "onehot_arxiv",
+   "kind": "onehot",
+   "weights": [
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "onehot_starcoder",
+   "kind": "onehot",
+   "weights": [
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "onehot_pes2o",
+   "kind": "onehot",
+   "weights": [
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "onehot_open-web-math",
+   "kind": "onehot",
+   "weights": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "onehot_algebraic-stack",
+   "kind": "onehot",
+   "weights": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0
+   ]
+  },
+  {
+   "name": "onehot_wiki",
+   "kind": "onehot",
+   "weights": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  },
+  {
+   "name": "mix01",
+   "kind": "pilot",
+   "tag": "base",
+   "weights": [
+    0.375,
+    0.25,
+    0.1406,
+    0.0938,
+    0.0635,
+    0.0615,
+    0.0156
+   ]
+  },
+  {
+   "name": "mix02",
+   "kind": "pilot",
+   "tag": "C0-wiki0",
+   "weights": [
+    0.0594,
+    0.0406,
+    0.65,
+    0.1062,
+    0.1,
+    0.0437,
+    0.0
+   ]
+  },
+  {
+   "name": "mix03",
+   "kind": "pilot",
+   "tag": "C0-wiki0",
+   "weights": [
+    0.0594,
+    0.65,
+    0.0406,
+    0.1062,
+    0.1,
+    0.0437,
+    0.0
+   ]
+  },
+  {
+   "name": "mix04",
+   "kind": "pilot",
+   "tag": "C0-dclm0",
+   "weights": [
+    0.0,
+    0.0406,
+    0.0406,
+    0.425,
+    0.4,
+    0.0437,
+    0.05
+   ]
+  },
+  {
+   "name": "mix05",
+   "kind": "pilot",
+   "tag": "C1-dclm50",
+   "weights": [
+    0.5,
+    0.2,
+    0.1125,
+    0.075,
+    0.0508,
+    0.0492,
+    0.0125
+   ]
+  },
+  {
+   "name": "mix06",
+   "kind": "pilot",
+   "tag": "C1-dclm55",
+   "weights": [
+    0.55,
+    0.18,
+    0.1012,
+    0.0675,
+    0.0457,
+    0.0443,
+    0.0112
+   ]
+  },
+  {
+   "name": "mix07",
+   "kind": "pilot",
+   "tag": "C1-dclm60",
+   "weights": [
+    0.6,
+    0.16,
+    0.09,
+    0.06,
+    0.0406,
+    0.0394,
+    0.01
+   ]
+  },
+  {
+   "name": "mix08",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.1187,
+    0.0406,
+    0.0406,
+    0.0266,
+    0.4,
+    0.35,
+    0.0234
+   ]
+  },
+  {
+   "name": "mix09",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0297,
+    0.1625,
+    0.325,
+    0.0266,
+    0.05,
+    0.35,
+    0.0562
+   ]
+  },
+  {
+   "name": "mix10",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0594,
+    0.0406,
+    0.0406,
+    0.425,
+    0.05,
+    0.35,
+    0.0344
+   ]
+  },
+  {
+   "name": "mix11",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0297,
+    0.1625,
+    0.325,
+    0.0266,
+    0.4,
+    0.0437,
+    0.0125
+   ]
+  },
+  {
+   "name": "mix12",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0297,
+    0.325,
+    0.0406,
+    0.425,
+    0.05,
+    0.0437,
+    0.0859
+   ]
+  },
+  {
+   "name": "mix13",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0594,
+    0.0406,
+    0.325,
+    0.425,
+    0.1,
+    0.0437,
+    0.0063
+   ]
+  },
+  {
+   "name": "mix14",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0594,
+    0.325,
+    0.0813,
+    0.0531,
+    0.2,
+    0.175,
+    0.1062
+   ]
+  },
+  {
+   "name": "mix15",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0297,
+    0.325,
+    0.325,
+    0.2125,
+    0.05,
+    0.0437,
+    0.0141
+   ]
+  },
+  {
+   "name": "mix16",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.2375,
+    0.1625,
+    0.0406,
+    0.1062,
+    0.4,
+    0.0437,
+    0.0094
+   ]
+  },
+  {
+   "name": "mix17",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.475,
+    0.0406,
+    0.0406,
+    0.0266,
+    0.05,
+    0.35,
+    0.0172
+   ]
+  },
+  {
+   "name": "mix18",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.2375,
+    0.0406,
+    0.0406,
+    0.425,
+    0.1,
+    0.0437,
+    0.1125
+   ]
+  },
+  {
+   "name": "mix19",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.2375,
+    0.0406,
+    0.325,
+    0.1062,
+    0.1,
+    0.0875,
+    0.1031
+   ]
+  },
+  {
+   "name": "mix20",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.0594,
+    0.0813,
+    0.1625,
+    0.2125,
+    0.2,
+    0.175,
+    0.1094
+   ]
+  },
+  {
+   "name": "mix21",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.2375,
+    0.0406,
+    0.1625,
+    0.0531,
+    0.05,
+    0.35,
+    0.1062
+   ]
+  },
+  {
+   "name": "mix22",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.2375,
+    0.1625,
+    0.0406,
+    0.2125,
+    0.05,
+    0.175,
+    0.1219
+   ]
+  },
+  {
+   "name": "mix23",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.475,
+    0.0406,
+    0.325,
+    0.0531,
+    0.05,
+    0.0437,
+    0.0125
+   ]
+  },
+  {
+   "name": "mix24",
+   "kind": "pilot",
+   "tag": "C1",
+   "weights": [
+    0.1187,
+    0.325,
+    0.0406,
+    0.1062,
+    0.05,
+    0.35,
+    0.0094
+   ]
+  }
+ ]
+}

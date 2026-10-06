@@ -130,8 +130,7 @@ def shard_table(data_root: Path, manifest: dict, domains: list[str]) -> dict[str
             path = data_root / d / Path(obj["name"]).name
             if not path.is_file() or path.stat().st_size != obj["bytes"]:
                 raise SystemExit(f"{path}: missing or size != manifest {obj['bytes']}")
-            if obj["tokens"] % SEQ_LEN:
-                raise SystemExit(f"{path}: {obj['tokens']} tokens is not a multiple of seq_len")
+            # the last shard of a domain is not a whole number of chunks; its tail is unused
             shards.append((str(path), int(obj["tokens"])))
         table[d] = shards
     return table

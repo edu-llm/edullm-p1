@@ -1,325 +1,304 @@
 {
- "generated_by": "experiments/token-selection: regenerated from token_selection_370m_wandb_curves.json via fit_and_plot.fit_all(); FLOPs recomputed analytically",
- "protocol": {
-  "form": "y = a + b * step**(-alpha)",
-  "fit_window": "steps >= 1000",
-  "alpha_grid": "np.linspace(0.05, 6.0, 1192); no arm's profiled optimum sits on a grid boundary",
-  "n_boot": 10000,
-  "resample": "i.i.d. residual bootstrap on the fit-window residuals",
-  "alpha_treatment": "re-estimated on every bootstrap draw (alpha-free); selected because it yields the WIDER intervals (mean width 0.01162 vs 0.00823 bpb for alpha-fixed, over the seven reported arms)",
-  "fitted_final_at": "each arm's own final logged step (2360 for all seven arms)",
-  "ci": "2.5/97.5 percentile of the bootstrap distribution",
-  "rng_seed": 0,
-  "source": "eduLLM/token-selection W&B eval/macro_bpb histories, cached in token_selection_370m_wandb_curves.json; full-loss control is full-loss-control-regmix10b-v3 (matched seed/step/grid rerun, replaces v2)",
-  "random_control": "reported as a single power law fitted to the union of both seeds' fit-window points (11 each, 22 total); per-seed fits are also listed in table1"
- },
+ "generated_by": "experiments/token-selection/fit_and_plot.py --write-json (flops from flops.py)",
+ "source": "wandb eduLLM/token-selection, the eight runs in WANDB_RUNS, all trained under the vendored token-selection code (olmo_core_token_selection/, fork revision 64c28145); curves cached in token_selection_370m_wandb_curves.json",
+ "method": "Fit y = a + b*step^(-alpha) on steps >= 1000, profiling alpha over np.linspace(0.05, 6.0, 1192) with (a, b) from closed-form OLS at each grid point. Fitted final is evaluated at each arm's own final logged step. 95% CI = 2.5/97.5 percentile of 10,000 i.i.d. residual bootstrap draws with alpha RE-ESTIMATED on every draw (alpha-free), numpy default_rng seed 0. Residuals are inflated by sqrt(n/(n-p)) with p=3 before resampling (1.155 at n=12, 1.069 at n=24 for the pooled random control). Perplexity's profiled optimum sits on the grid's lower bound (0.05); the other arms range from 0.999 (full-loss control) to 3.027 (Attention). Alpha-free was chosen over alpha-fixed because it is the more conservative of the two (mean CI width 0.01620 vs 0.01213 bpb).",
+ "p_value_note": "p_one_sided is the share of the 10,000 paired bootstrap draws on the side opposite the point estimate; 0.0 means no draw crossed zero (p < 0.0001); p_two_sided = 2 * p_one_sided",
  "table1": {
   "Full-loss control": {
-   "fitted_final": 1.6718,
-   "observed": 1.6751,
+   "fitted_final": 1.6789,
+   "observed": 1.6793,
    "ci": [
-    1.6642,
-    1.6798
+    1.6695,
+    1.6877
    ],
-   "alpha": 1.5937,
+   "alpha": 0.9992,
    "final_step": 2360,
-   "n_fit_points": 11
+   "n_fit_points": 12
   },
   "Random control seed 42": {
-   "fitted_final": 1.6857,
-   "observed": 1.687,
+   "fitted_final": 1.6885,
+   "observed": 1.6897,
    "ci": [
-    1.6761,
-    1.693
+    1.6825,
+    1.6931
    ],
-   "alpha": 1.1591,
+   "alpha": 0.7594,
    "final_step": 2360,
-   "n_fit_points": 11
+   "n_fit_points": 12
   },
   "Random control seed 69": {
-   "fitted_final": 1.6939,
-   "observed": 1.6951,
+   "fitted_final": 1.6961,
+   "observed": 1.6934,
    "ci": [
-    1.6852,
-    1.7002
+    1.6887,
+    1.7028
    ],
-   "alpha": 1.9884,
+   "alpha": 1.8335,
    "final_step": 2360,
-   "n_fit_points": 11
+   "n_fit_points": 12
   },
   "Random control average": {
-   "fitted_final": 1.69,
-   "observed": 1.6911,
+   "fitted_final": 1.6923,
+   "observed": 1.6915,
    "ci": [
-    1.6837,
-    1.695
+    1.6851,
+    1.6991
    ],
-   "alpha": 1.5587,
+   "alpha": 1.3339,
    "final_step": 2360,
-   "n_fit_points": 22,
+   "n_fit_points": 24,
    "n_seeds": 2
   },
   "RHO-1": {
-   "fitted_final": 1.6824,
-   "observed": 1.6843,
+   "fitted_final": 1.6935,
+   "observed": 1.6943,
    "ci": [
-    1.6762,
-    1.6863
+    1.6879,
+    1.6981
    ],
-   "alpha": 1.279,
+   "alpha": 1.6736,
    "final_step": 2360,
-   "n_fit_points": 11
-  },
-  "Attention": {
-   "fitted_final": 1.6991,
-   "observed": 1.7005,
-   "ci": [
-    1.6925,
-    1.7045
-   ],
-   "alpha": 1.0542,
-   "final_step": 2360,
-   "n_fit_points": 11
+   "n_fit_points": 12
   },
   "BLADE": {
-   "fitted_final": 1.709,
-   "observed": 1.7115,
+   "fitted_final": 1.7487,
+   "observed": 1.7537,
    "ci": [
-    1.702,
-    1.7197
+    1.7429,
+    1.7544
    ],
-   "alpha": 0.7944,
+   "alpha": 1.9984,
    "final_step": 2360,
-   "n_fit_points": 11
+   "n_fit_points": 12
   },
   "Perplexity": {
-   "fitted_final": 1.9047,
-   "observed": 1.9001,
+   "fitted_final": 1.8492,
+   "observed": 1.8499,
    "ci": [
-    1.9,
-    1.9101
+    1.8429,
+    1.8581
    ],
-   "alpha": 2.1982,
+   "alpha": 0.05,
    "final_step": 2360,
-   "n_fit_points": 11
+   "n_fit_points": 12
+  },
+  "Attention": {
+   "fitted_final": 1.9163,
+   "observed": 1.9171,
+   "ci": [
+    1.8939,
+    1.9328
+   ],
+   "alpha": 3.0275,
+   "final_step": 2360,
+   "n_fit_points": 12
   },
   "REL-EMA": {
-   "fitted_final": 1.9199,
-   "observed": 1.9207,
+   "fitted_final": 1.9435,
+   "observed": 1.9449,
    "ci": [
-    1.9176,
-    1.922
+    1.9408,
+    1.9463
    ],
-   "alpha": 3.5021,
+   "alpha": 2.9326,
    "final_step": 2360,
-   "n_fit_points": 11
+   "n_fit_points": 12
   }
  },
- "delta_rho_vs_random": {
-  "delta": -0.0075,
-  "ci": [
-   -0.0155,
-   -0.0001
-  ],
-  "p_one_sided": 0.024,
-  "p_two_sided": 0.048
- },
  "deltas_vs_control": {
-  "RHO-1": {
-   "delta": 0.0106,
-   "ci": [
-    0.0027,
-    0.0184
-   ],
-   "p_one_sided": 0.0035
-  },
   "Random control": {
-   "delta": 0.0182,
+   "delta": 0.0134,
    "ci": [
-    0.008,
-    0.0275
+    0.0022,
+    0.0249
    ],
-   "p_one_sided": 0.0005
+   "p_one_sided": 0.0082,
+   "p_two_sided": 0.0164
   },
-  "Attention": {
-   "delta": 0.0273,
+  "RHO-1": {
+   "delta": 0.0146,
    "ci": [
-    0.0179,
-    0.0357
+    0.0061,
+    0.026
    ],
-   "p_one_sided": 0.0
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   },
   "BLADE": {
-   "delta": 0.0372,
+   "delta": 0.0698,
    "ci": [
-    0.0309,
-    0.0436
+    0.0592,
+    0.0822
    ],
-   "p_one_sided": 0.0
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   },
   "Perplexity": {
-   "delta": 0.2329,
+   "delta": 0.1716,
    "ci": [
-    0.2239,
-    0.2433
+    0.1638,
+    0.1792
    ],
-   "p_one_sided": 0.0
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
+  },
+  "Attention": {
+   "delta": 0.2368,
+   "ci": [
+    0.2213,
+    0.2505
+   ],
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   },
   "REL-EMA": {
-   "delta": 0.2482,
+   "delta": 0.2647,
    "ci": [
-    0.2394,
-    0.2563
+    0.2559,
+    0.2738
    ],
-   "p_one_sided": 0.0
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   }
  },
  "deltas_vs_random": {
   "Full-loss control": {
-   "delta": -0.0182,
+   "delta": -0.0134,
    "ci": [
-    -0.0275,
-    -0.008
+    -0.0249,
+    -0.0022
    ],
-   "p_one_sided": 0.0005
+   "p_one_sided": 0.0082,
+   "p_two_sided": 0.0164
   },
   "RHO-1": {
-   "delta": -0.0075,
+   "delta": 0.0012,
    "ci": [
-    -0.0155,
-    -0.0001
+    -0.0073,
+    0.0097
    ],
-   "p_one_sided": 0.024
-  },
-  "Attention": {
-   "delta": 0.0091,
-   "ci": [
-    0.0007,
-    0.0172
-   ],
-   "p_one_sided": 0.0155
+   "p_one_sided": 0.392,
+   "p_two_sided": 0.784
   },
   "BLADE": {
-   "delta": 0.0191,
+   "delta": 0.0564,
    "ci": [
-    0.01,
-    0.0312
+    0.0475,
+    0.0656
    ],
-   "p_one_sided": 0.0
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   },
   "Perplexity": {
-   "delta": 0.2148,
+   "delta": 0.1582,
    "ci": [
-    0.2077,
-    0.2231
+    0.1479,
+    0.1684
    ],
-   "p_one_sided": 0.0
-  },
-  "REL-EMA": {
-   "delta": 0.23,
-   "ci": [
-    0.2243,
-    0.2364
-   ],
-   "p_one_sided": 0.0
-  }
- },
- "flops": {
-  "Full-loss control": {
-   "train_1e18": 26.031509533643245,
-   "score_1e18": 0.0,
-   "offline_score_1e18": 0.0,
-   "ref_1e18": 0.0,
-   "run_total_1e18": 26.031509533643245,
-   "grand_total_1e18": 26.031509533643245,
-   "run_rel_control": 1.0,
-   "total_rel_control": 1.0,
-   "note": "fwd+bwd only, 2360 steps"
-  },
-  "Random control": {
-   "train_1e18": 26.031509533643245,
-   "score_1e18": 0.0,
-   "offline_score_1e18": 0.0,
-   "ref_1e18": 0.0,
-   "run_total_1e18": 26.031509533643245,
-   "grand_total_1e18": 26.031509533643245,
-   "run_rel_control": 1.0,
-   "total_rel_control": 1.0,
-   "note": "mask is free; identical to full loss per token"
-  },
-  "RHO-1": {
-   "train_1e18": 26.031509533643245,
-   "score_1e18": 0.0,
-   "offline_score_1e18": 8.770302636948717,
-   "ref_1e18": 10.368482610857901,
-   "run_total_1e18": 26.031509533643245,
-   "grand_total_1e18": 45.17029478144986,
-   "run_rel_control": 1.0,
-   "total_rel_control": 1.7352161127295196,
-   "note": "no in-run scoring: reference losses come from one offline forward pass over the whole RegMix corpus (4,885,156 instances) with the frozen Instruct step-940 reference, plus that reference's 940-step pretraining; the pass and the reference are shared with Perplexity, and each arm is charged in full"
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   },
   "Attention": {
-   "train_1e18": 26.031509533643245,
-   "score_1e18": 0.08303511812964352,
-   "offline_score_1e18": 0.0,
-   "ref_1e18": 0.0,
-   "run_total_1e18": 26.11454465177289,
-   "grand_total_1e18": 26.11454465177289,
-   "run_rel_control": 1.003189792663477,
-   "total_rel_control": 1.003189792663477,
-   "note": "last-block Q/K recompute + QK^T only"
-  },
-  "BLADE": {
-   "train_1e18": 26.031509533643245,
-   "score_1e18": 20.1560360541571,
-   "offline_score_1e18": 0.0,
-   "ref_1e18": 9.92727058486395,
-   "run_total_1e18": 46.187545587800344,
-   "grand_total_1e18": 56.11481617266429,
-   "run_rel_control": 1.7742937853107343,
-   "total_rel_control": 2.155649717514124,
-   "note": "selection from step 0: 2 no-grad fwd per step for all 2360 steps, plus 2 fwd for each of 75 reference-update batches at the 5 later syncs and 2 fwd parity check at each of 6 syncs (in-run); 6x75x2 full-batch ref fwd+bwd (reference column)"
-  },
-  "Perplexity (Middle-PPL)": {
-   "train_1e18": 26.031509533643245,
-   "score_1e18": 0.0,
-   "offline_score_1e18": 8.770302636948717,
-   "ref_1e18": 10.368482610857901,
-   "run_total_1e18": 26.031509533643245,
-   "grand_total_1e18": 45.17029478144986,
-   "run_rel_control": 1.0,
-   "total_rel_control": 1.7352161127295196,
-   "note": "no in-run scoring: same offline reference-loss pass and Instruct reference as RHO-1, each arm charged in full"
+   "delta": 0.2234,
+   "ci": [
+    0.2007,
+    0.242
+   ],
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   },
   "REL-EMA": {
-   "train_1e18": 26.031509533643245,
-   "score_1e18": 8.677169844547748,
-   "offline_score_1e18": 0.0,
-   "ref_1e18": 0.0,
-   "run_total_1e18": 34.70867937819099,
-   "grand_total_1e18": 34.70867937819099,
-   "run_rel_control": 1.3333333333333333,
-   "total_rel_control": 1.3333333333333333,
-   "note": "1 extra no-grad fwd/step on the EMA history model"
+   "delta": 0.2513,
+   "ci": [
+    0.244,
+    0.2589
+   ],
+   "p_one_sided": 0.0,
+   "p_two_sided": 0.0
   }
+ },
+ "rho_1_vs_each_random_seed": {
+  "Random control seed 42": {
+   "delta": 0.005,
+   "ci": [
+    -0.0035,
+    0.0136
+   ],
+   "p_one_sided": 0.1266,
+   "p_two_sided": 0.2532
+  },
+  "Random control seed 69": {
+   "delta": -0.0026,
+   "ci": [
+    -0.0092,
+    0.0037
+   ],
+   "p_one_sided": 0.2234,
+   "p_two_sided": 0.4468
+  }
+ },
+ "random_seed_69_minus_seed_42": {
+  "delta": 0.0076,
+  "ci": [
+   -0.0022,
+   0.0169
+  ],
+  "p_one_sided": 0.0607,
+  "p_two_sided": 0.1214
  },
  "overlapping_pairs": [
   [
    "Full-loss control",
-   "RHO-1"
-  ],
-  [
-   "RHO-1",
    "Random control"
   ],
   [
    "Random control",
-   "Attention"
-  ],
-  [
-   "Attention",
-   "BLADE"
+   "RHO-1"
   ]
  ],
- "realized_keep_rate": 0.599609
+ "realized_keep_rate": 0.599609,
+ "flops": {
+  "Full-loss control": {
+   "in_run_1e18": 26.0315,
+   "total_1e18": 26.0315,
+   "in_run_rel_control": 1.0,
+   "total_rel_control": 1.0
+  },
+  "Random control": {
+   "in_run_1e18": 26.0315,
+   "total_1e18": 26.0315,
+   "in_run_rel_control": 1.0,
+   "total_rel_control": 1.0
+  },
+  "Attention": {
+   "in_run_1e18": 26.1145,
+   "total_1e18": 26.1145,
+   "in_run_rel_control": 1.0032,
+   "total_rel_control": 1.0032
+  },
+  "REL-EMA": {
+   "in_run_1e18": 34.7087,
+   "total_1e18": 34.7087,
+   "in_run_rel_control": 1.3333,
+   "total_rel_control": 1.3333
+  },
+  "RHO-1": {
+   "in_run_1e18": 26.0315,
+   "total_1e18": 45.1703,
+   "in_run_rel_control": 1.0,
+   "total_rel_control": 1.7352
+  },
+  "Perplexity": {
+   "in_run_1e18": 26.0315,
+   "total_1e18": 45.1703,
+   "in_run_rel_control": 1.0,
+   "total_rel_control": 1.7352
+  },
+  "BLADE": {
+   "in_run_1e18": 46.1875,
+   "total_1e18": 56.1148,
+   "in_run_rel_control": 1.7743,
+   "total_rel_control": 2.1556
+  }
+ }
 }

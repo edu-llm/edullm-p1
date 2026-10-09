@@ -31,10 +31,8 @@ come from closed-form OLS and we keep the grid point with the lowest SSE.
 
   * Fit window: ``step >= 1000``. Not because of warmup -- that is 24 steps --
     but because the early curve is far noisier: the two random-control seeds
-    differ by 0.0181 bpb on average over steps 125-875 against 0.0047 bpb
-    inside the window. Across fit windows starting at 500, 625, ..., 1500,
-    RHO-1's advantage over the two-run random control ranges from 0.0009 to
-    0.0076 bpb, and this window gives the largest.
+    differ by 0.0251 bpb on average (absolute difference) over steps 125-875
+    against 0.0106 bpb inside the window.
   * Alpha grid: ``np.linspace(0.05, 6.0, 1192)``.
   * 10,000 i.i.d. residual bootstrap draws. Residuals are resampled with
     replacement from the fit-window residuals and added back to the fitted
@@ -55,40 +53,45 @@ come from closed-form OLS and we keep the grid point with the lowest SSE.
 
 ALPHA GRID BOUNDS
 -----------------
-``alpha`` is profiled over ``np.linspace(0.05, 6.0, 1192)``. The bounds are set
-wide enough that no arm's profiled optimum lands on a boundary (largest:
-REL-EMA at 3.502; smallest: BLADE at 0.794), so the exponent is
-data-determined for every arm rather than clipped by the grid. That matters for
-the interval as well as the point estimate: a clipped exponent truncates the
-bootstrap, because draws that "want" a steeper exponent pile up at the same
-boundary value and artificially shrink the spread.
+``alpha`` is profiled over ``np.linspace(0.05, 6.0, 1192)``. Six of the seven
+reported arms have an interior optimum (smallest: full-loss control at 0.999;
+largest: Attention at 3.027), so their exponents are data-determined. The
+exception is Perplexity: its fitted exponent is the grid minimum, 0.05, and about
+half of its bootstrap draws land there too. Its exponent is therefore clipped by
+the grid, not determined by the data. That matters for the interval as well as
+the point estimate: a clipped exponent truncates the bootstrap, because draws
+that "want" a shallower exponent pile up at the same boundary value and
+artificially shrink the spread, so Perplexity's interval is probably too narrow.
+(Attention's exponent is the least certain: its bootstrap 95% range is 0.86 to
+5.90, and 2.3% of draws reach the upper bound.)
 
 WHY ALPHA IS RE-ESTIMATED PER DRAW (ALPHA-FREE)
 -----------------------------------------------
 Freezing ``alpha`` at its point estimate treats a quantity that was estimated
 from the same 12 points as if it were known exactly, so it understates
 uncertainty. Re-estimating it per draw propagates that uncertainty. It is also
-the more conservative of the two variants: mean CI width is 0.01162 bpb
-alpha-free vs 0.00823 bpb alpha-fixed, so every interval reported here is the
-WIDER of the two. That is the basis on which the protocol was chosen.
-(Both figures are measured with the small-sample rescaling on; without it they
-are 0.01007 and 0.00710.)
+the more conservative of the two variants: mean CI width over the seven
+reported arms is 0.01620 bpb alpha-free vs 0.01213 bpb alpha-fixed, so every
+interval reported here is the WIDER of the two. That is the basis on which the
+protocol was chosen. (Both figures are measured with the small-sample rescaling
+on; without it they are 0.01422 and 0.01061.)
 
 Data source
 -----------
 ``token_selection_370m_wandb_curves.json`` (committed) is the default, so the
 script runs offline with no credentials. Pass ``--source wandb`` to re-pull
-from ``eduLLM/token-selection`` instead. The live histories match the cache on
-the fit window except that the seed-69 random control's W&B history has no
-step-1500 evaluation (a resume collided with W&B's monotonic-step rule); the
-live path restores that one point from the cache.
+from ``eduLLM/token-selection`` instead. The live histories equal the cache at
+every step they share. The only gap is BLADE's step-125 evaluation, which is in
+the run's on-disk task-loss output and the cache but not in its W&B history
+(the run was restarted after an out-of-memory failure at step 125); the live
+path restores any such point from the cache and says so.
 
 Usage
 -----
     python fit_and_plot.py                 # table + delta CIs + both figures
     python fit_and_plot.py --source wandb  # re-pull curves from W&B first
     python fit_and_plot.py --no-figures    # numbers only
-    python fit_and_plot.py --write-json    # also refresh the bootstrap JSON
+    python fit_and_plot.py --write-json    # also refresh both result JSONs
 """
 
 from __future__ import annotations
@@ -130,25 +133,22 @@ EXPECTED_FIT_STEPS = tuple(range(MIN_STEP, 2251, 125)) + (2360,)
 # internal padding (both below) are what raise the ceiling from ~1.05 to this.
 F1 = 1.28
 F2 = 1.5
-# Wide enough that no arm's profiled optimum lands on a boundary; see docstring.
+# Perplexity's profiled optimum sits on the lower bound; see docstring.
 ALPHA_GRID = np.linspace(0.05, 6.0, 1192)
 ALPHA_FREE = True
 
 WANDB_PROJECT = "eduLLM/token-selection"
-# STALE: these are the confounded pre-unification runs (rho_1, attention, blade and
-# middle_ppl ran on RunPod 8xA100, on a different code path than the other three; see
-# ../../experiments/token-selection/README.md and arms/README.md). Repoint every key at
-# its rerun's W&B id once the unified-commit runs finish -- random_control,
-# random_control_seed69 and rel_ema are kept and do not change.
+# The eight reported runs (arms/*.yaml record the same ids). The Instruct reference
+# model (instruct-reference, f0460e5c099079f314cbed0e9c50fb62) is not fitted here.
 WANDB_RUNS = {
-    "control": "349f144dc23ee52d18396be695d6b6b0",
-    "rho_1": "ebf1fa33048b3459f768cd471c2a8917",
-    "random_control": "fa841187ff07e9164da282efd353c217",
-    "attention": "01e18e7141fdbf9b988f17c32bb0c084",
-    "blade": "005xjces",
-    "middle_ppl": "2bbd4ec49b531d37115a44f73a0512e2",
-    "rel_ema": "cc52d5537a03ad8e57cc87a025668b2e",
-    "random_control_seed69": "123189f79a722b3481d06bc48b61fad9",
+    "control": "2ba31b3f5bb006897451d9f68fbcf93b",
+    "rho_1": "bad4d901c4579b8c0319ebcec43ba765",
+    "random_control": "928cc12b8ed5e9652b2a9a9f5cbbc6bb",
+    "attention": "194a3c2a720db4fa11942a246f9a51b3",
+    "blade": "59e6d62ee97123b755812e9e2d822267",
+    "middle_ppl": "a6a187590e4cbf16c7d279cb3315d009",
+    "rel_ema": "1de7041a160ce9a1d2d5f2be9fc1a940",
+    "random_control_seed69": "6b741657880c37f422020c594a3a2bfc",
 }
 
 # The random control was run twice. It is REPORTED as a single two-run fit: one
@@ -167,13 +167,16 @@ RANDOM_SEED_LABEL = {
 ARMS = [
     # key,             bar/table label,     figure-1 legend label,          color,     ls,   marker
     ("control",        "Full-loss control", "Full-loss control", "#000000", "--", "s"),
-    ("rho_1",          "RHO-1",             "RHO-1",                        "#1f77b4", "-",  "o"),
     ("random_control", "Random control",    "Random control (2-seed mean)", "#7f7f7f", ":",  "^"),
-    ("attention",      "Attention",         "Attention",                    "#d62728", "-",  "D"),
+    ("rho_1",          "RHO-1",             "RHO-1",                        "#1f77b4", "-",  "o"),
     ("blade",          "BLADE",             "BLADE",                        "#9467bd", "-",  "v"),
     ("middle_ppl",     "Perplexity",        "Perplexity",                   "#2ca02c", "-",  "P"),
+    ("attention",      "Attention",         "Attention",                    "#d62728", "-",  "D"),
     ("rel_ema",        "REL-EMA",           "REL-EMA",                      "#bcbd22", "-",  "*"),
 ]
+# Figure 1's rescaled inset shows only RHO-1 and the two controls; every other arm is
+# far above them over the final steps.
+INSET_KEYS = ("control", "random_control", "rho_1")
 ORDER = [a[0] for a in ARMS]
 LABEL = {a[0]: a[1] for a in ARMS}
 LEGEND = {a[0]: a[2] for a in ARMS}
@@ -198,8 +201,8 @@ def load_curves_from_json(path: Path = CURVES_PATH) -> dict[str, tuple[np.ndarra
 def load_curves_from_wandb() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     """Pull eval/macro_bpb histories live from W&B.
 
-    Restores the one evaluation W&B dropped from the seed-69 random control
-    (step 1500) from the committed cache; any other gap is left alone.
+    Any evaluation that is in the committed cache but missing from W&B (only
+    BLADE's step 125) is restored from the cache and reported.
     """
     import wandb  # imported lazily so the offline path needs no wandb
 
@@ -222,19 +225,24 @@ def load_curves_from_wandb() -> dict[str, tuple[np.ndarray, np.ndarray]]:
         )
         print(f"  W&B {key:<15} n={len(rows):3d} final_step={rows[-1][0]} final={rows[-1][1]:.4f}")
 
-    # A resume of the seed-69 run collided with W&B's monotonic-step rule, so its
-    # step-1500 evaluation is in the run's task-loss output and the committed
-    # cache but not in the W&B history.
-    key, step = "random_control_seed69", 1500
-    steps, losses = out[key]
-    if step not in steps:
-        cached_steps, cached_losses = load_curves_from_json()[key]
-        hit = np.flatnonzero(cached_steps == step)
-        if hit.size != 1:
-            raise ValueError(f"{key}@{step} is missing from W&B and from the cache")
-        order = np.argsort(np.append(steps, step), kind="stable")
-        out[key] = (np.append(steps, step)[order], np.append(losses, cached_losses[hit[0]])[order])
-        print(f"  restored {key}@{step} from the committed cache")
+    # BLADE was restarted after an out-of-memory failure at step 125, so that
+    # evaluation is in its on-disk task-loss output and the committed cache but not
+    # in the W&B history. Restore any such point; refuse a value that disagrees.
+    cache = load_curves_from_json()
+    for key, (steps, losses) in out.items():
+        cached_steps, cached_losses = cache[key]
+        for s, v in zip(steps, losses):
+            hit = np.flatnonzero(cached_steps == s)
+            if hit.size and abs(cached_losses[hit[0]] - v) > 1e-9:
+                raise ValueError(f"{key}@{int(s)}: W&B {v} != cache {cached_losses[hit[0]]}")
+        missing = np.setdiff1d(cached_steps, steps)
+        if missing.size:
+            keep = np.isin(cached_steps, missing)
+            all_steps = np.concatenate([steps, cached_steps[keep]])
+            all_losses = np.concatenate([losses, cached_losses[keep]])
+            order = np.argsort(all_steps, kind="stable")
+            out[key] = (all_steps[order], all_losses[order])
+            print(f"  restored {key}@{[int(s) for s in missing]} from the committed cache")
     return out
 
 
@@ -555,7 +563,7 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
     # Rescaled inset over the final steps.
     lo_x, hi_x = 1880, 2420
     inset = ax.inset_axes((0.60, 0.50, 0.38, 0.37))
-    for key in ORDER:
+    for key in INSET_KEYS:
         r = results[key]
         steps, loss = r["steps"], r["loss"]
         m = steps >= lo_x
@@ -587,15 +595,15 @@ def figure1(results: dict[str, dict], fig_dir: Path) -> None:
         )
     tail = [
         v
-        for key in ORDER
+        for key in INSET_KEYS
         for s, v in zip(results[key]["steps"], results[key]["loss"])
-        if s >= lo_x and v < 1.80
+        if s >= lo_x
     ]
     inset.set_xlim(lo_x, hi_x)
     # Headroom matters here: with a tick sitting flush against the top spine the
     # topmost label is drawn over the inset frame and reads as clipped.
     inset.set_ylim(min(tail) - 0.012, max(tail) + 0.024)
-    inset.set_yticks(np.arange(1.66, 1.741, 0.02))
+    inset.set_yticks(np.arange(1.67, 1.721, 0.01))
     inset.set_title("final steps, rescaled", fontsize=12.5 * F1, style="italic")
     inset.tick_params(labelsize=11 * F1)
     inset.set_facecolor("white")
@@ -701,10 +709,9 @@ def _save(fig, fig_dir: Path, stem: str) -> None:
 # -------------------------------------------------------------------- json ---
 # Full run provenance, spelled out here rather than inherited from the curve cache.
 SOURCE_STRING = (
-    "wandb eduLLM/token-selection; full-loss control is "
-    "full-loss-control-regmix10b-v3 (native FarmShare rerun 2026-09-14, matched "
-    "to the selection arms on init, data seed, step count and eval grid; replaces "
-    "the hpo-ladder-derived full-loss-control-regmix10b-v2)"
+    "wandb eduLLM/token-selection, the eight runs in WANDB_RUNS, all trained under "
+    "the vendored token-selection code (olmo_core_token_selection/, fork revision "
+    "64c28145); curves cached in token_selection_370m_wandb_curves.json"
 )
 
 METHOD_STRING = (
@@ -714,11 +721,18 @@ METHOD_STRING = (
     "95% CI = 2.5/97.5 percentile of 10,000 i.i.d. residual bootstrap draws with "
     "alpha RE-ESTIMATED on every draw (alpha-free), numpy default_rng seed 0. "
     "Residuals are inflated by sqrt(n/(n-p)) with p=3 before resampling "
-    "(1.155 at n=12, 1.069 at n=24 for the pooled random control). No "
-    "arm's profiled optimum sits on a grid boundary (largest 3.502 for REL-EMA, "
-    "smallest 0.794 for BLADE). Alpha-free was chosen over alpha-fixed because it "
-    "is the more conservative of the two (mean CI width 0.01162 vs 0.00823 bpb)."
+    "(1.155 at n=12, 1.069 at n=24 for the pooled random control). Perplexity's "
+    "profiled optimum sits on the grid's lower bound (0.05); the other arms range "
+    "from 0.999 (full-loss control) to 3.027 (Attention). Alpha-free was chosen over "
+    "alpha-fixed because it is the more conservative of the two (mean CI width "
+    "0.01620 vs 0.01213 bpb)."
 )
+
+FINAL_NUMBERS_PATH = ROOT / "token_selection_370m_final_numbers.json"
+# Every selection arm keeps round(0.6 * 2047) = 1228 of the 2047 loss positions in
+# each 2048-token sequence; W&B's train/selected token fraction reads exactly this
+# at every step of every selection arm.
+REALIZED_KEEP_RATE = round(round(0.6 * 2047) / 2048, 6)
 
 
 def write_bootstrap_json(results: dict[str, dict]) -> None:
@@ -764,6 +778,83 @@ def write_bootstrap_json(results: dict[str, dict]) -> None:
     print(f"  wrote {BOOTSTRAP_PATH}")
 
 
+def write_final_numbers_json(results: dict[str, dict]) -> None:
+    """Every number the paper's Tables 1 and 2 and its delta statements quote."""
+    from flops import table as flops_table
+
+    def r4(x: float) -> float:
+        return round(float(x), 4)
+
+    def fit_row(r: dict) -> dict:
+        row = {
+            "fitted_final": r4(r["fitted_final"]),
+            "observed": r4(r["observed"]),
+            "ci": [r4(r["ci_lo"]), r4(r["ci_hi"])],
+            "alpha": r4(r["alpha"]),
+            "final_step": int(r["final_step"]),
+            "n_fit_points": r["n_fit_points"],
+        }
+        if "n_seeds" in r:
+            row["n_seeds"] = r["n_seeds"]
+        return row
+
+    def delta_row(arm: str, base: str) -> dict:
+        st = delta_stats(results[arm]["boot"], results[base]["boot"])
+        return {
+            "delta": r4(st["delta"]),
+            "ci": [r4(st["ci_lo"]), r4(st["ci_hi"])],
+            "p_one_sided": r4(st["p_one_sided"]),
+            "p_two_sided": r4(st["p_two_sided"]),
+        }
+
+    table1: dict[str, dict] = {}
+    for key in ORDER:
+        if key == "random_control":
+            for sk in RANDOM_SEED_KEYS:
+                table1[RANDOM_SEED_LABEL[sk]] = fit_row(results[f"{sk}__seedfit"])
+            table1["Random control average"] = fit_row(results[key])
+        else:
+            table1[LABEL[key]] = fit_row(results[key])
+
+    overlapping = [
+        [results[ka]["label"], results[kb]["label"]]
+        for i, ka in enumerate(ORDER)
+        for kb in ORDER[i + 1 :]
+        if not (
+            results[ka]["ci_hi"] < results[kb]["ci_lo"]
+            or results[kb]["ci_hi"] < results[ka]["ci_lo"]
+        )
+    ]
+    payload = {
+        "generated_by": "experiments/token-selection/fit_and_plot.py --write-json (flops from flops.py)",
+        "source": SOURCE_STRING,
+        "method": METHOD_STRING,
+        "p_value_note": (
+            "p_one_sided is the share of the 10,000 paired bootstrap draws on the side "
+            "opposite the point estimate; 0.0 means no draw crossed zero (p < 0.0001); "
+            "p_two_sided = 2 * p_one_sided"
+        ),
+        "table1": table1,
+        "deltas_vs_control": {
+            LABEL[k]: delta_row(k, "control") for k in ORDER if k != "control"
+        },
+        "deltas_vs_random": {
+            LABEL[k]: delta_row(k, "random_control") for k in ORDER if k != "random_control"
+        },
+        "rho_1_vs_each_random_seed": {
+            RANDOM_SEED_LABEL[sk]: delta_row("rho_1", f"{sk}__seedfit") for sk in RANDOM_SEED_KEYS
+        },
+        "random_seed_69_minus_seed_42": delta_row(
+            "random_control_seed69__seedfit", "random_control__seedfit"
+        ),
+        "overlapping_pairs": overlapping,
+        "realized_keep_rate": REALIZED_KEEP_RATE,
+        "flops": {name: {k: r4(v) for k, v in row.items()} for name, row in flops_table().items()},
+    }
+    FINAL_NUMBERS_PATH.write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
+    print(f"  wrote {FINAL_NUMBERS_PATH}")
+
+
 # -------------------------------------------------------------------- main ---
 def main() -> None:
     ap = argparse.ArgumentParser(description="Token-selection 370M fits and figures.")
@@ -777,7 +868,7 @@ def main() -> None:
     ap.add_argument(
         "--write-json",
         action="store_true",
-        help="refresh token_selection_370m_bootstrap_results.json",
+        help="refresh token_selection_370m_bootstrap_results.json and _final_numbers.json",
     )
     ap.add_argument("--fig-dir", type=Path, default=FIG_DIR)
     args = ap.parse_args()
@@ -803,6 +894,7 @@ def main() -> None:
         print()
         print("Updating JSON ...")
         write_bootstrap_json(results)
+        write_final_numbers_json(results)
 
 
 if __name__ == "__main__":

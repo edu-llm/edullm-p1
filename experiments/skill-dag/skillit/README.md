@@ -1,14 +1,19 @@
 # Skill-It (Mixing Laws Dataset / OLMoHQ × OLMo-2 370M)
 
-**Question.** Can Skill-It domain reweighting — driven by an offline probe adjacency or by online mixing-law derivatives — improve macro task-loss over the best static mixture (the 1%-floor LightGBM optimum both arms start from) under a matched one-epoch budget?
+**Question.** Can Skill-It domain reweighting — driven by an offline probe adjacency or by online mixing-law derivatives — improve macro task-loss over the static mixture both arms start from (the 1%-floor LightGBM optimum) under a matched one-epoch budget?
 
-**Answer.** Both Skill-It arms beat the Olmo-mix-1124 control decisively
-($p < 10^{-4}$), but **neither beat the best static mixture** (the LightGBM
-optimum they start from). The offline probe arm ends 0.0032 bpb above it — a
-gap smaller than the 0.0044 bpb difference we measure between two dataloader
-seeds of the same mixture, so the two are not meaningfully separable. The
-online derivative arm ends 0.0086 bpb above it, about twice the seed noise
-floor. Mid-run reweighting therefore bought nothing here.
+**Answer.** No. Neither dynamic arm beats the Olmo-mix-1124 control
+(average of data seeds 42 and 69): the offline probe ends 0.0099 bpb worse
+(95% CI [+0.0039, +0.0161], two-sided $p = 0.0010$) and the online derivative
+0.0019 bpb worse (CI [-0.0050, +0.0099], $p = 0.656$). The static LightGBM
+mixture they start from itself finishes 0.0091 bpb behind the control average
+($p = 0.0048$). Against that starting mixture the offline probe arm is
+indistinguishable (0.0009 bpb worse, CI [-0.0059, +0.0075], $p = 0.79$); the
+online derivative arm finishes 0.0072 bpb better (CI [-0.0148, +0.0012],
+two-sided $p = 0.087$, one-sided $p = 0.044$), inside the 0.0105 bpb difference
+between the two control seeds. All arms are single runs, so the bootstrap
+intervals cover power-law-fit uncertainty within a run only, and the two control
+seeds are the only run-to-run estimate.
 
 ---
 
@@ -22,11 +27,12 @@ floor. Mid-run reweighting therefore bought nothing here.
 | Data | The ~127B-token reservoir `pretrain/olmo-127b` v1, shared with MixLaw; rebuild it byte for byte from the public Olmo-mix-1124 files with [`datasets/manifests/olmo-127b-v1/`](../../../datasets/manifests/olmo-127b-v1/README.md) (`rebuild.py`) |
 | Global batch / seq / LR | 4,194,304 / 2048 / \(4\times10^{-4}\) cosine (warmup 24, \(\alpha_f=0.1\)) |
 | Full-run budget | ~2384 steps ≈ one epoch |
-| Data seed | 42 (both arms) |
+| Data seed | 42 for both Skill-It arms and the LightGBM static run; the Olmo-mix-1124 control uses 42 and 69 |
+| Hardware / trainer | FarmShare 4×L40S, the vendored Skill-It trainer ([`olmo_core_skillit/`](olmo_core_skillit/)), for every run compared below; runs differ only in mixture (and, for the second control, data seed) |
 | FLOPs / full arm | \(2.63\times10^{19}\) (\(6ND\) plus the PaLM attention term, as for the probes below; measured from W&B) |
 | Skill-It update | \(\eta=0.2\), \(w=1\); five mid-run updates |
 | Update schedule | steps 500, 875, 1250, 1625, 2000 |
-| Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels, every 125 steps (step 2375 excluded) |
+| Primary metric | Macro mean CE bits-per-byte over 20 OLMES-style labels, every 125 steps, plus the final step 2384 |
 
 Unlike MixLaw (fixed weights for the whole run), Skill-It **reweights domains mid-training**. Between updates the sampler holds the current mixture fixed; at each update step it updates the domain probabilities from an adjacency \(A\) and the current per-family losses \(L\).
 
@@ -42,37 +48,37 @@ does not rebuild it from \(A L\) alone. A domain whose \(A\) row is all zeros
 therefore keeps its existing share (scaled by the common normalizer) rather than
 collapsing to parity with every other zero-row domain — which is exactly what the
 logged trajectories below show. Intuition: domains that the adjacency says “help”
-high-loss task families get more mass. Arms differ only in **how \(A\) is built**
-and (for one arm) **where \(p\) starts**.
+high-loss task families get more mass. The two arms differ only in **how \(A\) is
+built**; both start from the same mixture, the 1%-floor LightGBM optimum.
 
 ### Offline probe matrix
 
-1. Train **7 one-hot** DataDecide-60M probes (100% of each domain in turn; 5 tokens/param → 1451 steps / ~285M tokens, sized against DataDecide's original \(N=57.1\mathrm{M}\) non-embedding count; data seed 6198, as for the 24 pilots).
-2. Fit Chinchilla step-laws on in-run curves (evals every 120 of the 1451 steps on a fixed four-batch subsample of each family's validation split); extrapolate to tpp=20 (step 5806).
+1. Train **8** DataDecide-60M probes: the 7 one-hot probes (100% of each domain in turn) and one probe at the LightGBM starting mixture (5 tokens/param → 1451 steps / ~285M tokens, sized against DataDecide's original \(N=57.1\mathrm{M}\) non-embedding count; data seed 6198, as for the 24 pilots). All eight use the same training setup (micro-batch 4 × 24 accumulation, global batch 196,608) and are submitted together by [`submit_skillit_probes.sh`](submit_skillit_probes.sh).
+2. Fit Chinchilla step-laws on in-run curves (evals every 120 of the 1451 steps on the first 128 items of each family's validation split, as 16 batches of 8: the same 128 items the 24 pilots are scored on, so every probe is read on the same subsample); extrapolate to tpp=20 (step 5806). The curves are rebuilt from each probe's trainer log by [`import_probe_logs.py`](import_probe_logs.py).
 3. Build
    \[
-   A_{ij} = \max\!\big(0,\; L_j(r_{\mathrm{DML}}) - L_j(i)\big)
+   A_{ij} = \max\!\big(0,\; L_j(r_{\mathrm{LGB}}) - L_j(i)\big)
    \]
-   where \(L_j(i)\) is family \(j\)’s extrapolated loss after training on 100% domain \(i\), and \(L_j(r_{\mathrm{DML}})\) is the MixLaw fit's prediction for family \(j\) at the Data Mixing Laws paper mixture \(r_{\mathrm{DML}}\), also at the Chinchilla-style budget. Positive \(A_{ij}\) means domain \(i\) alone beat that prediction on family \(j\).
+   where \(L_j(i)\) is family \(j\)’s extrapolated loss after training on 100% domain \(i\), and \(L_j(r_{\mathrm{LGB}})\) is the extrapolated loss of the probe trained on the LightGBM starting mixture \(r_{\mathrm{LGB}}\) (`LGB-min1pct`), also at the Chinchilla-style budget ([`build_adjacency.py --reference-run probe_lgb_start`](build_adjacency.py)). Positive \(A_{ij}\) means domain \(i\) alone beat the starting mixture on family \(j\).
 
 **Probe FLOPs.** The 6ND estimate of Kaplan et al. (2020) plus the attention term of Chowdhery et al. (2023, PaLM),
 \(C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D\),
 at the trained model's \(N_{\text{non-emb}} = 76{,}296{,}576\):
-\(\approx 1.74\times10^{17}\) per probe → **\(\approx 1.22\times10^{18}\)** for all 7.
+\(\approx 1.74\times10^{17}\) per probe → **\(\approx 1.39\times10^{18}\)** for all 8.
 
 **Offline \(A\) used by the Offline probe arm** (rows = domains, columns = task families; Chinchilla step 5806):
 
 | domain \\ family | arc_challenge | arc_easy | mmlu_humanities | mmlu_other | mmlu_social_sciences | mmlu_stem |
 |------------------|--------------:|---------:|----------------:|-----------:|---------------------:|----------:|
-| dclm | 0.340 | 0.149 | 0.368 | 0.000 | 0.079 | 0.486 |
-| arxiv | 0.006 | 0.000 | 0.000 | 0.000 | 0.000 | 0.340 |
+| dclm | 0.000 | 0.077 | 0.000 | 0.000 | 0.000 | 0.000 |
+| arxiv | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
 | starcoder | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
-| pes2o | 0.252 | 0.084 | 0.000 | 0.000 | 0.000 | 0.450 |
-| open-web-math | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.232 |
-| algebraic-stack | 0.017 | 0.000 | 0.000 | 0.000 | 0.000 | 0.242 |
-| wiki | 0.227 | 0.000 | 0.470 | 0.013 | 0.000 | 0.352 |
+| pes2o | 0.000 | 0.161 | 0.000 | 0.000 | 0.000 | 0.065 |
+| open-web-math | 0.000 | 0.240 | 0.000 | 0.009 | 0.000 | 0.212 |
+| algebraic-stack | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| wiki | 0.000 | 0.046 | 0.072 | 0.000 | 0.000 | 0.000 |
 
-Starcoder’s row is all zeros (never beats the fit's prediction for the Data Mixing Laws paper mix on these families at Chinchilla scale). DCLM and wiki dominate many columns. Density: 17 of 42 cells (40%) are nonzero.
+The rows for arXiv, StarCoder and Algebraic Stack are all zeros, and so are the columns for ARC Challenge and MMLU Social Sciences: no single domain beats the probe trained on the LightGBM starting mixture on those skills at Chinchilla scale. OpenWebMath and pes2o carry most of the edges. Density: 8 of 42 cells (19%) are nonzero.
 
 ### Online mixing-law derivative
 
@@ -101,46 +107,35 @@ alternative is the benefit of moving mass from \(r\) toward domain \(i\),
 The reported run used the default (historical) form, `derivative_a` in the vendored
 [`olmo_core_skillit/skillit_math.py`](olmo_core_skillit/skillit_math.py).
 
-#### Which \(r\) a published derivative matrix is evaluated at
+#### Which \(r\) the derivative matrix is evaluated at
 
 Because \(A\) depends on \(r\), a single printed derivative matrix is a snapshot and
-the reference point has to be stated. Two are in play and they are not the same
-matrix. Run
-[`compare_offline_online_A.py`](compare_offline_online_A.py) to regenerate both.
+the reference point has to be stated. Both matrices here refer to the same mixture,
+`LGB-min1pct`, the LightGBM-optimized mixture both arms start from: the offline
+matrix compares each one-hot probe with the probe trained on that mixture, and the
+derivative matrix is the one the derivative arm used at its first update (step 500).
+Run [`compare_offline_online_A.py`](compare_offline_online_A.py) to regenerate it.
 
-| Evaluated at | Density | Pearson \(r\) vs offline probe \(A\) | Edge-presence disagreements |
+| Derivative matrix, evaluated at `LGB-min1pct` | Density | Pearson \(r\) vs offline probe \(A\) | Edge-presence disagreements |
 |---|---:|---:|---:|
-| \(r_{\mathrm{DML}}\) (`mix01`) | 13/42 (31%) | **0.171** | 10/42 |
-| `LGB-min1pct` (the arm's own start) | 13/42 (31%) | **0.065** | 10/42 |
+| vs the offline matrix above | 13/42 (31%) | **0.454** | 13/42 |
 
-\(r_{\mathrm{DML}}\) is the like-for-like point, since the offline probe matrix is
-also referenced to \(r_{\mathrm{DML}}\); `LGB-min1pct` is the matrix the derivative
-arm actually used at its first update. At \(r_{\mathrm{DML}}\) the entries are
-roughly twice as large (dclm → arc_challenge 0.154 vs 0.065). Density and the
-10-of-42 edge-presence disagreement are the same at both points; only the
-correlation and the magnitudes move.
+The two matrices have an edge in the same cell in only 4 cells (pes2o → MMLU STEM,
+OpenWebMath → ARC Easy, Wikipedia → ARC Easy and MMLU Humanities). Both have
+all-zero rows for StarCoder, arXiv and Algebraic Stack. The derivative matrix gives
+Wikipedia an edge on all six skills and DCLM on four, where the probe matrix gives
+Wikipedia two and DCLM one.
 
 Figure IV is generated by
-[`plot_adjacency_comparison.py`](plot_adjacency_comparison.py) and its derivative
-panel is evaluated at **`LGB-min1pct`**, which is the point the paper's body
-describes and the point its \(r = 0.07\) is computed at; the committed output is
+[`plot_adjacency_comparison.py`](plot_adjacency_comparison.py); the committed output is
 [`figures/adjacency_comparison.png`](figures/adjacency_comparison.png).
 
-The derivative matrix's qualitative pattern is the same at either point:
-StarCoder, Algebraic Stack and arXiv all-zero, OpenWebMath helping only
-ARC Easy, pes2o trivial on both ARC skills, Wikipedia and DCLM broadly helpful,
-31% density, 10 of 42 edge-presence disagreements with the probe matrix.
+#### Robustness check (Appendix E)
 
-#### Robustness checks (Appendix E)
-
-[`appendix_e_robustness.py`](appendix_e_robustness.py) reproduces the paper's two
-robustness checks on these constructions and writes
+[`appendix_e_robustness.py`](appendix_e_robustness.py) reproduces the paper's
+robustness check on the derivative construction and writes
 [`artifacts/appendix_e_robustness.json`](artifacts/appendix_e_robustness.json):
 
-- **Probe reference.** Rebuilding the probe matrix against the extrapolated losses
-  of the trained Data Mixing Laws pilot (`mix01`), instead of the MixLaw fit's
-  prediction for that mixture, gives Pearson \(r = 0.987\) to the matrix used, with
-  2 of 42 cells differing in edge presence (`probe_reference.mix01_vs_committed`).
 - **Derivative along the simplex.** The gauge-invariant form above, the derivative
   along \(r(\varepsilon) = (1-\varepsilon)r + \varepsilon e_i\)
   (`online_A_from_fit(..., gauge_invariant=True)`), has \(r = 0.981\)–\(0.985\) to
@@ -155,9 +150,8 @@ Two arms were trained, both starting from the **LightGBM-optimized mixture**
 (`LGB-min1pct`, id 27 in
 [`../mixlaw/validation_mixtures_10b.json`](../mixlaw/validation_mixtures_10b.json))
 — confirmed by each run's own step-0 logged weights
-(`skillit-370m-probe-rerun-20260918-011120`,
-`skillit-370m-deriv-20260916-124719`), which match that published weight vector
-to full float precision.
+(`skillit_updates.jsonl`), which match that published weight vector to full
+float precision.
 
 | Arm | Manipulation | FLOPs |
 |-----|--------------|------:|
@@ -167,8 +161,13 @@ to full float precision.
 
 Comparisons use the **Olmo-mix-1124 seed average** as the control (the corpus's
 natural weighting), and additionally report each arm against the **LightGBM
-static** mixture it starts from. Both are fixed-weight full runs, not extra
-Skill-It trains. Both Skill-It arms ran on FarmShare 4×L40S.
+static** mixture it starts from: a single run of the same trainer with dynamic
+reweighting disabled. All of these references are fixed-weight full runs, not
+extra Skill-It trains. Every run, Skill-It arms and references alike, ran on
+FarmShare 4×L40S (see Training-code provenance below) with the same trainer,
+initialization (step-0 task loss 4.4728 bpb in all of them), batch, schedule and
+data seed 42; the only other difference is the second control, which uses data
+seed 69.
 
 ### Domain weights after each update
 
@@ -182,11 +181,11 @@ LightGBM-optimized mixture (see Arms actually run above).
 | step | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |-----:|-----:|------:|----------:|------:|--------------:|----------------:|-----:|
 | 0 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
-| 500 | 0.646 | 0.168 | 0.057 | 0.077 | 0.031 | 0.010 | 0.011 |
-| 875 | 0.720 | 0.131 | 0.037 | 0.071 | 0.023 | 0.008 | 0.011 |
-| 1250 | 0.779 | 0.101 | 0.023 | 0.064 | 0.017 | 0.006 | 0.010 |
-| 1625 | 0.827 | 0.077 | 0.015 | 0.057 | 0.012 | 0.004 | 0.009 |
-| 2000 | 0.864 | 0.057 | 0.009 | 0.050 | 0.008 | 0.003 | 0.008 |
+| 500 | 0.550 | 0.204 | 0.084 | 0.087 | 0.050 | 0.013 | 0.011 |
+| 875 | 0.546 | 0.198 | 0.081 | 0.092 | 0.059 | 0.013 | 0.011 |
+| 1250 | 0.540 | 0.191 | 0.079 | 0.097 | 0.070 | 0.012 | 0.011 |
+| 1625 | 0.534 | 0.184 | 0.076 | 0.102 | 0.081 | 0.012 | 0.011 |
+| 2000 | 0.526 | 0.177 | 0.073 | 0.107 | 0.095 | 0.011 | 0.011 |
 
 **Online derivative**
 
@@ -199,10 +198,11 @@ LightGBM-optimized mixture (see Arms actually run above).
 | 1625 | 0.553 | 0.168 | 0.069 | 0.099 | 0.062 | 0.011 | 0.037 |
 | 2000 | 0.549 | 0.159 | 0.065 | 0.103 | 0.067 | 0.010 | 0.047 |
 
-Offline probe's fixed adjacency drives weight toward `dclm` monotonically at
-every update; online derivative's recomputed adjacency instead redistributes
-weight from `arxiv`/`starcoder` onto `wiki` (about 4×), `open-web-math` and
-`pes2o` while leaving `dclm` close to its starting share. See
+Offline probe's sparse adjacency moves the mixture only slowly: `dclm` drifts down from
+0.553 to 0.526 and `arxiv`/`starcoder` fall, while `open-web-math` (0.042 to 0.095) and
+`pes2o` (0.082 to 0.107) rise and `wiki` stays at 0.011. Online derivative's recomputed
+adjacency instead redistributes weight from `arxiv`/`starcoder` onto `wiki` (about 4×),
+`open-web-math` and `pes2o` while leaving `dclm` close to its starting share. See
 [`contamination/README.md`](contamination/README.md#reading-these-together)
 for how this drives each arm's contaminated exposure.
 
@@ -210,27 +210,63 @@ for how this drives each arm's contaminated exposure.
 
 ## Training-code provenance
 
-Where each Skill-It 370M run ran, as recorded in its W&B run metadata
-(`eduLLM/skillit`):
+Where each run compared in this README ran, as recorded in its W&B run metadata
+(`eduLLM/skillit`, `eduLLM/mixlaw-new`); all on FarmShare 4×L40S:
 
-| Arm | W&B run | Platform |
-|-----|---------|----------|
-| Offline probe | `87ad0201c4b5781a3df50d7bb394776c` | FarmShare, 4×L40S |
-| Online derivative | `c0844ce36f24d6773c7f45cb31d810f4` | FarmShare, 4×L40S |
+| Run | Slurm job | W&B run | Data seed |
+|-----|----------:|---------|----------:|
+| Offline probe (matrix rebuilt against the LightGBM-start probe) | 1771665 | `eduLLM/skillit/iy441nc7` | 42 |
+| Online derivative | 1728144 | `eduLLM/skillit/c0844ce36f24d6773c7f45cb31d810f4` | 42 |
+| LightGBM static | 1744338 | `eduLLM/mixlaw-new/zgmte13g` | 42 |
+| Olmo-mix-1124 control | 1745704 | `eduLLM/mixlaw-new/i9z1vtbt` | 42 |
+| Olmo-mix-1124 control | 1760339 | `eduLLM/mixlaw-new/3vbmxzmg` | 69 |
 
-Both ran `.edullm/runpod/entrypoint.py` from an uncommitted copy of OLMo-core's
-Skill-It `.edullm/` code on FarmShare scratch, launched with
-`train_no_aws.sbatch`. That code is vendored in
+The online derivative arm ran the vendored `entrypoint.py` from an uncommitted copy of
+OLMo-core's Skill-It `.edullm/` code on FarmShare scratch, launched with
+`train_no_aws.sbatch`. The offline probe arm ran the same entrypoint from a copy of the
+bundle patched for the static arms (below), with only the offline matrix and its two
+checksum pins changed by
+[`patch_probe_matrix.py`](olmo_core_skillit/farmshare/patch_probe_matrix.py);
+[`stage_probe_rerun.sh`](olmo_core_skillit/farmshare/stage_probe_rerun.sh),
+[`farmshare_probe_rerun_l40s.sbatch`](olmo_core_skillit/farmshare/farmshare_probe_rerun_l40s.sbatch)
+and
+[`farmshare_preflight_submit_probe_rerun.sh`](olmo_core_skillit/farmshare/farmshare_preflight_submit_probe_rerun.sh)
+stage and submit it (one 4×L40S node, `--arm-index 0`). The Skill-It code is vendored in
 [`olmo_core_skillit/`](olmo_core_skillit/); its
 [`PROVENANCE.md`](olmo_core_skillit/PROVENANCE.md) records where it came from,
 how it differs from the nearest upstream commit (`f2ded0b6` on
-`edullm/skillit-370m`), and what was left out. The
-controls they are compared against are the MixLaw runs; see
+`edullm/skillit-370m`), and what was left out.
+
+The LightGBM static run (Slurm job 1744338, run name
+`static-lgbm-min1pct-farmshare-1744338`) ran the same entrypoint from a
+separate copy of that code with a third arm added: arm index 2, `a_mode`
+`static`, which holds the domain weights at `LGB-min1pct` for the whole run, so
+W&B logs only the step-0 Skill-It snapshot. Its step-0 macro bpb, 4.4728, is
+identical to both Skill-It arms'. W&B marks the run failed, but only because,
+after all 2384 steps had trained and the step-2384 eval had been logged,
+OLMo-core's W&B callback called `wandb.finish(exit_code=..., quiet=True)`, which
+the installed wandb rejects. The three files that set it up and launched it were added to
+[`olmo_core_skillit/farmshare/`](olmo_core_skillit/farmshare/) after vendoring,
+and the vendored files were left unmodified (see
+[`PROVENANCE.md`](olmo_core_skillit/PROVENANCE.md#added-after-vendoring)):
+
+| File | Role |
+|------|------|
+| `patch_legacy_static_lgbm_arm.py` | Adds the static arm to a copy of the vendored `.edullm/` bundle (recipe, `skillit_math.py`, `skillit_controller.py`, `train_skillit_370m.py`), refusing to patch if any target text differs |
+| `farmshare_static_lgbm_l40s.sbatch` | The Slurm job: one 4×L40S node, reads only the pre-staged local data manifest, runs the vendored `entrypoint.py --arm-index 2` |
+| `farmshare_preflight_submit_static_lgbm.sh` | Checks the staged run folder, venv and W&B/HF session files, then submits the job |
+
+The two Olmo-mix-1124 control runs use the same entrypoint on a separate copy of
+the bundle with static arms added by
+[`patch_static_validation_arms.py`](olmo_core_skillit/farmshare/patch_static_validation_arms.py)
+and launched with
+[`farmshare_static_validation_l40s.sbatch`](olmo_core_skillit/farmshare/farmshare_static_validation_l40s.sbatch);
+the other MixLaw static runs are described in
 [`../mixlaw/README.md`](../mixlaw/README.md#training-code-provenance).
 
 ## Evaluation and uncertainty
 
-Same as MixLaw: evals every 125 of the 2384 steps, with step 2375 excluded; power law \(y = a + b/\mathrm{step}^{\alpha}\) on steps ≥ 1000;
+Same as MixLaw: evals every 125 of the 2384 steps (plus the final step); power law \(y = a + b/\mathrm{step}^{\alpha}\) on steps ≥ 1000;
 fitted final as center; **alpha-free** residual bootstrap (200,000 draws, \(\alpha\)
 re-selected on every draw) for the 95% CI. Reproduce with
 [`../mixlaw/fit_and_bootstrap_370m.py`](../mixlaw/fit_and_bootstrap_370m.py) from
@@ -241,64 +277,113 @@ the committed curves in
 
 ## Results
 
-Numbers below are the re-pulled, corrected figures for the two real runs
-(`skillit-370m-probe-rerun-20260918-011120`,
-`skillit-370m-deriv-20260916-124719`), both starting from the LightGBM optimum.
-They supersede an earlier table on this page that was computed under the
-mistaken assumption of a Data-Mixing-Laws-paper start and used that mixture as
-the control.
+Numbers below are for the two Skill-It runs (both starting from the LightGBM
+optimum), the LightGBM static run they start from, and the two Olmo-mix-1124
+control runs (data seeds 42 and 69) with their average. All are single runs on
+the same FarmShare 4×L40S setup.
 
 ### Fitted final macro task-loss (bpb)
 
-| Arm | Fitted final | Observed | 95% CI | vs Olmo control |
-|-----|-------------:|---------:|--------|-----------------|
-| Olmo-mix-1124 average (control) | 1.6291 | 1.6327 | [1.6246, 1.6335] | — |
-| LightGBM static (start mixture) | **1.6080** | 1.6077 | [1.6049, 1.6106] | \(p < 10^{-4}\) |
-| Offline probe | 1.6112 | 1.6124 | [1.6078, 1.6141] | \(p < 10^{-4}\) |
-| Online derivative | 1.6166 | 1.6216 | [1.6114, 1.6235] | \(p = 0.004\) |
+| Arm | Fitted final | Observed | 95% CI | vs control average |
+|-----|-------------:|---------:|--------|--------------------|
+| Olmo-mix-1124 control, seed 42 | 1.6200 | 1.6223 | [1.6133, 1.6270] | — |
+| Olmo-mix-1124 control, seed 69 | 1.6095 | 1.6029 | [1.6040, 1.6139] | — |
+| Olmo-mix-1124 average (control) | 1.6148 | 1.6126 | [1.6104, 1.6190] | — |
+| LightGBM static | 1.6238 | 1.6248 | [1.6190, 1.6291] | \(p = 0.0048\) (worse) |
+| Offline probe | 1.6247 | 1.6246 | [1.6204, 1.6292] | \(p = 0.0010\) (worse) |
+| Online derivative | 1.6166 | 1.6216 | [1.6114, 1.6235] | \(p = 0.656\) |
 
-Lower is better. Both Skill-It arms beat the Olmo-mix-1124 control (probe
-\(p < 10^{-4}\), derivative \(p = 0.004\)). Neither beats the LightGBM static
-mixture they start from:
+Lower is better. The probe arm is 0.0099 bpb worse than the control average (95% CI
+[+0.0039, +0.0161]); the derivative arm is 0.0019 bpb worse (95% CI [-0.0050, +0.0099])
+and indistinguishable from it. The LightGBM static mixture they start from is 0.0091 bpb
+worse than the control average (95% CI [+0.0026, +0.0158], \(p = 0.0048\)). Against
+that static run (Δ = first minus second, so negative means the first is better; \(p\)
+two-sided, with the one-sided \(p\) for "beats the reference" in the last column):
 
-| Comparison | Δ bpb | 95% CI | \(p\) |
-|------------|------:|--------|------:|
-| Offline probe − LightGBM static | +0.0032 | [-0.0011, +0.0075] | 0.14 |
-| Online derivative − LightGBM static | +0.0086 | [+0.0026, +0.0161] | 0.0020 |
+| Comparison | Δ bpb | 95% CI | \(p\) (two-sided) | \(p\) (one-sided) |
+|------------|------:|--------|------:|------:|
+| Offline probe − LightGBM static | +0.0009 | [-0.0059, +0.0075] | 0.79 | — (worse) |
+| Online derivative − LightGBM static | -0.0072 | [-0.0148, +0.0012] | 0.087 | 0.044 |
 
-**Seed noise floor.** Two Olmo-mix-1124 runs differing in dataloader seed (12536 vs
-12345), hardware (8×A100 vs 4×L40S, which also changed the realized initialization)
-and training code (the second control ran a separate trainer) land 0.0044 bpb apart (95% CI [-0.0046, 0.0132], \(p = 0.34\)). The probe arm's
-0.0032 bpb deficit is *below* that floor; the derivative arm's 0.0086 bpb deficit
-is about twice it.
+**Run-to-run variation.** The two Olmo-mix-1124 controls differ only in data
+seed (42 vs 69) and land 0.0105 bpb apart (95% CI [+0.0023, +0.0193],
+\(p = 0.0095\)). Even identically configured runs on this stack are not
+bit-reproducible: the probe and LightGBM static runs, which share a
+data seed and every setting up to the first update at step 500, report identical gradient
+norms through step 20 and have already diverged by step 30 (0.7326 vs 0.7325; 0.5282 vs
+0.5061 at step 50), before any Skill-It update. The seed difference therefore reflects
+data order plus GPU nondeterminism, and is the only run-to-run estimate
+available. Each arm is a single run, and the bootstrap intervals above capture
+only power-law-fit uncertainty within a run, not run-to-run variation. The
+probe's +0.0009 bpb difference from the LightGBM static run is 0.09× the
+control-seed difference; the derivative's 0.0072 bpb advantage is 0.7× it.
+
+### Compute savings (Figure III)
+
+[`../mixlaw/plot_figure_iii_compute_savings.py`](../mixlaw/plot_figure_iii_compute_savings.py)
+asks how many steps each Skill-It arm needs to reach the LightGBM static run's
+final fitted loss (1.6238), using the same fitted power laws and paired bootstrap
+draws (results under `dynamic_vs_lightgbm` in
+[`../mixlaw/compute_savings_results.json`](../mixlaw/compute_savings_results.json)).
+Training FLOPs are linear in steps, so the step saving is also the FLOP saving as
+a fraction of one \(2.63\times10^{19}\)-FLOP arm. The net saving charges each arm
+for the 60M runs it depends on (\(1.74\times10^{17}\) FLOPs each): 8 for the probe
+arm (the seven one-hot probes and the probe at the LightGBM starting mixture, 5.28%
+of one arm) and 24 for the derivative arm (the MixLaw pilot grid its derivatives come
+from, 15.85%).
+
+| Arm | Reaches 1.6238 at step | Step saving | Net of overhead | P(net > 0) |
+|-----|-----------------------:|------------:|----------------:|-----------:|
+| Offline probe | 2420 [2187, 2879] (past the end of the run) | -1.5% [-20.8, 8.2] | -6.8% [-26.1, +3.0] | 0.099 |
+| Online derivative | 2216 [2087, 2421] | 7.0% [-1.5, 12.5] | -8.8% [-17.4, -3.4] | 0.0003 |
+
+Step intervals are the bootstrap 95% intervals around the point crossing; 39.7% of the
+probe's draws and 95.6% of the derivative's cross within the run. Conversely,
+LightGBM's fitted curve would reach the probe arm's final loss at 0.98× the run
+(95% CI [0.88×, 1.24×]; 0.1% of draws never do) and the derivative's at 1.20×
+([0.98×, 2.26×]). As in the MixLaw analysis, this reads each run's fitted curve at an
+intermediate step, so it assumes the power law holds up to the end of its LR schedule.
 
 ### Takeaways
 
-1. **Skill-It did not help** under this one-epoch 370M contract — neither arm
-   improved on the static mixture it started from.
-2. **Offline probe ≈ LightGBM static.** The gap is not statistically
-   distinguishable (\(p = 0.14\); the 95% CI [-0.0011, +0.0075] spans zero) and
-   is smaller than the seed-to-seed spread, so we do not claim the static
-   mixture is genuinely better.
-3. **Online derivative clearly hurts** — 0.0086 bpb worse than its own starting
-   mixture, ~2x the seed floor.
-4. **Both still beat the natural corpus weighting** by 0.013–0.018 bpb (probe
-   \(p < 10^{-4}\), derivative \(p = 0.004\)); the failure is specific to beating
-   an *already-optimized* static mixture.
-5. **Cost.** Two Skill-It trains 101.06 A100-hours and \(\approx 5.26\times10^{19}\)
-   FLOPs (Online derivative alone 53.8 A100-h), plus \(\approx 1.22\times10^{18}\)
-   FLOPs for the 60M probes.
+1. **No evidence that dynamic reweighting beats the control.** Against the
+   Olmo-mix-1124 average the probe is 0.0099 bpb worse (two-sided \(p = 0.0010\))
+   and the derivative 0.0019 bpb worse (\(p = 0.656\)).
+2. **The static starting mixture finishes behind the control.** LightGBM static
+   is 0.0091 bpb worse than the control average (95% CI [+0.0026, +0.0158],
+   \(p = 0.0048\)).
+3. **Neither arm clearly improves on its starting mixture.** The probe arm
+   finishes 0.0009 bpb behind LightGBM static (95% CI [-0.0059, +0.0075]); the
+   derivative arm 0.0072 bpb ahead (two-sided \(p = 0.087\), one-sided
+   \(p = 0.044\)), 0.7× the 0.0105 bpb control-seed difference. Both
+   comparisons are single runs against a single run.
+4. **Neither arm saves compute against its starting mixture.** The probe arm does
+   not reach the LightGBM static final loss within the run (-6.8% net of its 8
+   probes); the derivative arm's 7.0% step saving does not cover its 24 pilots
+   (-8.8% net).
+5. **Run-to-run variation is of the same size as these gaps.** The control
+   seeds differ by 0.0105 bpb (95% CI [+0.0023, +0.0193], \(p = 0.0095\)), and
+   matched runs on this stack are not bit-reproducible.
+6. **Cost.** Two Skill-It trains \(\approx 5.26\times10^{19}\) FLOPs on 4×L40S,
+   plus \(2.63\times10^{19}\) for the LightGBM static run and
+   \(\approx 1.39\times10^{18}\) FLOPs for the 8 60M probes.
 
 ---
 
 ## Conclusions
 
-At this scale and budget, **a good static mixture is not improved by Skill-It
-reweighting**. Holding the LightGBM optimum fixed for the full epoch is at least
-as good as adapting domain weights mid-run from either a probe or a mixing-law
-adjacency. Note the design limit: both arms start *at* an optimized mixture and
-move away from it, so this tests whether Skill-It can improve on a good mix, not
-whether it can rescue a bad one.
+At this scale and budget, **there is no evidence that the Skill-It rule at
+\(\eta = 0.2\), with either the offline probe or the mixing-law derivative
+adjacency, improves on the Olmo-mix-1124 control.** The offline probe arm finishes
+behind the control (+0.0099 bpb, two-sided \(p = 0.0010\)) and indistinguishable from the
+LightGBM mixture it starts from; the derivative arm is within noise of the control and
+0.0072 bpb ahead of its starting mixture, less than the control-seed difference. The
+LightGBM mixture itself finishes behind the control, so neither form of reweighting
+demonstrably recovers its deficit. With single runs and a two-seed run-to-run estimate,
+these differences cannot be separated from run-to-run variation with confidence. Note
+the design limit: both arms start *at* an optimized mixture and move away from it, so
+this tests whether Skill-It can improve on a good mix, not whether it can rescue a bad
+one.
 
 Benchmark contamination between the shared 127B-token reservoir and the
 evaluation suite is audited in [contamination/](contamination/), including

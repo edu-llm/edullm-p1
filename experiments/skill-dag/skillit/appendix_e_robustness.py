@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
-"""Reproduce the two robustness checks on the adjacency matrices in Appendix E.
+"""Reproduce the robustness check on the derivative adjacency matrix in Appendix E.
 
-1. **Probe reference.** The probe matrix ``A_ij = max(0, L_j(r_DML) - L_j(i))``
-   takes ``L_j(r_DML)`` from the MixLaw fit's prediction for the Data Mixing Laws
-   mixture. Here the same matrix is rebuilt against the losses of the trained
-   Data Mixing Laws pilot (``mix01``), extrapolated to the Chinchilla-style
-   budget exactly like the probe losses, and compared to the committed
-   ``artifacts/probes_full/A_offline.npy``.
-2. **Derivative along the simplex.** The derivative arm used
-   ``A_ij = max(0, -t_ij (L_j(r) - c_j))``, which depends on how the fit's
-   regularization pins the shift ``t -> t + q`` it cannot identify. Perturbing
-   the mixture along the simplex, ``r(eps) = (1 - eps) r + eps e_i``, gives
-   ``A_ij = max(0, (t_bar_j(r) - t_ij)(L_j(r) - c_j))`` with
-   ``t_bar_j(r) = sum_q r_q t_qj``, which is invariant to that shift
-   (``online_A_from_fit(..., gauge_invariant=True)``). Both forms are evaluated
-   at the domain weights in effect at each of the derivative arm's five updates.
+The derivative arm used ``A_ij = max(0, -t_ij (L_j(r) - c_j))``, which depends on how
+the fit's regularization pins the shift ``t -> t + q`` it cannot identify. Perturbing
+the mixture along the simplex, ``r(eps) = (1 - eps) r + eps e_i``, gives
+``A_ij = max(0, (t_bar_j(r) - t_ij)(L_j(r) - c_j))`` with
+``t_bar_j(r) = sum_q r_q t_qj``, which is invariant to that shift
+(``online_A_from_fit(..., gauge_invariant=True)``). Both forms are evaluated at the
+domain weights in effect at each of the derivative arm's five updates.
 
 Writes ``artifacts/appendix_e_robustness.json``.
 """
@@ -30,17 +23,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILLIT = ROOT / "skillit"
 MIXLAW = ROOT / "mixlaw"
 sys.path[:0] = [str(MIXLAW), str(SKILLIT)]
-from extrapolate_chinchilla import extrapolate_runs  # noqa: E402
 from mixlaw_common import CURVE_FAMILIES, DOMAINS  # noqa: E402
 from skillit_math import (  # noqa: E402
     default_mixlaw_fit_path,
     load_fit_json,
-    offline_A_from_extrapolated,
     online_A_from_fit,
-    regmix_family_losses_from_fit,
 )
 
-CHINCHILLA_STEP = 5806
 EDGE_EPS = 1e-4
 
 # Domain weights in effect at the derivative arm's updates at steps 500, 875,
@@ -65,51 +54,6 @@ def _compare(A: np.ndarray, reference: np.ndarray) -> dict:
     }
 
 
-def probe_reference_check() -> dict:
-    probe_data = json.loads((SKILLIT / "artifacts/probes_full/probe_data.json").read_text(encoding="utf-8"))
-    report = extrapolate_runs(probe_data, CHINCHILLA_STEP, seed=0)
-    fit = load_fit_json(default_mixlaw_fit_path())
-
-    L_fit = regmix_family_losses_from_fit(fit, domains=DOMAINS, families=CURVE_FAMILIES)
-    A_fit, _ = offline_A_from_extrapolated(
-        report, L_fit, domains=DOMAINS, families=CURVE_FAMILIES,
-        reference_label="regmix", chinchilla_step=CHINCHILLA_STEP,
-    )
-    committed = np.load(SKILLIT / "artifacts/probes_full/A_offline.npy")
-    if not np.allclose(A_fit, committed, atol=1e-9):
-        raise SystemExit("rebuilt fit-referenced probe matrix does not match artifacts/probes_full/A_offline.npy")
-
-    mixtures = json.loads((MIXLAW / "mixtures.json").read_text(encoding="utf-8"))
-    row = next(m for m in mixtures["mixtures"] if m["id"] == 1)
-    assert row["tag"] == "base", "mix01 is the Data Mixing Laws mixture"
-    progress = MIXLAW / "pilot_runs" / "mix01" / "progress"
-    final = json.loads((progress / "task_loss_final.json").read_text(encoding="utf-8"))
-    curve = [json.loads(line) for line in (progress / "task_loss.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
-    mix01 = {
-        "domain_order": list(DOMAINS),
-        "curve_families": list(CURVE_FAMILIES),
-        "runs": [{
-            "id": 0,
-            "run_name": "mix01",
-            "tag": "base",
-            "weights": dict(zip(mixtures["domain_order"], row["weights"])),
-            "task_loss_families": final["task_families"],
-            "curve": curve,
-        }],
-    }
-    families = extrapolate_runs(mix01, CHINCHILLA_STEP, seed=0)["runs"][0]["families"]
-    L_mix01 = {fam: families[fam]["chinchilla"] for fam in CURVE_FAMILIES}
-    A_mix01, _ = offline_A_from_extrapolated(
-        report, L_mix01, domains=DOMAINS, families=CURVE_FAMILIES,
-        reference_label="mix01_chinchilla", chinchilla_step=CHINCHILLA_STEP,
-    )
-    return {
-        "reference_losses_fit_prediction": L_fit,
-        "reference_losses_mix01_extrapolated": L_mix01,
-        "mix01_vs_committed": _compare(A_mix01, committed),
-    }
-
-
 def simplex_derivative_check() -> dict:
     fit = load_fit_json(default_mixlaw_fit_path())
     per_update = {}
@@ -126,13 +70,7 @@ def simplex_derivative_check() -> dict:
 
 
 def main() -> None:
-    out = {
-        "probe_reference": probe_reference_check(),
-        "simplex_derivative": simplex_derivative_check(),
-    }
-    probe = out["probe_reference"]["mix01_vs_committed"]
-    print(f"probe matrix, mix01 reference vs fit prediction: Pearson r = {probe['pearson_r']:.3f}, "
-          f"{probe['edge_disagreements']}/42 edges differ")
+    out = {"simplex_derivative": simplex_derivative_check()}
     for step, v in out["simplex_derivative"]["per_update"].items():
         print(f"derivative at update {step:>4}: simplex vs used Pearson r = {v['pearson_r']:.3f}, "
               f"{v['edge_disagreements']}/42 edges differ")

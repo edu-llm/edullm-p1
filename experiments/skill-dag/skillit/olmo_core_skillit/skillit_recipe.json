@@ -8,7 +8,7 @@
     "offline_a_source": "experiments/skill-dag/skillit/artifacts/probes_full/A_offline.json",
     "offline_a_source_sha256": "e542e3e66f70c752110b51f60d1ee84f5f7860931dce5684e7a621f35dd74a21",
     "derivative_fit_source": "experiments/skill-dag/mixlaw/mixlaw_fit_chinchilla.json",
-    "derivative_fit_source_sha256": "acb4754b46cd6a588dffce7e7ad0d9bd70b0188db010669a7cfccf8622da2bcc"
+    "derivative_fit_source_sha256": "2a2fd6b812fb2b7275d4b8b5b89c7a6df999d31fba25f559a3c1d4c96c07ee48"
   },
   "data_source": {
     "dataset_id": "pretrain/olmo-127b",
@@ -53,7 +53,7 @@
     0.013571059505826969,
     0.01113463256808213
   ],
-  "initial_weights_source": "wandb:eduLLM/mixlaw-1/78a3a85b7a5304a426f71629de27b198 (LGB-min1pct source_mixture_config.target_ratio, matched static control for probe/deriv equal-start comparison)",
+  "initial_weights_source": "experiments/skill-dag/mixlaw/mixlaw_fit_lightgbm_chinchilla.json optimization.min1pct.weights (LGB-min1pct, the 1%-floor LightGBM optimum both Skill-It arms and the matched static rerun start from)",
   "training": {
     "model": "olmo2_370M",
     "sequence_length": 2048,

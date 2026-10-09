@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Figure IV: Probe vs. derivative adjacency matrices (A_ij), side by side.
 
-Probe A is unchanged (offline, from one-hot probe extrapolation vs. the
-Data Mixing Laws paper mixture reference -- artifacts/probes_full/A_offline.npy).
+Probe A is the offline matrix (artifacts/probes_full/A_offline.npy): each one-hot
+probe's extrapolated loss compared with the probe trained on the LightGBM starting
+mixture.
 
-Derivative A is now evaluated at the LightGBM-optimized ("min1pct") mixture's
-domain weights (mixlaw_fit_lightgbm_chinchilla.json: optimization.min1pct.weights)
-instead of the previous reference, the Data Mixing Laws paper dataset's domain
-weights (skillit_math.regmix_weight_vector()) -- this matches the mixture that
-Skill-It training actually starts from, rather than an arbitrary comparison point.
+Derivative A is evaluated at the LightGBM-optimized ("min1pct") mixture's domain
+weights (mixlaw_fit_lightgbm_chinchilla.json: optimization.min1pct.weights), the
+mixture Skill-It training starts from, so both panels refer to the same mixture.
 
 Style matches the original Figure IV exactly: two heatmap panels sharing one
 colorbar, blue sequential colormap, "-" for exact-zero cells, bold black title

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Plot Chinchilla-extrapolated probe task-loss curves and build offline A vs RegMix."""
+"""Plot the Chinchilla-extrapolated probe task-loss curves of a finished adjacency build.
+
+Re-plots ``--artifacts-dir`` (as written by ``build_adjacency.py --write-intermediate``),
+labeling the reference by the run it was measured on.
+"""
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -17,84 +20,13 @@ for p in (_MIXLAW, _SCRIPT):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from extrapolate_chinchilla import extrapolate_runs  # noqa: E402
 from fit_mixing_law import extrapolate  # noqa: E402
-from mixlaw_common import CURVE_FAMILIES, CURVE_TASK_LOSS_LABELS, DOMAINS, task_family  # noqa: E402
-from skillit_math import (  # noqa: E402
-    default_mixlaw_fit_path,
-    load_fit_json,
-    offline_A_from_extrapolated,
-    regmix_family_losses_from_fit,
-)
+from mixlaw_common import CURVE_FAMILIES, DOMAINS, PROBE_STEPS, task_family  # noqa: E402
 
 CHINCHILLA_STEP = 5806
-PILOT_STEP = 1451
+PILOT_STEP = PROBE_STEPS
 
 ONEHOT_PROBES: tuple[str, ...] = tuple(f"probe_{d}" for d in DOMAINS)
-LOG_MAP = {
-    "probe_dclm": "probe-1668442_1.out",
-    "probe_arxiv": "probe-1668442_2.out",
-    "probe_starcoder": "probe-1668442_3.out",
-    "probe_pes2o": "probe-1668442_4.out",
-    "probe_open-web-math": "probe-1668442_5.out",
-    "probe_algebraic-stack": "probe-1668442_6.out",
-    "probe_wiki": "probe-1668442_7.out",
-}
-STEP_RE = re.compile(r"\[step=(\d+)/\d+")
-EVAL_RE = re.compile(r"eval/downstream_bpb/([a-z0-9_]+)_bpb=([0-9.]+)")
-
-
-def parse_log_curves(log_path: Path) -> list[dict]:
-    if not log_path.is_file():
-        return []
-    lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
-    curves: list[dict] = []
-    current_step: int | None = None
-    pending: dict[str, float] = {}
-
-    def flush() -> None:
-        nonlocal pending, current_step
-        if current_step is not None and pending:
-            curves.append({"step": current_step, "task_loss_bpb": dict(pending)})
-        pending = {}
-
-    for line in lines:
-        m = STEP_RE.search(line)
-        if m:
-            flush()
-            current_step = int(m.group(1))
-            continue
-        for label, val in EVAL_RE.findall(line):
-            key = label if label.endswith("_bpb") else f"{label}_bpb"
-            if key in CURVE_TASK_LOSS_LABELS:
-                pending[key] = float(val)
-    flush()
-    return curves
-
-
-def load_probe_run(runs_dir: Path, run_name: str, logs_dir: Path) -> dict:
-    progress = runs_dir / run_name / "progress"
-    final_path = progress / "task_loss_final.json"
-    payload = json.loads(final_path.read_text(encoding="utf-8"))
-    labels = {k: float(v) for k, v in payload["labels"].items() if k in CURVE_TASK_LOSS_LABELS}
-    fam_src = payload.get("task_families") or {}
-    families = {k: float(v) for k, v in fam_src.items() if k in CURVE_FAMILIES}
-    curve_path = progress / "task_loss.jsonl"
-    if curve_path.is_file():
-        curve = [json.loads(ln) for ln in curve_path.read_text().splitlines() if ln.strip()]
-    else:
-        curve = parse_log_curves(logs_dir / LOG_MAP[run_name])
-    mix_id = ONEHOT_PROBES.index(run_name)
-    return {
-        "id": mix_id,
-        "tag": run_name.replace("probe_", ""),
-        "run_name": run_name,
-        "weights": [],
-        "task_loss_labels": labels,
-        "task_loss_families": families,
-        "macro_mean": float(payload.get("macro_mean", np.mean(list(families.values())))),
-        "curve": curve,
-    }
 
 
 def family_series(curve: list[dict], family: str) -> tuple[list[int], list[float]]:
@@ -109,7 +41,9 @@ def family_series(curve: list[dict], family: str) -> tuple[list[int], list[float
     return steps, vals
 
 
-def plot_chinchilla_curves(report: dict, L_reg: dict[str, float], out_path: Path) -> None:
+def plot_chinchilla_curves(
+    report: dict, L_reg: dict[str, float], out_path: Path, ref_label: str = "RegMix"
+) -> None:
     cmap = plt.get_cmap("tab10")
     colors = {run["run_name"]: cmap(i) for i, run in enumerate(report["runs"])}
 
@@ -147,7 +81,7 @@ def plot_chinchilla_curves(report: dict, L_reg: dict[str, float], out_path: Path
     fig.tight_layout(rect=[0, 0, 1, 0.86])
     fig.suptitle(
         "Skill-It one-hot probes: measured evals (solid) + Chinchilla extrapolation "
-        f"(dashed → step {chin_step}); dotted = RegMix reference",
+        f"(dashed → step {chin_step}); dotted = {ref_label} reference",
         fontsize=11,
         y=0.99,
     )
@@ -165,7 +99,9 @@ def plot_chinchilla_curves(report: dict, L_reg: dict[str, float], out_path: Path
     print(f"wrote {out_path}")
 
 
-def plot_chinchilla_macro(report: dict, L_reg: dict[str, float], out_path: Path) -> None:
+def plot_chinchilla_macro(
+    report: dict, L_reg: dict[str, float], out_path: Path, ref_label: str = "RegMix"
+) -> None:
     cmap = plt.get_cmap("tab10")
     fig, ax = plt.subplots(figsize=(10, 5))
     reg_macro = float(np.mean([L_reg[f] for f in CURVE_FAMILIES]))
@@ -205,7 +141,7 @@ def plot_chinchilla_macro(report: dict, L_reg: dict[str, float], out_path: Path)
                 ax.plot(smooth[: len(ext_y)], ext_y, "--", lw=1.0, color=color, alpha=0.75)
             ax.scatter([chin_step], [chin_macro], marker="*", s=70, color=color, zorder=5)
 
-    ax.axhline(reg_macro, color="0.35", ls=":", lw=1.2, label="RegMix (chin)")
+    ax.axhline(reg_macro, color="0.35", ls=":", lw=1.2, label=f"{ref_label} (chin)")
     ax.set_xlabel("training step")
     ax.set_ylabel("macro mean task loss (bpb)")
     ax.set_title(f"Macro mean over 6 families (Chinchilla @ step {chin_step})")
@@ -229,41 +165,26 @@ def print_A(A: np.ndarray, L_reg: dict[str, float]) -> None:
         print(f"{dom:<18} {row}")
 
 
+if __name__ == "__main__":
+    main()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--runs-dir", type=Path, required=True)
-    ap.add_argument("--logs-dir", type=Path, required=True)
-    ap.add_argument("--out-dir", type=Path, required=True)
-    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument(
+        "--artifacts-dir",
+        type=Path,
+        required=True,
+        help="directory holding probe_chinchilla_extrapolated.json + A_offline.json",
+    )
     args = ap.parse_args()
-
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    data = {
-        "domain_order": list(DOMAINS),
-        "curve_families": list(CURVE_FAMILIES),
-        "runs": [load_probe_run(args.runs_dir, name, args.logs_dir) for name in ONEHOT_PROBES],
-    }
-    (args.out_dir / "probe_data.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-
-    report = extrapolate_runs(data, CHINCHILLA_STEP, seed=args.seed)
-    (args.out_dir / "probe_chinchilla_extrapolated.json").write_text(
-        json.dumps(report, indent=2) + "\n", encoding="utf-8"
-    )
-
-    fit = load_fit_json(default_mixlaw_fit_path())
-    L_reg = regmix_family_losses_from_fit(fit, domains=DOMAINS, families=CURVE_FAMILIES)
-    A, detail = offline_A_from_extrapolated(
-        report, L_reg, domains=DOMAINS, families=CURVE_FAMILIES, chinchilla_step=CHINCHILLA_STEP
-    )
-    detail["fit_json"] = str(default_mixlaw_fit_path())
-    np.save(args.out_dir / "A_offline.npy", A)
-    (args.out_dir / "A_offline.json").write_text(
-        json.dumps({**detail, "shape": list(A.shape)}, indent=2) + "\n", encoding="utf-8"
-    )
-
-    plot_chinchilla_curves(report, L_reg, args.out_dir / "task_loss_chinchilla_by_family.png")
-    plot_chinchilla_macro(report, L_reg, args.out_dir / "task_loss_chinchilla_macro.png")
-    print_A(A, L_reg)
+    report = json.loads((args.artifacts_dir / "probe_chinchilla_extrapolated.json").read_text(encoding="utf-8"))
+    detail = json.loads((args.artifacts_dir / "A_offline.json").read_text(encoding="utf-8"))
+    L_ref = {fam: float(v) for fam, v in detail["reference_losses"].items()}
+    label = detail["reference"]
+    plot_chinchilla_curves(report, L_ref, args.artifacts_dir / "task_loss_chinchilla_by_family.png", label)
+    plot_chinchilla_macro(report, L_ref, args.artifacts_dir / "task_loss_chinchilla_macro.png", label)
+    print_A(np.array(detail["A"]) if "A" in detail else np.load(args.artifacts_dir / "A_offline.npy"), L_ref)
 
 
 if __name__ == "__main__":

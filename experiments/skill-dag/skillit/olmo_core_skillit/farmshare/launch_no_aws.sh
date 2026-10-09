@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Launch one Skill-It arm using an already-staged local input manifest --
-# no S3/AWS access anywhere in this path. EDULLM_RUNPOD_INPUT_MANIFEST must
+# no external object-storage access anywhere in this path. EDULLM_RUNPOD_INPUT_MANIFEST must
 # already point at a valid local ready.json (see manifest/ready.json in this
 # handoff bundle); nothing here stages, downloads, or mints any credential.
 #

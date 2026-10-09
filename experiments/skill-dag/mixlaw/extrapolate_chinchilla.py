@@ -5,10 +5,8 @@ Uses the step law L(s) = L_inf + A * s^(-alpha) from fit_mixing_law.py, fitted o
 the 6 in-run curve labels (ARC + MMLU). Chinchilla-optimal here means
 tokens/param = 20 on the published DataDecide non-embedding parameter count.
 
-Step-law fits use **in-run eval points only** (``task_loss.jsonl``, typically steps
-120–1440). The post-hoc ``task_loss_final.json`` at step 1451 is **not** appended:
-it uses a different eval protocol (full vs ``eval_subset_batches``) and often
-disagrees with the last in-run point (notably on ``mmlu_stem``).
+Step-law fits use the in-run eval points of ``domain_probes`` runs (``task_loss.jsonl``,
+steps 120–1440, every item of each test label). The last point is the run's final loss.
 """
 from __future__ import annotations
 
@@ -19,7 +17,14 @@ from pathlib import Path
 import numpy as np
 
 from fit_mixing_law import extrapolate, fit_step_law
-from mixlaw_common import CURVE_TASK_LOSS_LABELS, DATADECIDE_MODEL_SIZE, task_family, token_budget
+from mixlaw_common import (
+    DATADECIDE_MODEL_SIZE,
+    PROBE_STEPS,
+    PROBE_TASK_LOSS_LABELS,
+    TOKENS_PER_STEP,
+    task_family,
+    token_budget,
+)
 
 CHINCHILLA_TOKENS_PER_PARAM = 20.0
 DATA_NAME = "mixlaw_data.json"
@@ -48,12 +53,12 @@ def _curve_points(run: dict) -> dict[str, list[tuple[int, float]]]:
 
 
 def extrapolate_runs(data: dict, target_step: int, seed: int) -> dict:
-    _, pilot_steps, pilot_tokens = token_budget(5.0)
+    pilot_steps, pilot_tokens = PROBE_STEPS, PROBE_STEPS * TOKENS_PER_STEP
     _, chinchilla_steps, chinchilla_tokens = token_budget(CHINCHILLA_TOKENS_PER_PARAM)
     if target_step != chinchilla_steps:
         chinchilla_steps = target_step
 
-    curve_families = sorted({task_family(label) for label in CURVE_TASK_LOSS_LABELS})
+    curve_families = sorted({task_family(label) for label in PROBE_TASK_LOSS_LABELS})
     run_reports = []
 
     for run in data["runs"]:
@@ -110,7 +115,7 @@ def extrapolate_runs(data: dict, target_step: int, seed: int) -> dict:
 
     return {
         "tokens_per_param_chinchilla": CHINCHILLA_TOKENS_PER_PARAM,
-        "tokens_per_param_pilot": 5.0,
+        "tokens_per_param_pilot": pilot_tokens / DATADECIDE_MODEL_SIZE,
         "datadecide_model_size": DATADECIDE_MODEL_SIZE,
         "pilot_steps": pilot_steps,
         "pilot_tokens": pilot_tokens,

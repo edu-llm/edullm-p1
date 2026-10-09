@@ -23,7 +23,7 @@
   "scheduler": "cos_with_warmup_and_decay",
   "eval_metric": "task_loss_bpb",
   "eval_interval": 120,
-  "eval_subset_batches": 4,
+  "eval_subset_batches": 16,
   "curve_task_labels": [
     "arc_challenge_val_rc_5shot_bpb",
     "arc_easy_val_rc_5shot_bpb",
@@ -35,7 +35,48 @@
   "seed": 6198,
   "data_seed": null,
   "train_paths": 1,
+  "data_mode": "domain_stratified_stream",
+  "dataset_id": "pretrain/olmo-127b",
+  "dataset_version": "v1",
+  "data_bucket": "edullm-data",
+  "edullm_data_uri": "s3://edullm-data/pretrain/olmo-127b/v1/",
+  "pool_dir": "/scratch/users/nzhao2/agent-runs/probes128-20261002/pool",
+  "pool_provenance": {
+    "dataset_id": "pretrain/olmo-127b",
+    "dataset_version": "v1",
+    "data_bucket": "edullm-data",
+    "edullm_data_uri": "s3://edullm-data/pretrain/olmo-127b/v1/",
+    "label_key": "source",
+    "local_copy": "/scratch/users/nzhao2/agent-runs/olmo127b-edullm-publish-20260730T233445Z/publish-stage/tokens",
+    "note": "Symlinks to train-00000 and train-00001 of each domain in the local FarmShare copy of the published pretrain/olmo-127b/v1 token shards (536,870,912 tokens per domain). No re-download.",
+    "ephemeral_scratch": true
+  },
+  "mix_weights_json": "/scratch/users/nzhao2/agent-runs/probes128-20261002/recipe/probe_algebraic-stack/mix_weights.json",
+  "stream_seed": 47,
+  "domain_weights": {
+    "dclm": 0.0,
+    "arxiv": 0.0,
+    "starcoder": 0.0,
+    "pes2o": 0.0,
+    "open-web-math": 0.0,
+    "algebraic-stack": 1.0,
+    "wiki": 0.0
+  },
+  "domains": [
+    "dclm",
+    "arxiv",
+    "starcoder",
+    "pes2o",
+    "open-web-math",
+    "algebraic-stack",
+    "wiki"
+  ],
+  "save_folder": "/scratch/users/nzhao2/agent-runs/probes128-20261002/runs/probe_algebraic-stack/checkpoints",
+  "ephemeral_scratch": true,
   "flash_attention": false,
   "fused_loss": false,
-  "wandb": null
+  "wandb": {
+    "mode": "disabled",
+    "enabled": false
+  }
 }

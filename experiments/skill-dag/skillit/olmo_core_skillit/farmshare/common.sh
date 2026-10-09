@@ -30,7 +30,6 @@ VENV="${VENV:-${RUN_DIR}/venv}"
 RUN_ROOT="${RUN_ROOT:-${RUN_DIR}/runs}"
 STAGE_ROOT="${STAGE_ROOT:-${RUN_DIR}/${STAGE_ROOT_REL:-inputs}}"
 INPUT_MANIFEST="${EDULLM_RUNPOD_INPUT_MANIFEST:-${STAGE_ROOT}/ready.json}"
-AWS_ENV_FILE="${AWS_ENV_FILE:-${RUN_DIR}/aws-session.env}"
 WANDB_ENV_FILE="${WANDB_ENV_FILE:-${RUN_DIR}/wandb-session.env}"
 if [[ -x "${VENV}/bin/python3" ]]; then
   PYTHON="${VENV}/bin/python3"

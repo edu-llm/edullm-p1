@@ -1,0 +1,80 @@
+items per label: {'arc_challenge_val_rc_5shot_bpb': 299, 'arc_easy_val_rc_5shot_bpb': 570, 'mmlu_humanities_val_rc_5shot_bpb': 518, 'mmlu_other_val_rc_5shot_bpb': 355, 'mmlu_social_sciences_val_rc_5shot_bpb': 337, 'mmlu_stem_val_rc_5shot_bpb': 321}
+items the in-run eval scored: {'arc_challenge_val_rc_5shot_bpb': 128, 'arc_easy_val_rc_5shot_bpb': 128, 'mmlu_humanities_val_rc_5shot_bpb': 128, 'mmlu_other_val_rc_5shot_bpb': 128, 'mmlu_social_sciences_val_rc_5shot_bpb': 128, 'mmlu_stem_val_rc_5shot_bpb': 128}
+
+reference probe: mean loss on the in-run items vs 5000 random subsets of the same size
+  arc_challenge_va         all 1.785  in-run 1.767  random-subset sd 0.052  z=-0.3
+  arc_easy_va              all 2.002  in-run 2.119  random-subset sd 0.070  z=+1.7
+  mmlu_humanities_va       all 1.666  in-run 2.010  random-subset sd 0.075  z=+4.6
+  mmlu_other_va            all 2.456  in-run 2.552  random-subset sd 0.096  z=+1.0
+  mmlu_social_sciences_va  all 1.739  in-run 1.494  random-subset sd 0.058  z=-4.2
+  mmlu_stem_va             all 3.077  in-run 2.655  random-subset sd 0.147  z=-2.9
+
+L_j(reference) full / in-run:
+ [1.785 2.002 1.666 2.456 1.739 3.077] 
+ [1.767 2.119 2.01  2.552 1.494 2.655]
+
+A on ALL items:
+ [[0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.    0.    0.    0.   ]
+ [0.01  0.055 0.    0.    0.    0.208]
+ [0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.    0.    0.    0.   ]] 
+ nonzero 3
+
+A on the items the in-run evals scored:
+ [[0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.    0.    0.    0.092]
+ [0.022 0.051 0.    0.    0.    0.254]
+ [0.    0.    0.    0.    0.    0.   ]
+ [0.    0.    0.08  0.    0.    0.   ]] 
+ nonzero 5
+
+in-run vs all items: {'nonzero': 5, 'edges_disagree': 2, 'corr': 0.9002403486634765, 'mean_abs_diff': 0.005571710166972771}
+
+first-N prefixes vs all items
+  first   16: nonzero 10  edge disagreements  9  corr 0.63  mean|dA| 0.0164
+  first   32: nonzero  9  edge disagreements  8  corr 0.85  mean|dA| 0.0091
+  first   64: nonzero 10  edge disagreements  7  corr 0.85  mean|dA| 0.0057
+  first  128: nonzero  5  edge disagreements  2  corr 0.90  mean|dA| 0.0056
+  first  256: nonzero  3  edge disagreements  0  corr 1.00  mean|dA| 0.0002
+  first  512: nonzero  3  edge disagreements  0  corr 1.00  mean|dA| 0.0002
+  first  all: nonzero  3  edge disagreements  0  corr 1.00  mean|dA| 0.0000
+
+random N-item subsets per label (paired across probes), 2000 draws
+  N= 64: nonzero 4.7 (5-95%: 2-8), edge disagreements vs all-items 2.7 (0-5), corr median 0.96, mean|dA| 0.0040
+         in-run subset's mean|dA| is at the 82th percentile of random subsets; edge disagreements at the 24th
+  N=128: nonzero 3.8 (5-95%: 2-6), edge disagreements vs all-items 1.4 (0-3), corr median 0.99, mean|dA| 0.0021
+         in-run subset's mean|dA| is at the 99th percentile of random subsets; edge disagreements at the 58th
+  edge frequency over random-128 draws (rows: domains):
+    dclm              0.00  0.33  0.00  0.02  0.14  0.03
+    arxiv             0.00  0.00  0.00  0.00  0.00  0.00
+    starcoder         0.00  0.00  0.00  0.00  0.00  0.00
+    pes2o             0.00  0.05  0.00  0.07  0.00  0.06
+    open-web-math     0.71  0.97  0.00  0.02  0.00  1.00
+    algebraic-stack   0.00  0.00  0.00  0.00  0.00  0.00
+    wiki              0.00  0.35  0.00  0.00  0.01  0.00
+  A sd over random-128 draws:
+    dclm             0.000 0.011 0.000 0.002 0.004 0.003
+    arxiv            0.000 0.000 0.000 0.000 0.000 0.000
+    starcoder        0.000 0.000 0.000 0.000 0.000 0.000
+    pes2o            0.000 0.003 0.000 0.007 0.000 0.007
+    open-web-math    0.014 0.029 0.000 0.002 0.000 0.046
+    algebraic-stack  0.000 0.000 0.000 0.000 0.000 0.000
+    wiki             0.000 0.012 0.000 0.000 0.000 0.000
+  N=256: nonzero 3.5 (5-95%: 3-5), edge disagreements vs all-items 0.6 (0-2), corr median 1.00, mean|dA| 0.0009
+         in-run subset's mean|dA| is at the 100th percentile of random subsets; edge disagreements at the 85th
+
+edge frequency when resampling ALL items with replacement (item-sampling noise of the full-set matrix):
+    dclm              0.00  0.24  0.00  0.00  0.08  0.01
+    arxiv             0.00  0.00  0.00  0.00  0.00  0.00
+    starcoder         0.00  0.00  0.00  0.00  0.00  0.00
+    pes2o             0.00  0.00  0.00  0.03  0.00  0.03
+    open-web-math     0.73  1.00  0.00  0.00  0.00  1.00
+    algebraic-stack   0.00  0.00  0.00  0.00  0.00  0.00
+    wiki              0.00  0.29  0.00  0.00  0.00  0.00
+
+wrote C:\alpha_ai\edullm-p1\experiments\skill-dag\skillit\artifacts\probe_subset_sensitivity\results.json

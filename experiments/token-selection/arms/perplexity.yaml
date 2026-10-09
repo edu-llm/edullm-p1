@@ -18,12 +18,12 @@ reference:
   # reference_scores.py), not a resident model: scored once, on FarmShare's 1-GPU
   # qos=normal lane, against the checkpoint above. Shared with rho-1.
   reference_scores_contract: instruct-reference-370m-step940/regmix-10b-v1
-# Migrated off the retired HQ reference (averaged steps 1000/1125/1315); this arm now
-# scores against the same frozen Instruct reference rho-1 uses (final checkpoint, no
-# averaging).
+# Scores against the same frozen Instruct reference rho-1 uses (final checkpoint, step
+# 940, no averaging).
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
   revision: 64c28145
 wandb_project: token-selection
-status: rerun-under-unified-commit
+status: reported
+wandb_run: eduLLM/token-selection/a6a187590e4cbf16c7d279cb3315d009

@@ -1,10 +1,9 @@
 # Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["blade"]
 #   and ../olmo_core_token_selection/token_selection_370m/blade.py (BLADE_SYNC_STEPS, BLADE_TAU, BLADE_K)
-# Method fix vs. the confounded run: the reference's own training term is now
-# selection-weighted (Wang et al. 2026, Sec. 2.2), scored against the outgoing
-# reference before it is overwritten by the sync. The schedule starts at step 0
-# (previously step 500), so BLADE selects at the same 60% budget as every other arm
-# from step 0 rather than running full-loss through step 500.
+# The reference's own training term is selection-weighted (Wang et al. 2026, Sec. 2.2),
+# scored against the outgoing reference before it is overwritten by the sync. The
+# schedule starts at step 0, so BLADE selects at the same 60% budget as every other arm
+# from step 0.
 name: blade
 method: blade  # top 60% by L_proxy - L_ref, selection-weighted reference update
 dataset_id: pretrain/regmix-10b
@@ -33,4 +32,5 @@ olmo_core:
   branch: edullm/token-selection-370m-unified
   revision: 64c28145
 wandb_project: token-selection
-status: rerun-under-unified-commit
+status: reported
+wandb_run: eduLLM/token-selection/59e6d62ee97123b755812e9e2d822267

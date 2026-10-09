@@ -23,4 +23,5 @@ olmo_core:
   branch: edullm/token-selection-370m-unified
   revision: 64c28145
 wandb_project: token-selection
-status: rerun-under-unified-commit
+status: reported
+wandb_run: eduLLM/token-selection/bad4d901c4579b8c0319ebcec43ba765

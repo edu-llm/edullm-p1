@@ -1,8 +1,8 @@
 # regmix-10b-v1
 
 Document-level manifest and byte-for-byte rebuild recipe for `pretrain/regmix-10b`
-v1, the 10B-token corpus that all seven 370M-parameter token-selection arms in the
-P1 paper trained on. It is a subsample of `allenai/olmo-mix-1124` (ODC-By v1.0; DCLM also
+v1, the 10B-token corpus that all eight 370M-parameter token-selection training runs in
+the P1 paper (seven arms, one with a second seed) trained on. It is a subsample of `allenai/olmo-mix-1124` (ODC-By v1.0; DCLM also
 subject to the Common Crawl terms of use) with Data Mixing Laws domain weights (the paper's
 Tables 3 and 4). We do not redistribute the corpus; this manifest is how to rebuild it.
 

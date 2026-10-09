@@ -17,8 +17,8 @@ if str(OLMO_CORE_TOKEN_SELECTION) not in sys.path:
 
 from token_selection_370m.arms import ARM_SPECS  # noqa: E402
 
-# hq-reference and instruct-reference are ArmSpecs too (arms.py's own "References"
-# section) but aren't in the reported-arm table under the same run_id-derived name;
+# instruct-reference is an ArmSpec too (arms.py's own "References" section) but isn't
+# in the reported-arm table under the same run_id-derived name;
 # map YAML stem -> ARM_SPECS key explicitly so a rename on either side is caught.
 YAML_TO_SPEC_KEY = {
     "instruct-reference": "instruct-reference",

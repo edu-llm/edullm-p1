@@ -7,13 +7,11 @@
 **name:** `refhq-instruct` → `pretrain/refhq-instruct`  
 *(The FarmShare scratch layout keeps the `refhq-new` directory name; `refhq-new` was not
 usable as the dataset id itself, since `new` collides with a version-token convention.)*  
-(Originally designed alongside a since-retired HQ-filtered web-mix reference corpus
-(`pretrain/refhq-regmix-5p5b`); this one is instruct-sourced instead. No size suffix —
-realized size is whatever one pass yields.)
+(No size suffix — realized size is whatever one pass yields.)
 
 **tokenizer:** HF `allenai/dolma2-tokenizer` → publish dep `tokenizer/dolma2-bpe` (EOS 100257). Already published; do not republish.
 
-**budget:** One pass of filtered unique data only. No upsampling, no 5.5B cap. Count tokens during build and report realized size in plan summary + the local `dataset_manifest.json` `sources[]`.
+**budget:** One pass of filtered unique data only. No upsampling. Count tokens during build and report realized size in plan summary + the local `dataset_manifest.json` `sources[]`.
 
 **dedup:** None (explicit). Keep SmolTalk `openhermes-100k` even though it overlaps full OpenHermes-2.5.
 

@@ -10,175 +10,94 @@ true from this repository alone.
 | --- | --- |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Branch | `edullm/token-selection-370m-unified` |
-| Commit | `64c28145` (see below) |
+| Commit | `64c28145` |
 | Source path | `.edullm/` |
-| Copied on | 2026-09-28 |
 
-This directory is byte-identical to `.edullm/` at that commit. No file was
-edited here after vendoring.
+Apart from this file, the directory is byte-identical to `.edullm/` at that
+commit. No vendored file was edited here.
 
-`d294e419` unifies every arm onto one code path: one entrypoint
-(`token_selection_entrypoint.py`), one train module
-(`TokenWeightedTrainModule`), and one hardware contract (FarmShare, 4×L40S).
-It replaces `53daffdf`, the commit the previous version of this directory
-was vendored from, which still had four arms running through a separate
-RunPod path on 8×A100.
+## Which commit each run recorded
 
-## What changed, and why
+Every run logs `GIT_COMMIT` into its W&B config and `run_identity.json`;
+`farmshare/sync_repo.sh` refuses to sync a dirty tree and stamps the synced code
+with its exact commit.
 
-The full history is in the branch's commits, but the paper-relevant changes
-are:
+- The eight reported arms (`full-loss-control`, `random-control`,
+  `random-control-seed69`, `rho-1`, `perplexity`, `attention`, `blade`,
+  `rel-ema-exp`) all record `64c28145`.
+- `instruct-reference` records `765ae838`, the commit the shared run directory
+  held when it started. Its method (full loss) is untouched by every later
+  commit, and its checkpoint ladder (step 0, every 125 steps, final step 940,
+  omitting 875) is the same under `64c28145`.
 
-- **No RunPod path, no AWS/S3 code.** `runpod/`, `train_on_corpus.py`,
-  `precomputed.py` and `Dockerfile` are deleted. Corpora are resolved from a
-  local manifest (`farmshare/stage_local.py`) bound to the pinned FarmShare
-  directories verified against this repository's
-  `datasets/manifests/*/outputs.json`.
-- **One new arm, trained in this study rather than read from elsewhere:**
-  `instruct-reference`. `rho-1` and `perplexity` both read their reference
-  losses from it: the final checkpoint (step 940, no averaging), scored
-  offline once against the whole corpus (see A1 below). There is no HQ
-  reference arm or checkpoint anywhere in this history.
-- **`random-control-seed69`** is now an ArmSpec (it previously ran from an
-  uncommitted hand edit; its seeds are confirmed against its W&B
-  `run_identity.json` artifact).
-- **Attention** (`selection.py`): the raw causal column-mass score is
-  normalized by its expectation under uniform attention (removing the bias
-  toward early positions) and aligned to the token whose loss it gates
-  (`get_labels` shifts labels left by one). See
-  `aligned_normalized_attention_scores`.
-- **BLADE** (`blade.py`): the reference's own training term is now
-  selection-weighted (Wang et al. 2026, Sec. 2.2), scored against the
-  *outgoing* reference before it is overwritten. The schedule moved to syncs
-  at steps 0/400/800/1200/1600/2000 (`tau=400`, `K=75`), so every arm selects
-  from step 0 at the same 60% budget. Each sync gets a fresh optimizer at the
-  proxy's own scheduled LR.
-- Every arm, including `full-loss-control` and `blade`, now runs through the
-  same `TokenWeightedTrainModule`; there is no separate stock-module branch.
-- `sync_repo.sh` refuses to sync a dirty tree and stamps the synced code with
-  its exact commit (`GIT_COMMIT`), which every run logs into its W&B config
-  and `run_identity.json`, closing the previous version's `git_commit=None`
-  gap.
-- `farmshare/{config.env,launch.sh,submit_from_laptop.sh}`: a smoke test can
-  now override `TRAIN_GPUS`, `TRAIN_PARTITION`/`TRAIN_QOS`, `EDULLM_LOCAL`
-  and `WANDB_MODE` to run one arm on the separate `qos=normal` 1-GPU cap with
-  offline W&B, instead of the production `qos=gpu` 4-GPU cap. Every
-  production launch leaves all of these unset and gets the same behavior as
-  before.
-- `eval_task_loss_olmo_core.py`: the single-rank (`world_size=1`) task-loss
-  eval process group now uses `gloo` with a file-based rendezvous, not
-  `nccl` with `env://`. Confirmed on FarmShare across two fixes: the 1-GPU
-  smoke test first hung at `dist.init_process_group(backend="nccl")` --
-  NCCL still probes IB/network topology on init even at `world_size=1`.
-  Switching to `gloo` didn't fix it either: `env://` makes rank 0 bind a
-  TCPStore server on a port that was only *probed* free a moment earlier
-  (bound, read, released) in `_default_single_rank_env()`, and FarmShare
-  doesn't let that bind-probe-release-rebind sequence proceed cleanly. A
-  file-based store has no port to race on and no other rank to wait for.
-  Production's real multi-rank eval (`world_size>1`, `task_loss_nproc=4`,
-  `env://` under torchrun) is unaffected by either change.
-- `token_selection_370m/arms.py`: BLADE's `rank_microbatch_tokens` drops
-  from the 16,384 default to 8,192. Confirmed on FarmShare: BLADE's step-0
-  pre_train sync OOM'd a 44 GiB L40S (39.47 GiB already in use, short by
-  6.12 GiB) -- it holds the proxy, the dynamic reference, and both their
-  optimizers resident during the K-update sync, exactly the case the
-  original design called out as needing a fallback.
-- `token_selection_370m/blade.py`: the K-update backward
-  (`_mean_ce_with_weight`) now backprops through `output.loss`, not
-  `output.ce_loss`. OLMo-core's LM head documents `ce_loss` as
-  logging-only and unconditionally `.detach()`-es it; once the OOM above
-  was fixed, the very first real K-update backward (this schedule's first
-  sync is at step 0, so nothing before this fix had ever exercised the
-  path end to end) failed with "element 0 of tensors does not require
-  grad and does not have a grad_fn". `output.loss` is the live tensor and
-  is numerically identical to `ce_loss` here, since this call never sets
-  `z_loss_multiplier` (it defaults to `None` upstream) -- the fix changes
-  nothing about what BLADE optimizes, only restores the gradient.
+## What the code does
 
-`cf4fdede` (on top of `90c2eb66`) reruns every arm under this one commit --
-nothing is kept from `53daffdf` -- and makes these further changes:
+Every arm runs through one entrypoint (`token_selection_entrypoint.py`), one
+train module (`TokenWeightedTrainModule`, the mean CE over kept or weighted
+tokens) and one hardware contract (FarmShare, 4×L40S). Corpora are resolved
+from a local manifest (`farmshare/stage_local.py`) bound to the pinned
+FarmShare directories verified against this repository's
+`datasets/manifests/*/outputs.json`.
 
-- **Offline reference scoring (`token_selection_370m/reference_scores.py`,
-  `farmshare/score_reference.py`).** The whole RegMix-10B corpus is scored
-  once against the frozen `instruct-reference` checkpoint (step 940), on the
-  1-GPU `qos=normal` lane, into a per-instance reference-CE table bound to
-  that checkpoint's sha256 and the exact corpus by a manifest. `rho-1` and
-  `perplexity` look up rows by `batch["index"]` instead of keeping a second
-  reference model resident during training.
-- **Per-instance random derivation and tie-breaking (`selection.py`).**
+- **Reference model.** `instruct-reference` is trained in this study. `rho-1`
+  and `perplexity` both read their reference losses from its final checkpoint
+  (step 940, no averaging).
+- **Offline reference scoring** (`token_selection_370m/reference_scores.py`,
+  `farmshare/score_reference.py`). The whole RegMix-10B corpus is scored once
+  against that checkpoint, on the 1-GPU `qos=normal` lane, into a
+  per-instance reference-CE table bound to the checkpoint's sha256 and the
+  exact corpus by a manifest. `rho-1` and `perplexity` look up rows by
+  `batch["index"]` instead of keeping a reference model resident.
+- **Per-instance random draws and tie-breaking** (`selection.py`).
   `random-control`'s mask, and every score-based method's tie-break
   (including BLADE's), are drawn per corpus instance
-  (`SeedSequence([tag, data_seed, index])`) -- independent of world size,
-  rank, and microbatch composition, so seeds 42 and 69 never share a draw
-  and a 1-GPU smoke run draws the same masks production would.
-- **BLADE (`blade.py`):** the step-0 sync's reference LR is floored at its
-  post-warmup value (it was training at LR 0, since the proxy's own
-  scheduler is still in warmup at step 0); selection is now per row
-  (`round(0.6*count)`, matching every other arm) instead of a per-rank batch
-  threshold; the reference is scored under the same bf16-cast parameters the
-  proxy trains under (via `torch.func.functional_call`, without touching the
-  reference's own fp32 AdamW state), with a post-sync parity check logged
-  after every sync.
-- **Exact step count (`recipe.py`).** `Duration.steps(steps)`, not
-  `Duration.tokens(max_tokens)` -- the latter rounds up, running one step
-  past every ladder/eval/FLOP computation that assumes the floor.
-- **All-token CE.** `SkipStepOptimizer`'s spike detector now watches the
-  mean CE over all valid tokens, not the kept-token CE, so a discontinuity
-  in the kept set alone (a BLADE resync, REL-EMA's growing alpha) can't look
-  like a loss spike.
-- **W&B flush before eval (`task_loss.py`).** Every rank flushes buffered
-  train metrics before the eval logs at a fixed step; otherwise W&B silently
-  drops the few train points just before every eval.
-- **Strict eval loading (`eval_task_loss_olmo_core.py`).** `strict=True`,
-  not a 5%-missing-keys tolerance -- both sides build the same class, so a
-  missing or unexpected key is a real bug.
-- **Keep every checkpoint (`checkpoint.py`, `task_loss.py`).** Pruning is
-  disabled for these runs (`keep_all_checkpoints=True`), so every ladder
-  checkpoint and its optimizer state stays on disk for later re-evaluation.
+  (`SeedSequence([tag, data_seed, index])`), independent of world size, rank
+  and microbatch composition, so seeds 42 and 69 never share a draw.
+- **Attention** (`selection.py`). Each token's score is the causal attention it
+  receives on the last block, aligned to the token whose loss it gates
+  (`get_labels` shifts labels left by one), and z-scored against the mean and
+  standard deviation of tokens at its own position from the model's own
+  immediately preceding training step (`AttentionPositionBaseline`, no extra
+  forward pass, no smoothing), with the uniform-attention prior used only on a
+  run's first step. Trained attention is recency-biased, so a uniform-attention
+  normalizer alone leaves the score position-confounded; the pre-production
+  diagnostic `farmshare/attention_diagnostic.py`, run against a trained
+  checkpoint, puts every position bin between 56.8% and 63.6% keep rate under
+  this score.
+- **BLADE** (`blade.py`). Syncs at steps 0/400/800/1200/1600/2000 (`tau=400`,
+  `K=75`), so it selects from step 0 at the same 60% budget as every other arm.
+  The reference's own training term is selection-weighted (Wang et al. 2026,
+  Sec. 2.2), scored against the *outgoing* reference before it is overwritten.
+  Each sync gets a fresh optimizer at the proxy's own scheduled LR, floored at
+  its post-warmup value so the step-0 sync does not train at LR 0. Selection is
+  per row (`round(0.6*count)`), like every other arm. The reference is scored
+  under the same bf16-cast parameters the proxy trains under (via
+  `torch.func.functional_call`), with a parity check logged after every sync.
+  The K-update backward goes through `output.loss` (OLMo-core detaches
+  `output.ce_loss`; the two are numerically identical here because no z-loss is
+  set). BLADE's rank microbatch is 8,192 tokens, since it holds the proxy, the
+  dynamic reference and both optimizers during a sync and 16,384 OOMs a 44 GiB
+  L40S.
+- **Exact step count** (`recipe.py`). `Duration.steps(steps)`, so every run
+  stops at exactly 2360 (or 940) steps.
+- **All-token CE for the spike detector.** `SkipStepOptimizer` watches the mean
+  CE over all valid tokens, so a discontinuity in the kept set alone (a BLADE
+  resync, REL-EMA's growing alpha) cannot look like a loss spike.
+- **Checkpoints and eval** (`production_contract/`). Permanent checkpoints at
+  step 0, every 125 steps and the final step, omitting the last 125-grid point
+  only when it is within 100 steps of the final step (so the 2360-step arms keep
+  step 2250). Every checkpoint is kept with its optimizer state. The 20-label
+  task-loss eval (`eval_task_loss_olmo_core.py`, `strict=True` loading) fires on
+  each permanent save, after every rank flushes its buffered train metrics to
+  W&B.
 - **Environment recording.** torch/CUDA/driver/GPU and a pip-freeze hash are
-  written to `run_identity.json` and the W&B config, kept out of the
-  resume-blocking scientific identity so a driver bump can't refuse a
-  resume.
-- **Attention's scoring formula replaced (`selection.py`).** A pre-production
-  diagnostic (`farmshare/attention_diagnostic.py`) run against a real trained
-  checkpoint found `attention_topk`'s existing fix (normalizing by the
-  *theoretical* uniform-attention expectation) still left the score almost
-  entirely position-confounded: keep rate ran from 1.9% at the start of a row
-  to 100% at the end. Root cause: real trained attention is recency-biased,
-  not uniform, so the theoretical normalizer's assumed ~117x drop in
-  attention mass from the first to the last position overcorrects against
-  the real ~5.4x drop. Replaced with `AttentionPositionBaseline`: each token
-  is z-scored against the mean/std of tokens at its own position from the
-  model's own immediately preceding training step (no extra forward pass --
-  the raw scores already exist for selection), falling back to the old
-  uniform-attention prior only on a fresh run's first step. No smoothing/EMA
-  constant across steps either: an offline sensitivity sweep found smoothing
-  over more than one step's statistics cut responsiveness to real attention
-  drift for a barely-measurable noise benefit, given how large the
-  production global batch already is. Re-running the diagnostic against the
-  same checkpoint under the new score: every bin lands between 56.8% and
-  63.6% keep rate.
-
-`16764e1d` (on top of `cf4fdede`) makes one entrypoint change: it removes the
-`EDULLM_DATASET_VERSION` / `EDULLM_REFHQ_DATASET_VERSION` production pins.
-They were leftovers from the S3/edullm-data registry, where "latest" could
-move. Corpora now resolve from the local staged manifest, which has one
-version per corpus and whose file sizes and sha256 are verified at staging, so
-the pin protected nothing; nothing in `farmshare/` ever exported it, so a
-production launch failed at entrypoint startup.
-
-`64c28145` (on top of `16764e1d`) keeps the step-2250 checkpoint and eval for the
-2360-step arms. The ladder used to omit the last 125-grid point when it was under 125
-steps from the final step, which dropped step 2250 (110 from the end); the threshold is
-now `min(interval, 100)`. The 940-step reference still omits step 875, so its ladder is
-unchanged.
-
-Which commit each run recorded: the eight comparison arms all record `64c28145` (a
-first launch of `full-loss-control` under `16764e1d` was cancelled after about 290 steps
-and restarted from scratch so the ladder is identical for every arm). The
-`instruct-reference` run recorded `765ae838`, the commit the shared run directory held
-when it started. Its method (full loss) is untouched by every later commit, and its
-checkpoint ladder is unchanged by the ladder change above.
+  written to `run_identity.json` and the W&B config, outside the
+  resume-blocking scientific identity.
+- **1-GPU lane.** `farmshare/{config.env,launch.sh,submit_from_laptop.sh}` let
+  a run override `TRAIN_GPUS`, `TRAIN_PARTITION`/`TRAIN_QOS`, `EDULLM_LOCAL` and
+  `WANDB_MODE` to use FarmShare's 1-GPU `qos=normal` cap (used for the
+  reference model and the offline scoring pass); a single-rank eval uses `gloo`
+  with a file-based rendezvous.
 
 ## What is included, and why
 
@@ -199,18 +118,7 @@ Only code that produced a reported result:
 | `eval_task_loss_olmo_core.py` | The 20-label OLMES evaluator behind every reported bpb number |
 | `farmshare/*` | The FarmShare staging and Slurm launch path every run used |
 | `requirements-token-selection-eval.txt` | Evaluator runtime pins |
+| `tests/` | The fork's tests for this code |
 
-## What is deliberately excluded
-
-- `tests/` (from the fork; the copy here is included for completeness, not
-  because it ran to produce a number) — kept as the record that the unified
-  code was tested before the reruns launched.
-- The OLMo-core library itself (`src/`). Pin it from the upstream branch and
-  commit above.
-
-## Caveat
-
-The correspondence between this code and the reported runs rests on
-`GIT_COMMIT` (logged in every run's W&B config, stamped by `sync_repo.sh` at
-sync time from the exact commit that was synced), not on a commit hash
-recorded by some earlier, unrelated mechanism.
+The OLMo-core library itself (`src/`) is not copied; pin it from the upstream
+branch and commit above.

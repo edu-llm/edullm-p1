@@ -1,4 +1,4 @@
-# Trains the frozen Instruct reference the `rho-1` arm scores against, and BLADE's L_val stream.
+# Trains the frozen Instruct reference the `rho-1` and `perplexity` arms score against.
 # Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["instruct-reference"]
 name: instruct-reference
 method: full
@@ -14,14 +14,14 @@ checkpoint_ladder: [0, 125, 250, 375, 500, 625, 750, 940]  # omit 875 (65 steps 
 frozen_reference:
   step: 940
   contract: instruct-reference-370m/checkpoints/step940
-  # rho-1 and perplexity both read this checkpoint (perplexity migrated off
-  # the retired HQ reference). BLADE reads the refhq-instruct *corpus* as its
-  # L_val stream, not this checkpoint -- it syncs its own dynamic reference
-  # from the proxy, independent of this arm.
+  # rho-1 and perplexity both read this checkpoint. BLADE reads the refhq-instruct
+  # *corpus* as its L_val stream, not this checkpoint -- it syncs its own dynamic
+  # reference from the proxy, independent of this arm.
   consumers: [rho-1, perplexity]
 olmo_core:
   repository: https://github.com/edu-llm/OLMo-core
   branch: edullm/token-selection-370m-unified
   revision: 765ae838  # commit the reference run recorded (GIT_COMMIT); its method (full loss) is unchanged in every later commit
 wandb_project: token-selection
-status: trained-in-this-study
+status: reported
+wandb_run: eduLLM/token-selection/f0460e5c099079f314cbed0e9c50fb62

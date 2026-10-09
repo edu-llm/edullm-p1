@@ -1,21 +1,14 @@
 # Benchmark contamination audit (matched-span, length-robust)
 
 This directory holds the code and results behind the paper's contamination
-audit of the corpora used in the token-selection experiment. It
-**replaces** an earlier verbatim-13-gram audit that lived at this path: that
-audit's own denominator (40,087 items) and per-corpus match counts (358 /
-1,472) did not match the numbers this paper's text now reports (40,582
-items; 957 / 2,432 for the training and Instruct corpora), and neither the scanner nor the eval-item index
-that produced them had ever been committed here, so the discrepancy was not
-reproducible from this repo. This directory now vendors the code that
-produced the *current* numbers, so the join can be checked directly rather
-than taken on faith. See [Superseded methodology](#superseded-methodology-not-vendored-here)
-below for what changed and why the two audits' numbers are not comparable.
+audit of the corpora used in the token-selection experiment: the 10B training
+corpus and the Instruct reference corpus, against the 40,582 evaluation items
+the runs are scored on.
 
 ## Methodology
 
 Full write-up: the "methodology v4" sections referenced in every file's
-docstring below. Summary, in contrast with the superseded audit:
+docstring below. Summary:
 
 - **Unit of overlap: a length-floored n-gram, not a fixed 13-gram.** An item's
   `stem` or `gold` field is indexed at `n = 13` only if it has >= 13 words;
@@ -40,8 +33,7 @@ docstring below. Summary, in contrast with the superseded audit:
   draws its five exemplars per *subject* rather than per label -- a
   label-wide common-prefix strip alone finds almost nothing there. Left
   unstripped, a single mirrored copy of a subject's dev examples matches
-  every item in that subject and inflates the subject's rate roughly 5x (see
-  [MMLU exemplar fix](#mmlu-exemplar-fix) below). Because this is fixed at
+  every item in that subject and inflates the subject's rate. Because this is fixed at
   the index rather than by excluding MMLU from a "self-contained" subset
   after scanning, MMLU's own rate is reported directly rather than omitted.
 - **Matched-span word rate as the primary length-robust metric**, alongside
@@ -73,9 +65,7 @@ Denominator: **40,582 evaluation items** (`eval_items_summary.json` ->
 `total_rows`; `item_index_summary.json` -> `n_items`), the same 20
 (task, split) labels of the OLMo-ladder RC suite the training runs in this
 experiment evaluate `task_loss_bpb` on (`TASK_LOSS_RAW_LABELS` in
-`dump_eval_items.py`). This is a corrected count from the same 20 labels the
-superseded audit's 40,087 used -- see
-[Superseded methodology](#superseded-methodology-not-vendored-here).
+`dump_eval_items.py`).
 
 | Corpus | Role | Path scanned (FarmShare scratch) | Docs scanned | Words scanned |
 | --- | --- | --- | --- | --- |
@@ -87,9 +77,8 @@ pes2o, starcoder, wiki}`; `refhq-new-v1` is organized by
 `{chat, code, general, math, science}` instead (its 23 source/category
 shards are listed in the reproduction commands below). Every path above is
 relative to `/scratch/users/nzhao2/` on FarmShare -- the actual location the
-runs read from, recorded here for the same reason the superseded audit's
-README recorded its own working directory: so the exact input is on the
-record rather than merely asserted. See
+runs read from, recorded here so the exact input is on the record rather than
+merely asserted. See
 [Dependencies and what's not vendored](#dependencies-and-whats-not-vendored)
 for why the raw corpora themselves are not (and cannot practically be)
 committed to this repo.
@@ -146,29 +135,6 @@ From `results_refhq-new-v1.json` -> `totals.per_benchmark`.
 | --- | --- | --- | --- | --- |
 | `csqa` (val only, this benchmark has no test split here) | 396 / 1,161 | **34.11%** | -- (no assessable gold; CSQA's gold is a single letter, always under the 8-word floor) | -- |
 | `mmlu` (pooled: 4 subject groups x val+test) | 728 / 13,827 | **5.27%** | 240 / 5,148 | **4.66%** |
-
-### MMLU exemplar fix
-
-`mmlu` above pools all four subject groups and both val/test splits (13,827
-assessable stems). The superseded verbatim-13-gram audit reported its MMLU
-figure differently -- `mmlu_val` alone (1,519 items, val split only) at
-**27.3%** -- so the two numbers are not scoped identically and a single
-"5x" is not a clean per-item ratio. The comparison is still informative in
-direction and rough magnitude: this pipeline's pooled rate of **5.27%** is
-far below 27.3%, and the gap is explained by *why* the old number was high,
-not by the denominator difference. That audit's index was built from a
-fixed-width 13-gram over MMLU's raw indexed text, which (per this pipeline's
-`item_identity.strip_exemplars`, applied here and not there) still carried
-each item's per-subject few-shot exemplars: a single mirrored dev block
-matches every item in the subject, so the reported rate was dominated by
-exemplar overlap rather than standalone-question leakage. `csqa`, which has
-no per-subject exemplar structure to strip, moves much less between the two
-audits (32.3% -> 34.1%) even though its own denominator also shifted
-slightly (1,220 items in the superseded audit vs 1,161 *assessable* stems
-here, out of 1,221 -- 60 CSQA stems fall under this pipeline's 8-word floor
-and are excluded rather than scored). The residual movement there is
-consistent with that item-count and floor correction rather than an
-exemplar effect, since CSQA has no per-subject exemplar block to strip.
 
 ## Code map
 
@@ -372,31 +338,3 @@ python "$CONTAM/aggregate_by_domain.py" \
   --domains chat,code,general,math,science \
   --corpus-name refhq-new-v1 --out "$CONTAM/results_refhq-new-v1.json"
 ```
-
-## Superseded methodology (not vendored here)
-
-This directory previously held a verbatim-13-gram audit (`n = 13`, hashed
-with `PYTHONHASHSEED=0`, indexed over reconstructed HuggingFace fields,
-denominator 40,087 items). That audit's numbers (0.89% / 1.09% / 3.67%
-overall; 358 / 438 / 1,472 matched items) do not match this paper's current
-text, and its scanner, its eval-side index builder, and the FarmShare run
-directory it was copied from were never committed to this repo -- so when a
-reviewer tried to check the paper's numbers against this directory, there
-was nothing here that could reproduce either the old or the new figures.
-
-Rather than reconcile the two audits' numbers after the fact, this directory
-now vendors the pipeline that produced the paper's *current* numbers in
-full, per [Dependencies and what's not vendored](#dependencies-and-whats-not-vendored)
-above, so the join is checkable directly. The two audits are not expected to
-agree term-for-term: a fixed-width 13-gram with no length floor, scanned
-against reconstructed HuggingFace fields, is a different measurement from a
-length-floored, provenance-tagged, exemplar-stripped one, and their
-"self-contained" and "overall" columns are not even defined over the same
-benchmark subsets (the old audit's self-contained rate flatly counts items
-across 8 of the 10 benchmarks; this pipeline's `macro_stem_rate` averages
-per-benchmark rates across all 10, MMLU included), so a single conversion
-factor between them does not exist. [MMLU exemplar fix](#mmlu-exemplar-fix)
-below works through the closest thing to a before/after comparison this
-directory can make -- the same benchmark, on the same corpus, indexed with
-and without exemplar-stripping -- and is explicit about where even that
-comparison's denominators still differ.

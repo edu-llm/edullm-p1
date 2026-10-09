@@ -3,7 +3,7 @@
 Corpus id: `refhq-new-v1` — the ~3.9B-token Instruct reference corpus of the
 token-selection paper, published locally as `pretrain/refhq-instruct`
 (profile `pretrain-tokens/v1`, tokens only). The Instruct reference model trained
-on it; its checkpoints scored the RHO-1 arm, and BLADE's reference updates also
+on it; its step-940 checkpoint scored the RHO-1 and Perplexity arms, and BLADE's reference updates also
 drew from this corpus. We do not redistribute the corpus; this manifest is how to
 rebuild it.
 
@@ -275,7 +275,4 @@ See the module docstring in `build_manifest.py` for the full algorithm and
   `/scratch/users/nzhao2/refhq-new-v1/` is currently invalid
   (`401 Invalid user token` / expired OAuth claim) — harmless here since the
   repo isn't actually gated right now, but worth flagging since other
-  in-flight agent work may assume that token is live. (The HQ reference
-  corpus and its own scratch `.hf_token` have since been deleted entirely,
-  not merely left invalid; `submit_refhq_new.sh` no longer falls back to
-  that path.)
+  in-flight agent work may assume that token is live.

@@ -1,8 +1,7 @@
 # Source of truth: ../olmo_core_token_selection/token_selection_370m/arms.py ARM_SPECS["attention"]
-# Method fix vs. the confounded run: the raw causal column-mass score is normalized
-# by its expectation under uniform causal attention (removing the bias toward early
-# positions) and aligned to the target token whose loss it gates. See
-# token_selection_370m/selection.py's aligned_normalized_attention_scores.
+# Score: causal attention received on the last block, aligned to the target token whose
+# loss it gates and z-scored per position against the model's own immediately preceding
+# training step (token_selection_370m/selection.py, AttentionPositionBaseline).
 name: attention
 method: attention_topk  # top 60% by position-normalized, target-aligned attention received
 dataset_id: pretrain/regmix-10b
@@ -20,4 +19,5 @@ olmo_core:
   branch: edullm/token-selection-370m-unified
   revision: 64c28145
 wandb_project: token-selection
-status: rerun-under-unified-commit
+status: reported
+wandb_run: eduLLM/token-selection/194a3c2a720db4fa11942a246f9a51b3

@@ -2,20 +2,14 @@
 
 Every arm below runs through the same code path: one entrypoint
 (`token_selection_entrypoint.py`), one train module (`TokenWeightedTrainModule`), and
-one hardware contract (FarmShare, 4×L40S). There is no RunPod path and no AWS/S3 code
-anywhere in this tree; corpora are read from local FarmShare paths staged by
-`../olmo_core_token_selection/farmshare/stage_local.py`, bound by the per-file sha256
-recorded in this repository's `../../datasets/manifests/<corpus>/outputs.json`. See
+one hardware contract (FarmShare, 4×L40S). Corpora are read from local FarmShare paths
+staged by `../olmo_core_token_selection/farmshare/stage_local.py`, bound by the per-file
+sha256 recorded in this repository's `../../datasets/manifests/<corpus>/outputs.json`. See
 [`../olmo_core_token_selection/PROVENANCE.md`](../olmo_core_token_selection/PROVENANCE.md)
 for the exact commit every run logged, and
 [`../olmo_core_token_selection/token_selection_370m/arms.py`](../olmo_core_token_selection/token_selection_370m/arms.py)
-for the source of truth these YAMLs describe.
-
-This directory replaces the previous per-arm directories (`attention/`, `rho-1/`,
-`middle-ppl-token/`, `rel-ema-exp/`, `reference/`, `ARMS.md`), each of which was a
-README plus a config file describing a superseded, partly RunPod/8×A100 setup that
-produced none of the numbers reported after the unification. That history is kept in
-git, not here.
+for the source of truth these YAMLs describe. Each YAML's `wandb_run` is the W&B run the
+paper reports for that arm.
 
 ## Shared contract
 
@@ -30,11 +24,10 @@ git, not here.
 - **Hardware:** one FarmShare node, 4×L40S (`PRODUCTION_WORLD_SIZE = 4`), for every
   *reported* arm. `instruct-reference` is the one exception -- see its row below.
 - **Rank microbatch:** 16,384 tokens (`ArmSpec.rank_microbatch_tokens` default) for
-  every arm except BLADE. Arms that hold a second model in memory during training
-  (BLADE, RHO-1, Perplexity) may fall back to 8,192 or 4,096 if the smoke test needs
-  it; BLADE's 1-GPU smoke test OOM'd a 44 GiB L40S at 16,384 (both the proxy and the
-  dynamic reference, plus both optimizers, are resident during its K-update sync), so
-  it now uses 8,192. RHO-1 and Perplexity haven't needed to fall back yet.
+  every arm except BLADE, which uses 8,192: both the proxy and the dynamic reference,
+  plus both optimizers, are resident during its K-update sync, and 16,384 OOMs a
+  44 GiB L40S. RHO-1 and Perplexity read reference losses from the offline table, so
+  they hold no second model.
 - **Permanent checkpoints:** step 0, every 125 steps, and the true final step,
   omitting the last 125-grid point when it falls within 100 steps of the final step. The
   2360-step arms therefore keep step 2250 (110 steps from the end); the 940-step
@@ -62,34 +55,24 @@ Every arm above except the Instruct reference is trained under the one commit pi
 `../olmo_core_token_selection/PROVENANCE.md`. The Instruct reference recorded the earlier
 commit `765ae838`; its method (full loss) and its checkpoint ladder are unchanged in every
 later commit, which differ only in the Attention scoring, the entrypoint's dataset-version
-check, and the 2360-step ladder. Nothing is kept from a pre-unification commit.
+check, and the 2360-step ladder.
 
-## Methodology fixes since the confounded runs
+## Method notes
 
-- **Attention.** The raw causal column-mass score favored early positions and was one
-  position off from the target it was meant to gate; the token-count alignment fix
-  landed first. A second, larger problem surfaced later, from a pre-production
-  diagnostic (`farmshare/attention_diagnostic.py`) run against a real trained
-  checkpoint: normalizing by the *theoretical* expectation under uniform causal
-  attention still left the score almost entirely position-confounded (keep rate
-  ranged from 1.9% at the start of a row to 100% at the end), because real trained
-  attention is recency-biased, not uniform -- the normalizer assumed a ~117x drop in
-  attention mass from the first to the last position, while the real drop is only
-  ~5.4x. The fix replaces that theoretical normalizer with an *empirical* one
-  (`AttentionPositionBaseline`): each token is z-scored against the mean/std of
-  tokens at its own position from the model's own immediately preceding training
-  step (no smoothing/decay constant -- an offline sensitivity check found smoothing
-  over more steps cut responsiveness to real drift for a barely-measurable noise
-  benefit at this batch size), falling back to the old uniform-attention prior only
-  on a fresh run's first step, before any real history exists. Re-running the same
-  diagnostic against the same checkpoint under the new score: every bin lands
-  between 56.8% and 63.6% keep rate.
-- **BLADE.** The reference's own training term is now selection-weighted (Wang et al.
+- **Attention.** Each token's score is the causal attention it receives on the last
+  block, aligned to the target token whose loss it gates. Trained attention is
+  recency-biased, so a theoretical normalizer (the expectation under uniform causal
+  attention) leaves the score position-confounded. The score is instead z-scored
+  against the mean and standard deviation of tokens at its own position from the
+  model's own immediately preceding training step (`AttentionPositionBaseline`, no
+  smoothing), falling back to the uniform-attention prior only on a run's first step.
+  The pre-production diagnostic `farmshare/attention_diagnostic.py`, run against a
+  trained checkpoint, puts every position bin between 56.8% and 63.6% keep rate under
+  this score.
+- **BLADE.** The reference's own training term is selection-weighted (Wang et al.
   2026, Sec. 2.2), scored against the *outgoing* reference before it is overwritten by
-  the sync. The schedule starts at step 0 (previously step 500), syncing at
-  0/400/800/1200/1600/2000 instead of 500/875/1250/1625/2000, so BLADE selects at the
-  same 60% budget as every other arm from step 0 rather than running full-loss (68.5%
-  effective keep) through step 500.
+  the sync. Syncs run at steps 0/400/800/1200/1600/2000, so BLADE selects at the same
+  60% budget as every other arm from step 0.
 
 ## Running the tests
 

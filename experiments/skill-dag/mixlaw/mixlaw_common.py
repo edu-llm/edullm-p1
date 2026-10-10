@@ -162,16 +162,6 @@ OLMO_MIX_1124_WEIGHTS: dict[str, float] = {
     d: _OLMO_MIX_1124_DOMAIN_TOKENS[d] / _OLMO_MIX_1124_TOTAL for d in DOMAINS
 }
 
-# --- Compute budget (≈12 B200 GPU-hours for all 24 mixtures) -----------------
-# 12 GPU-hours / 24 mixes ≈ 30 min/mix including final task-loss eval. Default
-# tokens/param=5 (~285M tokens, 1451 steps) targets that envelope at ~200k tok/s
-# (measured on GPU7 smoke). Data is *not* the limit: the olmohq pool supports
-# ~30B tokens/mix (wiki binds).
-TOTAL_GPU_HOURS = 12.0
-DEFAULT_TOKENS_PER_PARAM = 5.0
-
-# Backward-compatible alias used by older call sites / preflight.
-DOMAIN_TARGET_TOKENS = DOMAIN_AVAILABLE_TOKENS
 
 MIXTURES_JSON = Path(__file__).with_name("mixtures.json")
 

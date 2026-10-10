@@ -98,7 +98,6 @@ def compare(A: np.ndarray, A_ref: np.ndarray) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--items-dir", type=Path, default=SKILLIT / "artifacts/probe_subset_sensitivity/items")
-    ap.add_argument("--probes-dir", type=Path, default=SKILLIT / "artifacts/probes_full/runs")
     ap.add_argument("--draws", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, default=SKILLIT / "artifacts/probe_subset_sensitivity/results.json")
@@ -113,18 +112,6 @@ def main() -> None:
     inrun_n = {lb: int(probes[REF][lb]["inrun"].sum()) for lb in LABELS}
     print("items per label:", n_docs)
     print("items the in-run eval scored:", inrun_n)
-
-    # sanity: full-set and in-run means against what the training runs recorded.
-    for name in DOMAINS + [REF]:
-        name_dir = args.probes_dir / f"probe_{name}"
-        final = name_dir / "task_loss.jsonl"
-        if not final.is_file():
-            continue
-        last = [json.loads(line) for line in final.read_text(encoding="utf-8").splitlines() if line.strip()]
-        last = [r for r in last if r.get("step") == 1451] or last[-1:]
-        if last:
-            print(f"in-run step-1451 row for probe_{name}:", {k: v for k, v in last[-1].items() if "bpb" in k or k == "step"})
-        break
 
     # is the in-run subset (the first items of each label, in the loader's order) typical?
     print("\nreference probe: mean loss on the in-run items vs 5000 random subsets of the same size")

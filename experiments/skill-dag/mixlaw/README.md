@@ -74,9 +74,16 @@ and launched with
 because OLMo-core's W&B callback called `wandb.finish(quiet=...)`, which the installed wandb rejects,
 after all 2384 steps had trained and the step-2384 eval had been logged.
 
+**Reproducing the arm weights.** `patch_static_validation_arms.py` reads the MixLaw arm's weights from
+`mixlaw_fit_chinchilla.json` → `optimization.min1pct`. That file now holds the refit of the rerun pilots
+(see [Proxy pilot](#proxy-pilot-datadecide-60m)). The arms that ran were chosen from the earlier fit, which is in git history at commit
+`c3d9906` (check it out to rerun the patch script); the weights actually trained are also recorded in `validation_mixtures_10b.json`.
+
 ## Proxy pilot (DataDecide-60M)
 
-24 designed mixtures over the same 7 domains, each trained with a **DataDecide-60M** proxy and scored on OLMo-ladder task-loss (bits-per-byte). Surrogates are fit on **Chinchilla-extrapolated** family losses (step 5806, tokens/param = 20).
+24 designed mixtures over the same 7 domains, each trained as a **DataDecide-60M** proxy and scored on OLMo-ladder task-loss (bits-per-byte). The pilots and the 7 one-hot probes of the Skill-It matrix come from one trainer and one launcher, [`../domain_probes/`](../domain_probes/README.md). Surrogates are fit on **Chinchilla-extrapolated** family losses (step 5806, tokens/param = 20).
+
+**This section describes the rerun of the pilots.** The 370M arms above were trained at the optima of an earlier fit, whose pilots ran 1451 steps on different hardware and an older data path and scored only the first 128 items of each validation split. That prefix is not representative of the split, so all 24 pilots (and the 7 probes) were rerun with every item of the test split ([why, and the setup](../domain_probes/README.md)). The 370M runs were not repeated; [Earlier fit versus refit](#earlier-fit-versus-refit) compares the two sets of optima.
 
 ### Proxy architecture
 
@@ -84,28 +91,28 @@ after all 2384 steps had trained and the step-2384 eval had been logged.
 - Global batch 96 sequences; learning rate $5.8\times10^{-3}$
 - Tokenizer: dolma2 (100,352 embedding rows); untied LM head
 - Body params 37.8M; **non-embedding params 76.3M** (76,296,576, including the untied LM head); total ~114.8M with dolma2 vocab
-- **Budget:** tokens/param = 5 → **285M tokens / 1451 steps** per mixture, sized against DataDecide's published non-embedding count, 57.1M (57,078,144), as is the tpp = 20 Chinchilla target
+- **Budget:** 1440 steps of 96 sequences = **283M tokens** per mixture (tokens/param = 4.96), sized against DataDecide's published non-embedding count, 57.1M (57,078,144), as is the tpp = 20 Chinchilla target. The learning rate warms up over 144 steps, holds, and decays by cosine to 10% of peak over the last 144.
 - **Pilot FLOPs.** We use the 6ND training estimate of Kaplan et al. (2020) plus the
   attention term of Chowdhery et al. (2023, PaLM), $C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D$,
   evaluated at the **trained** model's $N_{\text{non-emb}} = 76{,}296{,}576$ (dolma2 vocab):
-  $\approx 1.74\times10^{17}$ per mix → **$\approx 4.17\times10^{18}$** for 24, about 16% of
-  one $2.63\times10^{19}$ validation run. `flops.py` computes all three from the
+  $\approx 1.72\times10^{17}$ per mix → **$\approx 4.14\times10^{18}$** for 24, about 16% of
+  one $2.63\times10^{19}$ validation run (the 7 probes add $1.21\times10^{18}$). `flops.py` computes all of these from the
   two architectures and the trained token counts.
 
 ### Evaluation and Chinchilla targets
 
-In-run curves use six **ARC + MMLU** val families, evaluated every 120 of the 1451 steps on a fixed four-batch subsample of each family's validation split. Step-laws fit **in-run curve points only** (steps 120–1440); a post-hoc full eval at step 1451 is kept for reporting but **not** used in the step law. Curves are extrapolated to Chinchilla step **5806** (tpp = 20). Mixing-law / LightGBM targets are those six extrapolated family losses.
+In-run curves use six **ARC + MMLU** test families, evaluated every 120 of the 1440 steps on **every item** of each family's test split (1172, 2376, 3018, 4705, 3077 and 3242 items for ARC Challenge, ARC Easy and the MMLU STEM, humanities, social-sciences and other groups). Step-laws fit all 12 in-run points (steps 120–1440); the last point is the run's final loss, so there is no separate post-hoc eval. Curves are extrapolated to Chinchilla step **5806** (tpp = 20). Mixing-law / LightGBM targets are those six extrapolated family losses.
 
 Observed Chinchilla-target range across the 24 pilots:
 
 | family | min | max | std |
 |--------|----:|----:|----:|
-| arc_challenge | 1.5043 | 1.7831 | 0.0790 |
-| arc_easy | 1.8108 | 2.1452 | 0.0878 |
-| mmlu_humanities | 1.6810 | 1.9250 | 0.0678 |
-| mmlu_other | 2.2812 | 2.7868 | 0.1331 |
-| mmlu_social_sciences | 1.2668 | 1.4775 | 0.0608 |
-| mmlu_stem | 2.1722 | 2.4410 | 0.0805 |
+| arc_challenge | 1.6395 | 2.0027 | 0.0960 |
+| arc_easy | 1.6368 | 1.9285 | 0.0916 |
+| mmlu_humanities | 1.2417 | 1.4282 | 0.0559 |
+| mmlu_other | 1.9674 | 2.2725 | 0.0737 |
+| mmlu_social_sciences | 1.4839 | 1.6823 | 0.0585 |
+| mmlu_stem | 2.4705 | 2.8377 | 0.1011 |
 
 ---
 
@@ -211,29 +218,31 @@ More negative $t_{ij}$ means increasing domain $j$ lowers family $i$ loss. Among
 
 | family | $c_i$ | $k_i$ | $k$/std | max$\|t\|$ | in-sample RMSE |
 |--------|------:|------:|--------:|----------:|---------------:|
-| arc_challenge | 1.5043 | 0.0790 | 1.00 | 3.72 | 0.0471 |
-| arc_easy | 1.8108 | 0.0878 | 1.00 | 2.16 | 0.0887 |
-| mmlu_humanities | 1.6022 | 0.0678 | 1.00 | 1.69 | 0.0163 |
-| mmlu_other | 2.1336 | 0.1331 | 1.00 | 1.77 | 0.0951 |
-| mmlu_social_sciences | 1.2571 | 0.0608 | 1.00 | 2.77 | 0.0198 |
-| mmlu_stem | 2.1427 | 0.0805 | 1.00 | 1.88 | 0.0433 |
+| arc_challenge | 0.8077 | 0.0960 | 1.00 | 2.59 | 0.0530 |
+| arc_easy | 0.0500 | 0.0916 | 1.00 | 3.12 | 0.0812 |
+| mmlu_humanities | 1.0524 | 0.0559 | 1.00 | 2.08 | 0.0200 |
+| mmlu_other | 1.9674 | 0.0737 | 1.00 | 1.73 | 0.0326 |
+| mmlu_social_sciences | 0.0500 | 0.0585 | 1.00 | 3.35 | 0.0213 |
+| mmlu_stem | 2.4035 | 0.1011 | 1.00 | 1.89 | 0.0764 |
 
 #### Skill / transfer matrix $t_{ij}$ (rows = families, columns = domains)
 
 | family | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |--------|---:|---:|---:|---:|---:|---:|---:|
-| arc_challenge | -3.72 | 2.07 | 1.20 | -0.07 | 0.49 | 1.03 | -1.50 |
-| arc_easy | 1.31 | 0.69 | 0.84 | 0.72 | -2.16 | 1.48 | -1.92 |
-| mmlu_humanities | -0.67 | 1.63 | 1.69 | 0.72 | 1.63 | 1.61 | -1.27 |
-| mmlu_other | 0.19 | 1.77 | 1.22 | 0.70 | 1.41 | 1.58 | -1.23 |
-| mmlu_social_sciences | -2.77 | 1.69 | 1.34 | 0.17 | 1.50 | 1.82 | -1.64 |
-| mmlu_stem | -0.07 | 1.88 | 1.43 | -1.66 | 1.18 | 1.59 | -0.49 |
+| arc_challenge | 2.06 | 2.37 | 2.59 | 2.27 | 2.42 | 2.26 | 2.39 |
+| arc_easy | 2.87 | 2.92 | 2.86 | 2.87 | 3.12 | 2.98 | 2.97 |
+| mmlu_humanities | 0.82 | 2.00 | 1.59 | 2.08 | 1.85 | 1.90 | 0.56 |
+| mmlu_other | -1.45 | 1.20 | 1.61 | -0.13 | 1.73 | 1.17 | 0.24 |
+| mmlu_social_sciences | 3.13 | 3.30 | 3.34 | 3.28 | 3.35 | 3.26 | 3.22 |
+| mmlu_stem | -0.27 | -0.17 | 1.89 | 1.32 | 1.04 | 1.65 | -1.06 |
 
 Only within-row comparisons of $t_{ij}$ are meaningful: on the simplex, adding the
 same constant to a family's whole row while rescaling its $k_i$ leaves the fitted
 law unchanged, so each row is pinned only by the fit's regularization. $c_i$ is
 constrained at or below the lowest extrapolated loss across the 24 pilots; that
-bound is active for ARC Challenge and ARC Easy.
+bound is active for MMLU Other. The ARC Easy and MMLU Social Sciences fits sit at the
+0.05 floor of $c_i$, an intercept far below any observed loss, and their rows of $t_{ij}$ are all near 3,
+so those two fits carry little beyond the overall level of the family and are weakly identified.
 
 ### LightGBM
 
@@ -247,43 +256,42 @@ Features = 7 mixture weights; target = per-family Chinchilla loss; predicted mac
 | feature_fraction | 1.0 |
 | bagging_fraction | 1.0 |
 | seed | 0 |
-| num_leaves | 7 |
-| max_depth | 3 |
-| min_data_in_leaf | 2 |
-| learning_rate | 0.05 |
-| lambda_l2 | 0.1 |
+| num_leaves | 5 |
+| max_depth | 2 |
+| min_data_in_leaf | 4 |
+| learning_rate | 0.1 |
+| lambda_l2 | 1.0 |
 | num_boost_round | 100 |
 
-LOO grid: hand-picked default macro LOO RMSE 0.0439 → selected 0.0366
-(num_leaves 7, max_depth 3, min_data_in_leaf 2, lr 0.05, λ₂ 0.1, rounds 100).
+LOO grid (144 configs): hand-picked default macro LOO RMSE 0.0466 → selected 0.0395 (num_leaves 5, max_depth 2, min_data_in_leaf 4, lr 0.1, λ₂ 1.0, rounds 100).
 
 #### LightGBM feature importance (gain)
 
 | family | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |--------|---:|---:|---:|---:|---:|---:|---:|
-| arc_challenge | 0.75 | 0.06 | 0.02 | 0.15 | 0.32 | 0.05 | 0.18 |
-| arc_easy | 0.27 | 0.32 | 0.26 | 0.08 | 0.53 | 0.19 | 0.19 |
-| mmlu_humanities | 0.85 | 0.00 | 0.05 | 0.06 | 0.04 | 0.01 | 0.12 |
-| mmlu_other | 1.76 | 0.25 | 0.59 | 0.96 | 0.30 | 0.06 | 0.40 |
-| mmlu_social_sciences | 0.67 | 0.02 | 0.03 | 0.14 | 0.01 | 0.02 | 0.01 |
-| mmlu_stem | 0.22 | 0.06 | 0.24 | 0.71 | 0.02 | 0.01 | 0.31 |
+| arc_challenge | 0.66 | 0.02 | 0.21 | 0.03 | 0.14 | 0.01 | 0.03 |
+| arc_easy | 0.06 | 0.16 | 0.03 | 0.20 | 0.27 | 0.05 | 0.14 |
+| mmlu_humanities | 0.32 | 0.01 | 0.01 | 0.02 | 0.00 | 0.02 | 0.00 |
+| mmlu_other | 0.44 | 0.02 | 0.02 | 0.10 | 0.07 | 0.00 | 0.02 |
+| mmlu_social_sciences | 0.27 | 0.01 | 0.02 | 0.03 | 0.05 | 0.01 | 0.03 |
+| mmlu_stem | 0.19 | 0.24 | 0.38 | 0.06 | 0.20 | 0.02 | 0.11 |
 
 ### Leave-one-out cross-validation
 
 | Metric | Mixing law | LightGBM |
 |--------|-----------:|---------:|
-| Mean LOO RMSE | 0.0766 | 0.0751 |
-| Mean LOO RMSE / std | 84.4% | 84.1% |
-| Macro LOO RMSE | 0.0443 | 0.0366 |
+| Mean LOO RMSE | 0.0732 | 0.0657 |
+| Mean LOO RMSE / std | 84.9% | 77.2% |
+| Macro LOO RMSE | 0.0422 | 0.0395 |
 
 | family | ML LOO | LGB LOO | ML in-sample | LGB in-sample |
 |--------|-------:|--------:|-------------:|--------------:|
-| arc_challenge | 0.0774 | 0.0757 | 0.0471 | 0.0079 |
-| arc_easy | 0.1269 | 0.1163 | 0.0887 | 0.0159 |
-| mmlu_humanities | 0.0271 | 0.0288 | 0.0163 | 0.0028 |
-| mmlu_other | 0.1432 | 0.1306 | 0.0951 | 0.0111 |
-| mmlu_social_sciences | 0.0269 | 0.0317 | 0.0198 | 0.0037 |
-| mmlu_stem | 0.0581 | 0.0674 | 0.0433 | 0.0090 |
+| arc_challenge | 0.0870 | 0.0744 | 0.0530 | 0.0185 |
+| arc_easy | 0.0898 | 0.1069 | 0.0812 | 0.0348 |
+| mmlu_humanities | 0.0286 | 0.0238 | 0.0200 | 0.0056 |
+| mmlu_other | 0.0524 | 0.0384 | 0.0326 | 0.0096 |
+| mmlu_social_sciences | 0.0264 | 0.0351 | 0.0213 | 0.0073 |
+| mmlu_stem | 0.1552 | 0.1154 | 0.0764 | 0.0258 |
 
 ### Mixture optima and near-optimal candidates
 
@@ -291,92 +299,112 @@ Surrogate optima plus nearby mixtures (within +0.04 bpb of that model’s optimu
 
 #### Table I: the four 370M mixtures
 
-The predicted macro is each surrogate's own Chinchilla-extrapolated 60M
-prediction, so it is not comparable across the two surrogates.
+The 370M arms were trained at the optima of the earlier fit. Table I scores them with the refit surrogates and adds the refit optima. The predicted
+macro is each surrogate's Chinchilla-extrapolated 60M prediction, so the two columns are on different scales. The surrogates disagree on
+the natural mixture: the mixing law predicts it better than every pilot and than its own 1%-floor optimum below (the natural mixture
+puts less than 1% on wiki, which the floor forbids), while LightGBM predicts it behind its own optimum.
 
-| Mixture | pred. macro | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Olmo-mix-1124 (`olmo-mix-1124`) | — | 0.951 | 0.005 | 0.021 | 0.015 | 0.003 | 0.003 | 0.001 |
-| Data Mixing Laws paper (`mix01`) | — | 0.375 | 0.250 | 0.141 | 0.094 | 0.064 | 0.061 | 0.016 |
-| MixLaw (`ML-min1pct`) | 1.7984 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
-| LightGBM (`LGB-min1pct`) | 1.8335 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
+| Mixture | ML pred. macro | LGB pred. macro | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Olmo-mix-1124 (`olmo-mix-1124`) | 1.7179 | 1.8062 | 0.951 | 0.005 | 0.021 | 0.015 | 0.003 | 0.003 | 0.001 |
+| Data Mixing Laws paper (`mix01`) | 1.8189 | 1.8491 | 0.375 | 0.250 | 0.141 | 0.094 | 0.064 | 0.061 | 0.016 |
+| MixLaw (`ML-min1pct`) | 1.7557 | 1.8201 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
+| LightGBM (`LGB-min1pct`) | 1.7810 | 1.7784 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
+| refit MixLaw optimum | 1.7191 | 1.8027 | 0.940 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 |
+| refit LightGBM optimum | 1.7863 | 1.7690 | 0.551 | 0.179 | 0.159 | 0.019 | 0.033 | 0.050 | 0.010 |
 
 **Selection rule.** Both surrogates are minimized with a 1% per-domain floor,
 so every domain stays in the mixture, and the 30% Wikipedia cap
 (`MIXTURE_OPT_CONSTRAINTS` in `mixlaw_common.py`). The row labelled "optimum"
-in each table below is that minimizer, the mixture trained at 370M. The MixLaw
-optimum holds arXiv, StarCoder and Algebraic Stack at the 1% floor and puts
-Wikipedia at the 30% cap, beyond the 12.2% maximum across the 24 pilots, so on
-that domain it extrapolates beyond the pilot grid.
+in each table below is that minimizer. The refit MixLaw
+optimum puts 94% of the mixture in DCLM and every other domain at the 1% floor, beyond the 60% maximum
+DCLM weight across the 24 pilots, so it extrapolates far beyond the pilot grid. (The earlier fit's MixLaw optimum, the one trained at 370M, held arXiv,
+StarCoder and Algebraic Stack at the floor and put Wikipedia at the 30% cap, beyond the 12.2% maximum across the pilots.)
 
 The LightGBM surrogate is piecewise constant, so its minimum is a region, not a
-point: near-opt 1 below predicts exactly the optimum's macro while moving up to
-2.9 pp of weight per domain, and all eight near-optimal mixtures lie within
-0.0075 bpb of it, against a macro LOO RMSE of 0.0366. Its argmin is weakly
+point: near-opt 1 below predicts 1.7683 (the optimum: 1.7690) while moving up to
+7.0 pp of weight per domain, and all eight near-optimal mixtures lie within
+0.0050 bpb of the optimum, against a macro LOO RMSE of 0.0395. Its argmin is weakly
 identified. Treat the specific LightGBM weight vector accordingly.
 
 **Mixing law**
 
 | candidate | pred macro | max_w | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |-----------|------------:|-------:|---:|---:|---:|---:|---:|---:|---:|
-| optimum | 1.7984 | 0.556 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
-| near-opt 1 | 1.7995 | 0.440 | 0.440 | 0.011 | 0.011 | 0.207 | 0.013 | 0.018 | 0.300 |
-| near-opt 2 | 1.8016 | 0.435 | 0.435 | 0.018 | 0.011 | 0.134 | 0.069 | 0.032 | 0.300 |
-| near-opt 3 | 1.8022 | 0.354 | 0.354 | 0.020 | 0.012 | 0.258 | 0.027 | 0.029 | 0.300 |
-| near-opt 4 | 1.8024 | 0.440 | 0.440 | 0.012 | 0.012 | 0.043 | 0.181 | 0.012 | 0.300 |
-| near-opt 5 | 1.8026 | 0.346 | 0.346 | 0.012 | 0.012 | 0.180 | 0.137 | 0.014 | 0.300 |
-| near-opt 6 | 1.8032 | 0.309 | 0.274 | 0.011 | 0.021 | 0.309 | 0.073 | 0.011 | 0.300 |
-| near-opt 7 | 1.8036 | 0.397 | 0.223 | 0.010 | 0.010 | 0.397 | 0.051 | 0.010 | 0.300 |
-| near-opt 8 | 1.8041 | 0.638 | 0.638 | 0.024 | 0.036 | 0.010 | 0.016 | 0.010 | 0.267 |
+| optimum | 1.7191 | 0.940 | 0.940 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 |
+| near-opt 1 | 1.7334 | 0.825 | 0.825 | 0.010 | 0.010 | 0.109 | 0.011 | 0.025 | 0.010 |
+| near-opt 2 | 1.7361 | 0.811 | 0.811 | 0.010 | 0.024 | 0.034 | 0.039 | 0.018 | 0.064 |
+| near-opt 3 | 1.7390 | 0.791 | 0.791 | 0.090 | 0.010 | 0.053 | 0.018 | 0.019 | 0.018 |
+| near-opt 4 | 1.7390 | 0.739 | 0.739 | 0.048 | 0.010 | 0.059 | 0.010 | 0.010 | 0.124 |
+| near-opt 5 | 1.7442 | 0.748 | 0.748 | 0.010 | 0.010 | 0.018 | 0.017 | 0.130 | 0.068 |
+| near-opt 6 | 1.7458 | 0.731 | 0.731 | 0.065 | 0.031 | 0.122 | 0.010 | 0.010 | 0.031 |
+| near-opt 7 | 1.7460 | 0.737 | 0.737 | 0.164 | 0.010 | 0.056 | 0.010 | 0.010 | 0.012 |
+| near-opt 8 | 1.7462 | 0.746 | 0.746 | 0.014 | 0.119 | 0.011 | 0.010 | 0.017 | 0.082 |
 
 **LightGBM**
 
 | candidate | pred macro | max_w | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |-----------|------------:|-------:|---:|---:|---:|---:|---:|---:|---:|
-| optimum | 1.8335 | 0.553 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
-| near-opt 1 | 1.8335 | 0.558 | 0.558 | 0.199 | 0.073 | 0.083 | 0.033 | 0.042 | 0.012 |
-| near-opt 2 | 1.8380 | 0.491 | 0.491 | 0.167 | 0.071 | 0.087 | 0.046 | 0.073 | 0.064 |
-| near-opt 3 | 1.8383 | 0.495 | 0.495 | 0.167 | 0.072 | 0.179 | 0.015 | 0.055 | 0.017 |
-| near-opt 4 | 1.8391 | 0.502 | 0.502 | 0.172 | 0.095 | 0.128 | 0.048 | 0.022 | 0.033 |
-| near-opt 5 | 1.8397 | 0.505 | 0.505 | 0.190 | 0.125 | 0.080 | 0.021 | 0.024 | 0.055 |
-| near-opt 6 | 1.8398 | 0.520 | 0.520 | 0.188 | 0.083 | 0.078 | 0.049 | 0.044 | 0.037 |
-| near-opt 7 | 1.8398 | 0.583 | 0.583 | 0.171 | 0.082 | 0.069 | 0.029 | 0.048 | 0.018 |
-| near-opt 8 | 1.8410 | 0.377 | 0.182 | 0.182 | 0.076 | 0.377 | 0.020 | 0.037 | 0.127 |
+| optimum | 1.7690 | 0.551 | 0.551 | 0.179 | 0.159 | 0.019 | 0.033 | 0.050 | 0.010 |
+| near-opt 1 | 1.7683 | 0.598 | 0.598 | 0.178 | 0.088 | 0.048 | 0.027 | 0.051 | 0.010 |
+| near-opt 2 | 1.7700 | 0.517 | 0.517 | 0.168 | 0.067 | 0.180 | 0.010 | 0.048 | 0.010 |
+| near-opt 3 | 1.7700 | 0.378 | 0.378 | 0.220 | 0.068 | 0.255 | 0.010 | 0.058 | 0.010 |
+| near-opt 4 | 1.7718 | 0.343 | 0.343 | 0.185 | 0.074 | 0.056 | 0.030 | 0.302 | 0.010 |
+| near-opt 5 | 1.7725 | 0.432 | 0.432 | 0.174 | 0.088 | 0.176 | 0.010 | 0.109 | 0.010 |
+| near-opt 6 | 1.7725 | 0.358 | 0.358 | 0.167 | 0.096 | 0.167 | 0.010 | 0.192 | 0.010 |
+| near-opt 7 | 1.7731 | 0.368 | 0.368 | 0.210 | 0.148 | 0.077 | 0.017 | 0.171 | 0.010 |
+| near-opt 8 | 1.7733 | 0.479 | 0.479 | 0.200 | 0.039 | 0.010 | 0.021 | 0.240 | 0.010 |
 
 ### Random-simplex plausibility
 
-1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Both surrogates predict the Chinchilla-extrapolated loss, so they are compared against the pilots' Chinchilla-extrapolated macro range, **1.8369 – 2.0561 bpb** (the raw observed pilot range, 2.0444 – 2.2888 bpb, is on a different basis).
+1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Both surrogates predict the Chinchilla-extrapolated loss, so they are compared against the pilots' Chinchilla-extrapolated macro range, **1.7567 - 1.9930 bpb** (the raw observed pilot range, 1.9768 - 2.1857 bpb, is on a different basis).
 
 | Metric | Mixing law | LightGBM |
 |--------|-----------:|---------:|
-| Macro min | 1.7838 | 1.8408 |
-| Macro p50 | 1.8895 | 1.9297 |
-| Macro p95 | 1.9973 | 2.0022 |
-| Macro p99 | 2.0460 | 2.0217 |
-| Macro max | 2.1064 | 2.0339 |
-| Macro mean ± std | 1.8968 ± 0.0542 | 1.9393 ± 0.0441 |
-| % inside pilots' extrapolated macro range | 87.6% (117 below, 7 above) | 100.0% |
+| Macro min | 1.7509 | 1.7793 |
+| Macro p50 | 1.8702 | 1.9013 |
+| Macro p95 | 1.9328 | 1.9598 |
+| Macro p99 | 1.9521 | 1.9786 |
+| Macro max | 1.9883 | 2.0002 |
+| Macro mean ± std | 1.8699 ± 0.0386 | 1.8956 ± 0.0427 |
+| % inside pilots' extrapolated macro range | 99.9% (1 below, 0 above) | 99.8% (0 below, 2 above) |
 | Mixtures with macro > 3 bpb | 0 | 0 |
 | Mixtures with macro > 5 bpb | 0 | 0 |
 
-Off-hull predictions stay bounded; claimed gains of the surrogate optima over the best measured pilot are **not distinguishable from LOO error** at 60M scale — hence the 370M validation.
+Off-hull predictions stay bounded. The best measured pilot (`mix06`) has an extrapolated macro of 1.7567. The mixing law's optimum is predicted 0.0376 bpb below it, less than the mixing law's macro LOO RMSE (0.0422); LightGBM's optimum is predicted at 1.7690, not below that pilot. A claimed gain of a surrogate optimum over the best measured pilot is **not distinguishable from LOO error** at 60M scale, hence the 370M validation.
 
 ### Pilot mixtures ranked by predicted macro (top 12)
 
 | ML rank | LGB rank | mix | tag | ML pred | LGB pred | measured curve-6 |
 |--------:|---------:|-----|-----|--------:|---------:|-----------------:|
-| 1 | 4 | Pilot 18 | C1 | 1.8368 | 1.8700 | 2.1089 |
-| 2 | 2 | Pilot 07 | C1-dclm60 | 1.8618 | 1.8451 | 2.0444 |
-| 3 | 7 | Pilot 22 | C1 | 1.8666 | 1.8810 | 2.0899 |
-| 4 | 1 | Pilot 06 | C1-dclm55 | 1.8668 | 1.8370 | 2.0963 |
-| 5 | 5 | Pilot 05 | C1-dclm50 | 1.8726 | 1.8714 | 2.0830 |
-| 6 | 14 | Pilot 23 | C1 | 1.8733 | 1.9107 | 2.0981 |
-| 7 | 17 | Pilot 19 | C1 | 1.8752 | 1.9628 | 2.1456 |
-| 8 | 13 | Pilot 17 | C1 | 1.8897 | 1.9093 | 2.0835 |
-| 9 | 10 | Pilot 01 | base | 1.8913 | 1.8951 | 2.0727 |
-| 10 | 8 | Pilot 04 | C0-dclm0 | 1.8964 | 1.8888 | 2.1174 |
-| 11 | 6 | Pilot 21 | C1 | 1.8969 | 1.8764 | 2.1364 |
-| 12 | 3 | Pilot 16 | C1 | 1.8992 | 1.8527 | 2.1125 |
+| 1 | 5 | Pilot 07 | C1-dclm60 | 1.7743 | 1.8214 | 2.0385 |
+| 2 | 1 | Pilot 06 | C1-dclm55 | 1.7835 | 1.7698 | 1.9768 |
+| 3 | 2 | Pilot 05 | C1-dclm50 | 1.7931 | 1.7945 | 2.0143 |
+| 4 | 4 | Pilot 17 | C1 | 1.8024 | 1.8095 | 2.0518 |
+| 5 | 6 | Pilot 23 | C1 | 1.8126 | 1.8288 | 2.0445 |
+| 6 | 9 | Pilot 01 | base | 1.8189 | 1.8491 | 2.0633 |
+| 7 | 3 | Pilot 22 | C1 | 1.8286 | 1.8064 | 2.0298 |
+| 8 | 8 | Pilot 18 | C1 | 1.8289 | 1.8461 | 2.0260 |
+| 9 | 7 | Pilot 21 | C1 | 1.8491 | 1.8334 | 2.0495 |
+| 10 | 17 | Pilot 19 | C1 | 1.8578 | 1.9045 | 2.0862 |
+| 11 | 12 | Pilot 12 | C1 | 1.8708 | 1.8877 | 2.0868 |
+| 12 | 13 | Pilot 24 | C1 | 1.8770 | 1.8904 | 2.0947 |
+
+### Earlier fit versus refit
+
+The earlier fit used pilots of 1451 steps scored on the first 128 items of each validation split; the refit uses the 1440-step reruns scored on every test item. Both fit the same two surrogates to the same 24 mixtures. Optima under the same constraints (1% floor, 30% Wikipedia cap):
+
+| Surrogate | Fit | pred. macro | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| MixLaw | earlier | 1.7984 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
+| MixLaw | refit | 1.7191 | 0.940 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 |
+| LightGBM | earlier | 1.8335 | 0.553 | 0.212 | 0.087 | 0.082 | 0.042 | 0.014 | 0.011 |
+| LightGBM | refit | 1.7690 | 0.551 | 0.179 | 0.159 | 0.019 | 0.033 | 0.050 | 0.010 |
+
+- The **MixLaw optimum moved by 0.77** in L1 distance (from a Wikipedia-capped mixture to 94% DCLM); the **LightGBM optimum moved by 0.21**, with DCLM at 0.55 in both.
+- Leave-one-out error is similar: mixing-law macro LOO RMSE 0.0443 → 0.0422, LightGBM 0.0366 → 0.0395.
+- The pilots' ranking changed: the Spearman correlation between the earlier and refit rankings of the 24 pilots is 0.78 by extrapolated macro and 0.84 by the measured macro at the end of the run. The best measured pilot changed from `mix07` (60% DCLM) to `mix06` (55% DCLM). Absolute losses are not comparable between the two fits: the eval items, split and run length differ.
+- The 370M arms and their results above are unchanged; they remain the product of the earlier fit.
 
 ---
 
@@ -493,9 +521,10 @@ above that target, and none of the 200,000 bootstrap draws crosses it within the
 run. Conversely, the control's fitted curve reaches the MixLaw mixture's final loss
 (1.6433) at step 1755 (95% CI [1699, 1813]), 629 steps before the end of training.
 This assumes each fitted power law holds up to the end of its LR schedule. The
-pilot cost does not depend on the arm: the 24 pilots take $4.17\times10^{18}$
+pilot cost does not depend on the arm: the earlier 24 pilots (1451 steps, the ones behind this figure and
+`compute_savings_results.json`) took $4.17\times10^{18}$
 FLOPs ($1.74\times10^{17}$ per 60M run), about 15.8% of one $2.63\times10^{19}$-FLOP
-370M arm; with no training-compute saving to set against it, it is overhead here.
+370M arm, and the 1440-step reruns take $4.14\times10^{18}$ ($1.72\times10^{17}$ each, 15.7%); with no training-compute saving to set against it, it is overhead here.
 
 ### Takeaways
 
@@ -512,7 +541,7 @@ FLOPs ($1.74\times10^{17}$ per 60M run), about 15.8% of one $2.63\times10^{19}$-
 4. **No compute saving.** MixLaw never reaches the control's final loss within the
    run; the control reaches MixLaw's final loss 629 steps before the end.
 5. **Cost.** Five full static arms (the control at two seeds) $\approx 1.32\times10^{20}$
-   FLOPs on 4×L40S, plus $\approx 4.17\times10^{18}$ FLOPs for the 60M pilot grid.
+   FLOPs on 4×L40S, plus $\approx 4.2\times10^{18}$ FLOPs for the 60M pilot grid ($4.17\times10^{18}$ for the earlier grid that picked these arms, $4.14\times10^{18}$ for the rerun).
 
 ---
 
@@ -525,8 +554,8 @@ the two-seed control, as does the Data Mixing Laws paper mixture, and the LightG
 optimum finishes behind it by a margin comparable to the control-seed difference.
 Two features of the design may matter and were not isolated here: the surrogates'
 predicted gains over the best measured pilot are not distinguishable from their
-leave-one-out error at 60M scale (see Random-simplex plausibility), and the MixLaw
-optimum puts Wikipedia at the 30% cap, beyond the 12.2% maximum across the pilots.
+leave-one-out error at 60M scale (see Random-simplex plausibility; the refit gives the same picture), and the MixLaw
+optimum trained at 370M, from the earlier fit, puts Wikipedia at the 30% cap, beyond the 12.2% maximum across the pilots (the refit MixLaw optimum instead sits at 94% DCLM).
 With one run per arm and a two-seed run-to-run estimate, small differences should be read with
 that uncertainty in mind. Dynamic reweighting starting from the LightGBM mixture is
 reported in [`../skillit/README.md`](../skillit/README.md#results).

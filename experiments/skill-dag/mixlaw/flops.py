@@ -40,15 +40,15 @@ class Architecture:
 
 
 # DataDecide-60M body with the dolma2 embedding (the 24 pilots and the 7 Skill-It
-# probes): 76,296,576 non-embedding parameters, 1451 steps of 96 x 2048 tokens
-# (tokens/param = 5 against DataDecide's 57,078,144 -> 285,278,208 tokens).
+# probes): 76,296,576 non-embedding parameters, 1440 steps of 96 x 2048 tokens
+# (283,115,520 tokens, 4.96 tokens/param against DataDecide's 57,078,144).
 PROBE = Architecture(
     name="60M pilot / probe",
     n_nonemb=76_296_576,
     n_layers=N_LAYERS,
     seq_len=SEQ_LEN,
     d_model=D_MODEL,
-    steps=1451,
+    steps=1440,
     tokens_per_step=TOKENS_PER_STEP,
 )
 

@@ -223,16 +223,26 @@ def regmix_family_losses_measured(
     pilot_final: Path | None = None,
     families: Sequence[str] = DEFAULT_FAMILIES,
 ) -> dict[str, float]:
-    """Measured ``L_j(r_RegMix)`` from mixlaw pilot ``mix01`` @ probe step 1451."""
-    path = pilot_final
-    if path is None:
-        mixlaw = optional_mixlaw_paths()
-        if mixlaw is None:
-            raise FileNotFoundError("mixlaw sibling directory not found next to skillit/")
-        path = mixlaw / "pilot_runs/mix01/task_loss_final.json"
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    fam_src = payload.get("task_loss_families") or payload.get("task_families") or {}
-    return {fam: float(fam_src[fam]) for fam in families}
+    """Measured ``L_j(r_RegMix)``: the last in-run eval of pilot ``mix01`` (domain_probes/runs).
+
+    ``mix01`` is the mixture of the data-mixing-law paper's recommended mix, so it is the
+    measured counterpart of the fitted ``L_j(r_RegMix)``. ``pilot_final`` overrides the
+    ``task_loss.jsonl`` that is read.
+    """
+    path = pilot_final or Path(__file__).resolve().parents[1] / "domain_probes/runs/mix01/task_loss.jsonl"
+    rows = [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not rows:
+        raise ValueError(f"{path} has no eval rows")
+
+    def family(label: str) -> str:  # "arc_easy_test_rc_5shot_bpb" -> "arc_easy"
+        stem = label.removesuffix("_bpb")
+        for split in ("_val_", "_test_"):
+            if split in stem:
+                return stem.split(split)[0]
+        return stem
+
+    fam_src = {family(k): float(v) for k, v in rows[-1]["task_loss_bpb"].items()}
+    return {fam: fam_src[fam] for fam in families}
 
 
 def offline_A_from_extrapolated(

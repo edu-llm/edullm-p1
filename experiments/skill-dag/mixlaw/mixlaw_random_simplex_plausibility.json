@@ -5,26 +5,26 @@
   "fit_file": "mixlaw_fit_chinchilla.json",
   "range_basis": "Chinchilla-extrapolated six-family pilot targets",
   "chinchilla_target_macro_range": [
-    1.8368673299194356,
-    2.0561396799338345
+    1.7567241886891747,
+    1.9929937110561486
   ],
   "macro": {
-    "min": 1.7838449321397036,
-    "p5": 1.8210878735892182,
-    "p50": 1.8895019936277468,
-    "p95": 1.9972963173698928,
-    "p99": 2.0459667041214096,
-    "max": 2.106399066123419,
-    "mean": 1.896836737380225,
-    "std": 0.05419340288614924,
-    "pct_in_chinchilla_target_range": 87.6,
-    "n_below_chinchilla_target_range": 117,
-    "n_above_chinchilla_target_range": 7,
+    "min": 1.7508668217037,
+    "p5": 1.8057763327890033,
+    "p50": 1.8702195549340117,
+    "p95": 1.9327851400230387,
+    "p99": 1.9520972118149342,
+    "max": 1.9882993141812413,
+    "mean": 1.8699387867351378,
+    "std": 0.03857509233591656,
+    "pct_in_chinchilla_target_range": 99.9,
+    "n_below_chinchilla_target_range": 1,
+    "n_above_chinchilla_target_range": 0,
     "n_gt_3": 0,
     "n_gt_5": 0,
     "n_gt_10": 0
   },
   "any_family_gt_10": 0,
-  "mmlu_other_p99": 2.69574110483535,
-  "mmlu_other_max": 2.7657392310307802
+  "mmlu_other_p99": 2.246149415488153,
+  "mmlu_other_max": 2.2722433619348914
 }

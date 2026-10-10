@@ -53,13 +53,13 @@ built**; both start from the same mixture, the 1%-floor LightGBM optimum.
 
 ### Offline probe matrix
 
-1. Train **8** DataDecide-60M probes: the 7 one-hot probes (100% of each domain in turn) and one probe at the LightGBM starting mixture (5 tokens/param → 1451 steps / ~285M tokens, sized against DataDecide's original \(N=57.1\mathrm{M}\) non-embedding count; data seed 6198, as for the 24 pilots). All eight use the same training setup (micro-batch 4 × 24 accumulation, global batch 196,608) and are submitted together by [`submit_skillit_probes.sh`](submit_skillit_probes.sh).
-2. Fit Chinchilla step-laws on in-run curves (evals every 120 of the 1451 steps on the first 128 items of each family's validation split, as 16 batches of 8: the same 128 items the 24 pilots are scored on, so every probe is read on the same subsample); extrapolate to tpp=20 (step 5806). The curves are rebuilt from each probe's trainer log by [`import_probe_logs.py`](import_probe_logs.py).
+1. Train **8** DataDecide-60M probes: the 7 one-hot probes (100% of each domain in turn) and one probe at the LightGBM starting mixture (5 tokens/param → 1451 steps / ~285M tokens, sized against DataDecide's original \(N=57.1\mathrm{M}\) non-embedding count; data seed 6198, as for the earlier 24 pilots). All eight used the same training setup (micro-batch 4 × 24 accumulation, global batch 196,608). Their launcher was removed in commit `26376e3` (it is in git history) in favor of [`../domain_probes/`](../domain_probes/README.md); see the rerun note below.
+2. Fit Chinchilla step-laws on in-run curves (evals every 120 of the 1451 steps on the first 128 items of each family's validation split, as 16 batches of 8: the same 128 items the earlier 24 pilots were scored on, so every probe is read on the same subsample); extrapolate to tpp=20 (step 5806). The curves were rebuilt from each probe's trainer log by `import_probe_logs.py`, removed in `26376e3` with the old launcher; the committed [`A_offline.json`](artifacts/probes_full/A_offline.json) and [`probe_data.json`](artifacts/probes_full/probe_data.json) are its output.
 3. Build
    \[
    A_{ij} = \max\!\big(0,\; L_j(r_{\mathrm{LGB}}) - L_j(i)\big)
    \]
-   where \(L_j(i)\) is family \(j\)’s extrapolated loss after training on 100% domain \(i\), and \(L_j(r_{\mathrm{LGB}})\) is the extrapolated loss of the probe trained on the LightGBM starting mixture \(r_{\mathrm{LGB}}\) (`LGB-min1pct`), also at the Chinchilla-style budget ([`build_adjacency.py --reference-run probe_lgb_start`](build_adjacency.py)). Positive \(A_{ij}\) means domain \(i\) alone beat the starting mixture on family \(j\).
+   where \(L_j(i)\) is family \(j\)’s extrapolated loss after training on 100% domain \(i\), and \(L_j(r_{\mathrm{LGB}})\) is the extrapolated loss of the probe trained on the LightGBM starting mixture \(r_{\mathrm{LGB}}\) (`LGB-min1pct`), also at the Chinchilla-style budget ([`build_adjacency.py`](build_adjacency.py) with that probe as `--reference-run`). Positive \(A_{ij}\) means domain \(i\) alone beat the starting mixture on family \(j\).
 
 **Probe FLOPs.** The 6ND estimate of Kaplan et al. (2020) plus the attention term of Chowdhery et al. (2023, PaLM),
 \(C \approx 6 N_{\text{non-emb}} D + 12\,n_{\text{layers}}\,s\,d_{\text{model}}\,D\),
@@ -80,6 +80,8 @@ at the trained model's \(N_{\text{non-emb}} = 76{,}296{,}576\):
 
 The rows for arXiv, StarCoder and Algebraic Stack are all zeros, and so are the columns for ARC Challenge and MMLU Social Sciences: no single domain beats the probe trained on the LightGBM starting mixture on those skills at Chinchilla scale. OpenWebMath and pes2o carry most of the edges. Density: 8 of 42 cells (19%) are nonzero.
 
+**Rerun, and status of this matrix.** The first 128 items of each validation split turned out not to be representative. Scoring the eight probes' step-1451 checkpoints on every item of those splits ([`probe_subset_sensitivity.py`](probe_subset_sensitivity.py); results in [`artifacts/probe_subset_sensitivity/`](artifacts/probe_subset_sensitivity/report.txt)) puts the in-run subset at z = +4.6 on MMLU humanities and z = −4.2 on social sciences against random 128-item subsets of the same split. At step 1451, with the measured losses and no extrapolation, the matrix on every item has 3 nonzero cells (OpenWebMath → ARC Challenge, ARC Easy and MMLU STEM) against 5 on the in-run subset; the edges outside those three change with the choice of items. The 7 one-hot probes were therefore rerun with every item of the test split ([`../domain_probes/`](../domain_probes/README.md), 1440 steps). The matrix above, and the Offline probe arm that used it, come from the earlier probes and have **not been rebuilt**: rebuilding needs a reference run at the refit LightGBM optimum, which has not been trained (the refit moved that optimum, see [`../mixlaw/README.md`](../mixlaw/README.md#earlier-fit-versus-refit)).
+
 ### Online mixing-law derivative
 
 Reuse the parametric MixLaw surrogate per family \(j\):
@@ -94,7 +96,7 @@ Skill-It-compatible adjacency at the **current** weights \(r\):
 A_{ij} = \max\!\big(0,\; -(dL_j/dr_i)\big) = \max\!\big(0,\; -t_{ij}(L_j(r)-c_j)\big)
 \]
 
-So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \(t_{ij}\) / \(c_j\) / \(k_j\) are those from the MixLaw parametric fit.
+So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \(t_{ij}\) / \(c_j\) / \(k_j\) are those from the MixLaw parametric fit. The derivative arm used the earlier fit (git history, commit `c3d9906`); [`skillit_math.py`](skillit_math.py) and the scripts that read `mixlaw_fit_chinchilla.json` now read the refit of the rerun pilots, so re-running them gives a different derivative matrix.
 
 **This adjacency depends on the fit's gauge.** On the simplex \(\sum_i r_i = 1\), so
 replacing \(t_{ij} \to t_{ij} + q_j\) for every domain \(i\) and \(k_j \to k_j e^{-q_j}\)

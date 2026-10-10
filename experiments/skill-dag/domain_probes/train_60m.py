@@ -432,10 +432,13 @@ def init_wandb(args: argparse.Namespace, meta: dict, out_dir: Path):
     if args.wandb_mode == "disabled" or not os.environ.get("WANDB_API_KEY"):
         return None
     try:
+        import secrets
+
         import wandb
 
         id_file = out_dir / "wandb_run_id.txt"
-        run_id = id_file.read_text().strip() if id_file.exists() else wandb.util.generate_id()
+        # wandb.util.generate_id was removed from newer wandb releases, so make the id here.
+        run_id = id_file.read_text().strip() if id_file.exists() else secrets.token_hex(4)
         id_file.write_text(run_id)
         (out_dir / "wandb").mkdir(exist_ok=True)
         return wandb.init(

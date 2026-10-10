@@ -381,7 +381,7 @@ def log_probe_final_eval(
                     step = int(digits)
                     break
         if step <= 0:
-            step = 1451
+            step = 1440
     run = wandb.init(
         project=project,
         entity=entity or None,

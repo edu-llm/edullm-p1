@@ -1,0 +1,86 @@
+{
+  "run": "onehot_open-web-math",
+  "kind": "onehot",
+  "weights": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "domains": [
+    "dclm",
+    "arxiv",
+    "starcoder",
+    "pes2o",
+    "open-web-math",
+    "algebraic-stack",
+    "wiki"
+  ],
+  "realized_weights": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "total_steps": 1440,
+  "total_seqs": 138240,
+  "tokens": 283115520,
+  "schedule": {
+    "warmup": 144,
+    "decay": 144
+  },
+  "lr": 0.0058,
+  "microbatch": 4,
+  "eval_labels": [
+    "arc_challenge_test_rc_5shot_bpb",
+    "arc_easy_test_rc_5shot_bpb",
+    "mmlu_stem_test_rc_5shot_bpb",
+    "mmlu_humanities_test_rc_5shot_bpb",
+    "mmlu_social_sciences_test_rc_5shot_bpb",
+    "mmlu_other_test_rc_5shot_bpb"
+  ],
+  "eval_interval": 120,
+  "model_seed": 6198,
+  "data_seed": 6198,
+  "dataset_id": "pretrain/olmo-127b",
+  "dataset_version": "v1",
+  "train_shards": {
+    "dclm": 111,
+    "arxiv": 83,
+    "starcoder": 69,
+    "pes2o": 99,
+    "open-web-math": 50,
+    "algebraic-stack": 48,
+    "wiki": 14
+  },
+  "domain_chunks": {
+    "dclm": 14475741,
+    "arxiv": 10798198,
+    "starcoder": 9039680,
+    "pes2o": 12860823,
+    "open-web-math": 6454336,
+    "algebraic-stack": 6290536,
+    "wiki": 1829095
+  },
+  "data_plan_sha256": "3e2919245e443018713b1bdc03c4063577403516247e5da81b544cd282b15e27",
+  "code_commit": "5727e248923235b0e8c29abedd5f5d71cba51774",
+  "host": "oat-04",
+  "slurm_job_id": "1794620",
+  "slurm_array_task_id": "4",
+  "gpu": "NVIDIA L40S",
+  "torch": "2.9.0+cu128",
+  "eval_items": {
+    "arc_challenge_test_rc_5shot_bpb": 1172,
+    "arc_easy_test_rc_5shot_bpb": 2376,
+    "mmlu_stem_test_rc_5shot_bpb": 3018,
+    "mmlu_humanities_test_rc_5shot_bpb": 4705,
+    "mmlu_social_sciences_test_rc_5shot_bpb": 3077,
+    "mmlu_other_test_rc_5shot_bpb": 3242
+  }
+}

@@ -49,11 +49,14 @@ final unsharded checkpoint `step1440-unsharded`, the data plan and the Slurm log
   Runs started on `oat-01` to `oat-06`. Tasks 28 to 30 (`mix22`, `mix23`, `mix24`) were moved to the `gpu` QOS or
   resubmitted (`mix24` as job 1826231) to get a GPU sooner; this changes where they ran, not what they
   computed. Each run's job id and node are in its `run_meta.json`.
-- **W&B logging did not run.** The trainer logs to W&B project `domain-probes`, but its run-id helper
+- **W&B: backfilled, not live-logged.** The trainer logs to W&B project `domain-probes`, but its run-id helper
   (`wandb.util.generate_id`) does not exist in the installed wandb, so W&B was disabled with a warning at the start of
-  every run and the runs are not in W&B. The training itself was not affected, and `task_loss.jsonl` and
-  `run_meta.json` above are the record. The helper was replaced afterwards, which does not change any
-  number.
+  every run. The training itself was not affected, and `task_loss.jsonl` and `run_meta.json` above are the record. After
+  the runs finished, all 31 were uploaded to [`eduLLM/domain-probes`](https://wandb.ai/eduLLM/domain-probes) from those two
+  files and the Slurm trainer log (run ids `bf-<run>`, tag `backfilled`, groups `pilot` and `onehot`): the 12 evals
+  (`eval/<label>`, `eval/macro_bpb`) and the per-step training loss, gradient norm, z-loss and peak GPU memory. Their W&B
+  timestamps are the upload time, not the training time. The eval values match the committed files exactly. The id
+  helper was replaced in `train_60m.py` afterwards, which does not change any number.
 
 ## Reproduce
 

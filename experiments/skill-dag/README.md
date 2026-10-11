@@ -18,7 +18,7 @@ one independent resampling stream per arm, reproducible offline via
 [`mixlaw/fit_and_bootstrap_370m.py`](mixlaw/fit_and_bootstrap_370m.py) from the
 single curve file `mixlaw/skill_dag_370m_wandb_curves.json`, which
 [`mixlaw/pull_370m_curves.py`](mixlaw/pull_370m_curves.py) writes from W&B.
-FLOPs: \(2.63\times10^{19}\) per 370M arm (W&B); MixLaw 60M pilot grid
+FLOPs: \(2.63\times10^{19}\) per 370M arm (W&B); MixLaw 60M probe grid
 \(\approx 4.17\times10^{18}\); Skill-It 60M probes \(\approx 1.22\times10^{18}\).
 
 **Data.** Every arm draws from the ~127B-token reservoir `pretrain/olmo-127b` v1,

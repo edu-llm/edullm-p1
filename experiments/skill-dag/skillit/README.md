@@ -53,8 +53,8 @@ built**; both start from the same mixture, the 1%-floor LightGBM optimum.
 
 ### Offline probe matrix
 
-1. Train **8** DataDecide-60M probes: the 7 one-hot probes (100% of each domain in turn) and one probe at the LightGBM starting mixture (5 tokens/param → 1451 steps / ~285M tokens, sized against DataDecide's original \(N=57.1\mathrm{M}\) non-embedding count; data seed 6198, as for the earlier 24 pilots). All eight used the same training setup (micro-batch 4 × 24 accumulation, global batch 196,608). Their launcher was removed in commit `26376e3` (it is in git history) in favor of [`../domain_probes/`](../domain_probes/README.md); see the rerun note below.
-2. Fit Chinchilla step-laws on in-run curves (evals every 120 of the 1451 steps on the first 128 items of each family's validation split, as 16 batches of 8: the same 128 items the earlier 24 pilots were scored on, so every probe is read on the same subsample); extrapolate to tpp=20 (step 5806). The curves were rebuilt from each probe's trainer log by `import_probe_logs.py`, removed in `26376e3` with the old launcher; the committed [`A_offline.json`](artifacts/probes_full/A_offline.json) and [`probe_data.json`](artifacts/probes_full/probe_data.json) are its output.
+1. Train **8** DataDecide-60M probes: the 7 one-hot probes (100% of each domain in turn) and one probe at the LightGBM starting mixture (5 tokens/param → 1451 steps / ~285M tokens, sized against DataDecide's original \(N=57.1\mathrm{M}\) non-embedding count; data seed 6198, as for the earlier 24 mixture probes). All eight used the same training setup (micro-batch 4 × 24 accumulation, global batch 196,608). Their launcher was removed in commit `26376e3` (it is in git history) in favor of [`../domain_probes/`](../domain_probes/README.md); see the rerun note below.
+2. Fit Chinchilla step-laws on in-run curves (evals every 120 of the 1451 steps on the first 128 items of each family's validation split, as 16 batches of 8: the same 128 items the earlier 24 mixture probes were scored on, so every probe is read on the same subsample); extrapolate to tpp=20 (step 5806). The curves were rebuilt from each probe's trainer log by `import_probe_logs.py`, removed in `26376e3` with the old launcher; the committed [`A_offline.json`](artifacts/probes_full/A_offline.json) and [`probe_data.json`](artifacts/probes_full/probe_data.json) are its output.
 3. Build
    \[
    A_{ij} = \max\!\big(0,\; L_j(r_{\mathrm{LGB}}) - L_j(i)\big)
@@ -84,7 +84,7 @@ The rows for arXiv, StarCoder and Algebraic Stack are all zeros, and so are the 
 
 ### Online mixing-law derivative
 
-Reuse the parametric MixLaw surrogate per family \(j\):
+Reuse the parametric MixLaw model per family \(j\):
 
 \[
 L_j(r) = c_j + k_j \exp\!\Big(\sum_i t_{ij} r_i\Big)
@@ -96,7 +96,7 @@ Skill-It-compatible adjacency at the **current** weights \(r\):
 A_{ij} = \max\!\big(0,\; -(dL_j/dr_i)\big) = \max\!\big(0,\; -t_{ij}(L_j(r)-c_j)\big)
 \]
 
-So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \(t_{ij}\) / \(c_j\) / \(k_j\) are those from the MixLaw parametric fit. The derivative arm used the earlier fit (git history, commit `c3d9906`); [`skillit_math.py`](skillit_math.py) and the scripts that read `mixlaw_fit_chinchilla.json` now read the refit of the rerun pilots, so re-running them gives a different derivative matrix.
+So \(A\) **changes every update** as \(r\) and predicted \(L(r)\) move. Fitted \(t_{ij}\) / \(c_j\) / \(k_j\) are those from the MixLaw parametric fit. The derivative arm used the earlier fit (git history, commit `c3d9906`); [`skillit_math.py`](skillit_math.py) and the scripts that read `mixlaw_fit_chinchilla.json` now read the refit of the rerun probes, so re-running them gives a different derivative matrix.
 
 **This adjacency depends on the fit's gauge.** On the simplex \(\sum_i r_i = 1\), so
 replacing \(t_{ij} \to t_{ij} + q_j\) for every domain \(i\) and \(k_j \to k_j e^{-q_j}\)
@@ -331,7 +331,7 @@ Training FLOPs are linear in steps, so the step saving is also the FLOP saving a
 a fraction of one \(2.63\times10^{19}\)-FLOP arm. The net saving charges each arm
 for the 60M runs it depends on (\(1.74\times10^{17}\) FLOPs each): 8 for the probe
 arm (the seven one-hot probes and the probe at the LightGBM starting mixture, 5.28%
-of one arm) and 24 for the derivative arm (the MixLaw pilot grid its derivatives come
+of one arm) and 24 for the derivative arm (the MixLaw probe grid its derivatives come
 from, 15.85%).
 
 | Arm | Reaches 1.6238 at step | Step saving | Net of overhead | P(net > 0) |
@@ -361,7 +361,7 @@ intermediate step, so it assumes the power law holds up to the end of its LR sch
    comparisons are single runs against a single run.
 4. **Neither arm saves compute against its starting mixture.** The probe arm does
    not reach the LightGBM static final loss within the run (-6.8% net of its 8
-   probes); the derivative arm's 7.0% step saving does not cover its 24 pilots
+   probes); the derivative arm's 7.0% step saving does not cover its 24 probes
    (-8.8% net).
 5. **Run-to-run variation is of the same size as these gaps.** The control
    seeds differ by 0.0105 bpb (95% CI [+0.0023, +0.0193], \(p = 0.0095\)), and

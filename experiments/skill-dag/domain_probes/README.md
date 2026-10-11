@@ -3,13 +3,13 @@
 One trainer ([`train_60m.py`](train_60m.py)), one launcher ([`launch.sbatch`](launch.sbatch)) and
 one list of runs ([`runs.json`](runs.json)) produce every 60M run in the skill-dag experiments:
 
-- **24 pilots** `mix01`–`mix24`, the designed mixtures of [`../mixlaw/`](../mixlaw/README.md#mixture-sampling)
-  (weights in [`../mixlaw/mixtures.json`](../mixlaw/mixtures.json)). The mixing-law and LightGBM surrogates are fit on them.
+- **24 mixture probes** `mix01`–`mix24`, the designed mixtures of [`../mixlaw/`](../mixlaw/README.md#mixture-sampling)
+  (weights in [`../mixlaw/mixtures.json`](../mixlaw/mixtures.json)). The mixing-law and LightGBM models are fit on them.
 - **7 one-hot probes** `onehot_<domain>`, 100% of one domain each. The Skill-It probe matrix
   ([`../skillit/`](../skillit/README.md)) compares them with a reference run.
 
 All 31 runs share the same code, the same hardware class, the same seeds and the same evaluation, so
-they can be compared with each other and nothing else differs between a pilot and a probe except the
+they can be compared with each other and nothing else differs between a mixture probe and a one-hot probe except the
 mixture weights.
 
 ## Setup
@@ -26,7 +26,7 @@ mixture weights.
 | Hardware | one NVIDIA L40S per run on FarmShare, micro-batch 4 (peak 23.7 GB; micro-batch 8 peaks at 44 GB, 16 does not fit), PyTorch 2.9.0+cu128, OLMo ladder model code from the `ai2-olmo` package |
 | Cost | each run took 1 h 57 m 49 s to 1 h 59 m 13 s of Slurm wall-clock, about 61 GPU-hours for all 31 |
 
-Why every item and not a subset: the earlier pilots and probes scored only the first 128 items of each
+Why every item and not a subset: the earlier probes scored only the first 128 items of each
 validation split, and that prefix is not representative (for the reference probe, MMLU humanities
 z = +4.6, social sciences z = −4.2 against random 128-item subsets), which flips probe rankings on
 humanities. Scoring every item of the test split costs about 2 minutes per run.

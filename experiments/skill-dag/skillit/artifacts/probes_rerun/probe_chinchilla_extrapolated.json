@@ -1,0 +1,3237 @@
+{
+  "tokens_per_param_chinchilla": 20.0,
+  "tokens_per_param_pilot": 4.960138858053969,
+  "datadecide_model_size": 57078144,
+  "pilot_steps": 1440,
+  "pilot_tokens": 283115520,
+  "chinchilla_steps": 5806,
+  "chinchilla_tokens": 1141506048,
+  "step_ratio": 4.031944444444444,
+  "curve_families": [
+    "arc_challenge",
+    "arc_easy",
+    "mmlu_humanities",
+    "mmlu_other",
+    "mmlu_social_sciences",
+    "mmlu_stem"
+  ],
+  "n_curve_families": 6,
+  "runs": [
+    {
+      "id": 0,
+      "run_name": "probe_dclm",
+      "tag": "onehot_dclm",
+      "weights": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "macro_curve_6_measured": 2.082,
+      "macro_curve_6_chinchilla": 1.8369651863510563,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 1.968,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.639
+            },
+            {
+              "step": 240,
+              "loss": 2.522
+            },
+            {
+              "step": 360,
+              "loss": 2.371
+            },
+            {
+              "step": 480,
+              "loss": 2.233
+            },
+            {
+              "step": 600,
+              "loss": 2.114
+            },
+            {
+              "step": 720,
+              "loss": 2.066
+            },
+            {
+              "step": 840,
+              "loss": 2.058
+            },
+            {
+              "step": 960,
+              "loss": 2.025
+            },
+            {
+              "step": 1080,
+              "loss": 2.008
+            },
+            {
+              "step": 1200,
+              "loss": 2.053
+            },
+            {
+              "step": 1320,
+              "loss": 2.023
+            },
+            {
+              "step": 1440,
+              "loss": 1.968
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.9840000312539384,
+            "A": 4.928837701708958,
+            "alpha": 0.22241751155805978,
+            "rmse": 0.045583499920261325,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7011208895579086,
+          "delta": -0.26687911044209134
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 1.941,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.666
+            },
+            {
+              "step": 240,
+              "loss": 2.466
+            },
+            {
+              "step": 360,
+              "loss": 2.254
+            },
+            {
+              "step": 480,
+              "loss": 2.163
+            },
+            {
+              "step": 600,
+              "loss": 2.003
+            },
+            {
+              "step": 720,
+              "loss": 1.999
+            },
+            {
+              "step": 840,
+              "loss": 2.037
+            },
+            {
+              "step": 960,
+              "loss": 1.945
+            },
+            {
+              "step": 1080,
+              "loss": 1.921
+            },
+            {
+              "step": 1200,
+              "loss": 1.957
+            },
+            {
+              "step": 1320,
+              "loss": 2.055
+            },
+            {
+              "step": 1440,
+              "loss": 1.941
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.6376584024279677,
+            "A": 13.137696900881743,
+            "alpha": 0.5254731026409585,
+            "rmse": 0.05768995711346985,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7759204857030984,
+          "delta": -0.1650795142969017
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.531,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.442
+            },
+            {
+              "step": 240,
+              "loss": 2.333
+            },
+            {
+              "step": 360,
+              "loss": 2.187
+            },
+            {
+              "step": 480,
+              "loss": 2.086
+            },
+            {
+              "step": 600,
+              "loss": 2.025
+            },
+            {
+              "step": 720,
+              "loss": 1.895
+            },
+            {
+              "step": 840,
+              "loss": 1.82
+            },
+            {
+              "step": 960,
+              "loss": 1.735
+            },
+            {
+              "step": 1080,
+              "loss": 1.744
+            },
+            {
+              "step": 1200,
+              "loss": 1.678
+            },
+            {
+              "step": 1320,
+              "loss": 1.569
+            },
+            {
+              "step": 1440,
+              "loss": 1.531
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.765500000000095,
+            "A": 7.063223792671682,
+            "alpha": 0.2838548536199932,
+            "rmse": 0.08629711388269377,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.3689040251709492,
+          "delta": -0.1620959748290507
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.275,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.144
+            },
+            {
+              "step": 240,
+              "loss": 2.921
+            },
+            {
+              "step": 360,
+              "loss": 2.763
+            },
+            {
+              "step": 480,
+              "loss": 2.639
+            },
+            {
+              "step": 600,
+              "loss": 2.551
+            },
+            {
+              "step": 720,
+              "loss": 2.482
+            },
+            {
+              "step": 840,
+              "loss": 2.459
+            },
+            {
+              "step": 960,
+              "loss": 2.414
+            },
+            {
+              "step": 1080,
+              "loss": 2.365
+            },
+            {
+              "step": 1200,
+              "loss": 2.395
+            },
+            {
+              "step": 1320,
+              "loss": 2.374
+            },
+            {
+              "step": 1440,
+              "loss": 2.275
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.137500000000003,
+            "A": 5.851594220144158,
+            "alpha": 0.22066772264463372,
+            "rmse": 0.026806308833609085,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.0018866074110373,
+          "delta": -0.2731133925889626
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 1.697,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.389
+            },
+            {
+              "step": 240,
+              "loss": 2.224
+            },
+            {
+              "step": 360,
+              "loss": 2.093
+            },
+            {
+              "step": 480,
+              "loss": 1.998
+            },
+            {
+              "step": 600,
+              "loss": 1.899
+            },
+            {
+              "step": 720,
+              "loss": 1.851
+            },
+            {
+              "step": 840,
+              "loss": 1.84
+            },
+            {
+              "step": 960,
+              "loss": 1.802
+            },
+            {
+              "step": 1080,
+              "loss": 1.782
+            },
+            {
+              "step": 1200,
+              "loss": 1.771
+            },
+            {
+              "step": 1320,
+              "loss": 1.787
+            },
+            {
+              "step": 1440,
+              "loss": 1.697
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.8485000000000001,
+            "A": 4.816518068826673,
+            "alpha": 0.2341191063179619,
+            "rmse": 0.026074994573285774,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.481695277209191,
+          "delta": -0.21530472279080914
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 3.08,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 4.254
+            },
+            {
+              "step": 240,
+              "loss": 3.974
+            },
+            {
+              "step": 360,
+              "loss": 3.722
+            },
+            {
+              "step": 480,
+              "loss": 3.543
+            },
+            {
+              "step": 600,
+              "loss": 3.396
+            },
+            {
+              "step": 720,
+              "loss": 3.219
+            },
+            {
+              "step": 840,
+              "loss": 3.255
+            },
+            {
+              "step": 960,
+              "loss": 3.237
+            },
+            {
+              "step": 1080,
+              "loss": 3.082
+            },
+            {
+              "step": 1200,
+              "loss": 3.184
+            },
+            {
+              "step": 1320,
+              "loss": 3.289
+            },
+            {
+              "step": 1440,
+              "loss": 3.08
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.8215152892198807,
+            "A": 9.028251697183968,
+            "alpha": 0.2698576209710728,
+            "rmse": 0.07961187343012084,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.6922638330541524,
+          "delta": -0.38773616694584767
+        }
+      }
+    },
+    {
+      "id": 1,
+      "run_name": "probe_arxiv",
+      "tag": "onehot_arxiv",
+      "weights": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "macro_curve_6_measured": 2.2171666666666665,
+      "macro_curve_6_chinchilla": 1.9576509300262035,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 2.093,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.672
+            },
+            {
+              "step": 240,
+              "loss": 2.59
+            },
+            {
+              "step": 360,
+              "loss": 2.383
+            },
+            {
+              "step": 480,
+              "loss": 2.314
+            },
+            {
+              "step": 600,
+              "loss": 2.249
+            },
+            {
+              "step": 720,
+              "loss": 2.268
+            },
+            {
+              "step": 840,
+              "loss": 2.203
+            },
+            {
+              "step": 960,
+              "loss": 2.151
+            },
+            {
+              "step": 1080,
+              "loss": 2.119
+            },
+            {
+              "step": 1200,
+              "loss": 2.128
+            },
+            {
+              "step": 1320,
+              "loss": 2.161
+            },
+            {
+              "step": 1440,
+              "loss": 2.093
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.0465000000005533,
+            "A": 4.011061173501538,
+            "alpha": 0.184472732549699,
+            "rmse": 0.03501119391884786,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.8573240176341068,
+          "delta": -0.23567598236589316
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 2.031,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.719
+            },
+            {
+              "step": 240,
+              "loss": 2.617
+            },
+            {
+              "step": 360,
+              "loss": 2.354
+            },
+            {
+              "step": 480,
+              "loss": 2.213
+            },
+            {
+              "step": 600,
+              "loss": 2.201
+            },
+            {
+              "step": 720,
+              "loss": 2.187
+            },
+            {
+              "step": 840,
+              "loss": 2.084
+            },
+            {
+              "step": 960,
+              "loss": 2.063
+            },
+            {
+              "step": 1080,
+              "loss": 2.054
+            },
+            {
+              "step": 1200,
+              "loss": 2.059
+            },
+            {
+              "step": 1320,
+              "loss": 2.061
+            },
+            {
+              "step": 1440,
+              "loss": 2.031
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.2200341046683263,
+            "A": 5.646190619910925,
+            "alpha": 0.2713781684641505,
+            "rmse": 0.04716631439705785,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7574635792759397,
+          "delta": -0.2735364207240605
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.75,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.666
+            },
+            {
+              "step": 240,
+              "loss": 2.518
+            },
+            {
+              "step": 360,
+              "loss": 2.371
+            },
+            {
+              "step": 480,
+              "loss": 2.275
+            },
+            {
+              "step": 600,
+              "loss": 2.108
+            },
+            {
+              "step": 720,
+              "loss": 2.103
+            },
+            {
+              "step": 840,
+              "loss": 1.893
+            },
+            {
+              "step": 960,
+              "loss": 1.911
+            },
+            {
+              "step": 1080,
+              "loss": 1.811
+            },
+            {
+              "step": 1200,
+              "loss": 1.921
+            },
+            {
+              "step": 1320,
+              "loss": 1.872
+            },
+            {
+              "step": 1440,
+              "loss": 1.75
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.8750000000000314,
+            "A": 7.104810059868486,
+            "alpha": 0.2755439815502854,
+            "rmse": 0.07643854542267993,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.5272871283933018,
+          "delta": -0.22271287160669817
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.6,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.309
+            },
+            {
+              "step": 240,
+              "loss": 3.134
+            },
+            {
+              "step": 360,
+              "loss": 2.969
+            },
+            {
+              "step": 480,
+              "loss": 2.854
+            },
+            {
+              "step": 600,
+              "loss": 2.794
+            },
+            {
+              "step": 720,
+              "loss": 2.788
+            },
+            {
+              "step": 840,
+              "loss": 2.712
+            },
+            {
+              "step": 960,
+              "loss": 2.733
+            },
+            {
+              "step": 1080,
+              "loss": 2.669
+            },
+            {
+              "step": 1200,
+              "loss": 2.659
+            },
+            {
+              "step": 1320,
+              "loss": 2.68
+            },
+            {
+              "step": 1440,
+              "loss": 2.6
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.717675907759004,
+            "A": 4.905981440824063,
+            "alpha": 0.23297258357295958,
+            "rmse": 0.025927820081208697,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.3690728936243963,
+          "delta": -0.23092710637560376
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 1.924,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.46
+            },
+            {
+              "step": 240,
+              "loss": 2.352
+            },
+            {
+              "step": 360,
+              "loss": 2.206
+            },
+            {
+              "step": 480,
+              "loss": 2.133
+            },
+            {
+              "step": 600,
+              "loss": 2.067
+            },
+            {
+              "step": 720,
+              "loss": 2.069
+            },
+            {
+              "step": 840,
+              "loss": 2.028
+            },
+            {
+              "step": 960,
+              "loss": 1.981
+            },
+            {
+              "step": 1080,
+              "loss": 1.956
+            },
+            {
+              "step": 1200,
+              "loss": 1.968
+            },
+            {
+              "step": 1320,
+              "loss": 1.962
+            },
+            {
+              "step": 1440,
+              "loss": 1.924
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.9620039206909431,
+            "A": 3.6703811057848164,
+            "alpha": 0.18396439575731496,
+            "rmse": 0.021268546911968455,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7072364384055034,
+          "delta": -0.2167635615944965
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 2.905,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.968
+            },
+            {
+              "step": 240,
+              "loss": 3.755
+            },
+            {
+              "step": 360,
+              "loss": 3.469
+            },
+            {
+              "step": 480,
+              "loss": 3.264
+            },
+            {
+              "step": 600,
+              "loss": 3.181
+            },
+            {
+              "step": 720,
+              "loss": 3.174
+            },
+            {
+              "step": 840,
+              "loss": 3.102
+            },
+            {
+              "step": 960,
+              "loss": 2.989
+            },
+            {
+              "step": 1080,
+              "loss": 2.979
+            },
+            {
+              "step": 1200,
+              "loss": 2.994
+            },
+            {
+              "step": 1320,
+              "loss": 3.045
+            },
+            {
+              "step": 1440,
+              "loss": 2.905
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.5110364220007406,
+            "A": 7.595303428883302,
+            "alpha": 0.2320596830799887,
+            "rmse": 0.056148753749346005,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.527521522823972,
+          "delta": -0.377478477176028
+        }
+      }
+    },
+    {
+      "id": 2,
+      "run_name": "probe_starcoder",
+      "tag": "onehot_starcoder",
+      "weights": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "macro_curve_6_measured": 2.508666666666666,
+      "macro_curve_6_chinchilla": 2.281818484678696,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 2.457,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.984
+            },
+            {
+              "step": 240,
+              "loss": 2.906
+            },
+            {
+              "step": 360,
+              "loss": 2.796
+            },
+            {
+              "step": 480,
+              "loss": 2.711
+            },
+            {
+              "step": 600,
+              "loss": 2.587
+            },
+            {
+              "step": 720,
+              "loss": 2.622
+            },
+            {
+              "step": 840,
+              "loss": 2.604
+            },
+            {
+              "step": 960,
+              "loss": 2.575
+            },
+            {
+              "step": 1080,
+              "loss": 2.532
+            },
+            {
+              "step": 1200,
+              "loss": 2.485
+            },
+            {
+              "step": 1320,
+              "loss": 2.492
+            },
+            {
+              "step": 1440,
+              "loss": 2.457
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.228500038641676,
+            "A": 3.6428110957212287,
+            "alpha": 0.14717240978185642,
+            "rmse": 0.03196153773400812,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.2459142459534007,
+          "delta": -0.21108575404659913
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 2.477,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.952
+            },
+            {
+              "step": 240,
+              "loss": 2.936
+            },
+            {
+              "step": 360,
+              "loss": 2.748
+            },
+            {
+              "step": 480,
+              "loss": 2.617
+            },
+            {
+              "step": 600,
+              "loss": 2.619
+            },
+            {
+              "step": 720,
+              "loss": 2.642
+            },
+            {
+              "step": 840,
+              "loss": 2.635
+            },
+            {
+              "step": 960,
+              "loss": 2.586
+            },
+            {
+              "step": 1080,
+              "loss": 2.56
+            },
+            {
+              "step": 1200,
+              "loss": 2.498
+            },
+            {
+              "step": 1320,
+              "loss": 2.525
+            },
+            {
+              "step": 1440,
+              "loss": 2.477
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.2385000000000004,
+            "A": 3.3082435365290044,
+            "alpha": 0.13277275396680996,
+            "rmse": 0.04403765984610817,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.285284187375277,
+          "delta": -0.19171581262472293
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.811,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.763
+            },
+            {
+              "step": 240,
+              "loss": 2.656
+            },
+            {
+              "step": 360,
+              "loss": 2.474
+            },
+            {
+              "step": 480,
+              "loss": 2.281
+            },
+            {
+              "step": 600,
+              "loss": 2.177
+            },
+            {
+              "step": 720,
+              "loss": 2.051
+            },
+            {
+              "step": 840,
+              "loss": 2.069
+            },
+            {
+              "step": 960,
+              "loss": 1.966
+            },
+            {
+              "step": 1080,
+              "loss": 1.922
+            },
+            {
+              "step": 1200,
+              "loss": 1.855
+            },
+            {
+              "step": 1320,
+              "loss": 1.869
+            },
+            {
+              "step": 1440,
+              "loss": 1.811
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.9055000000000508,
+            "A": 8.070835828691076,
+            "alpha": 0.29225148535517453,
+            "rmse": 0.07310109084520183,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.5465912658298437,
+          "delta": -0.2644087341701562
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.876,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.635
+            },
+            {
+              "step": 240,
+              "loss": 3.429
+            },
+            {
+              "step": 360,
+              "loss": 3.275
+            },
+            {
+              "step": 480,
+              "loss": 3.165
+            },
+            {
+              "step": 600,
+              "loss": 3.121
+            },
+            {
+              "step": 720,
+              "loss": 3.05
+            },
+            {
+              "step": 840,
+              "loss": 3.089
+            },
+            {
+              "step": 960,
+              "loss": 3.019
+            },
+            {
+              "step": 1080,
+              "loss": 2.97
+            },
+            {
+              "step": 1200,
+              "loss": 2.934
+            },
+            {
+              "step": 1320,
+              "loss": 2.92
+            },
+            {
+              "step": 1440,
+              "loss": 2.876
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.4380000015298176,
+            "A": 4.889458610479306,
+            "alpha": 0.1661935398181538,
+            "rmse": 0.02223936028434236,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.596053777160172,
+          "delta": -0.27994622283982773
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 2.159,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.699
+            },
+            {
+              "step": 240,
+              "loss": 2.585
+            },
+            {
+              "step": 360,
+              "loss": 2.483
+            },
+            {
+              "step": 480,
+              "loss": 2.382
+            },
+            {
+              "step": 600,
+              "loss": 2.312
+            },
+            {
+              "step": 720,
+              "loss": 2.28
+            },
+            {
+              "step": 840,
+              "loss": 2.269
+            },
+            {
+              "step": 960,
+              "loss": 2.278
+            },
+            {
+              "step": 1080,
+              "loss": 2.233
+            },
+            {
+              "step": 1200,
+              "loss": 2.205
+            },
+            {
+              "step": 1320,
+              "loss": 2.205
+            },
+            {
+              "step": 1440,
+              "loss": 2.159
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.0795000129540988,
+            "A": 3.5917528163770207,
+            "alpha": 0.16328359721250682,
+            "rmse": 0.022286434251452485,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.9519229191180454,
+          "delta": -0.20707708088195442
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 3.272,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 4.421
+            },
+            {
+              "step": 240,
+              "loss": 3.954
+            },
+            {
+              "step": 360,
+              "loss": 3.771
+            },
+            {
+              "step": 480,
+              "loss": 3.621
+            },
+            {
+              "step": 600,
+              "loss": 3.593
+            },
+            {
+              "step": 720,
+              "loss": 3.551
+            },
+            {
+              "step": 840,
+              "loss": 3.547
+            },
+            {
+              "step": 960,
+              "loss": 3.526
+            },
+            {
+              "step": 1080,
+              "loss": 3.401
+            },
+            {
+              "step": 1200,
+              "loss": 3.318
+            },
+            {
+              "step": 1320,
+              "loss": 3.336
+            },
+            {
+              "step": 1440,
+              "loss": 3.272
+            }
+          ],
+          "step_law": {
+            "L_inf": 2.736209739860831,
+            "A": 12.351502703883941,
+            "alpha": 0.4183478891582456,
+            "rmse": 0.044894545266841585,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 3.065144512635438,
+          "delta": -0.2068554873645616
+        }
+      }
+    },
+    {
+      "id": 3,
+      "run_name": "probe_pes2o",
+      "tag": "onehot_pes2o",
+      "weights": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "macro_curve_6_measured": 2.2021666666666664,
+      "macro_curve_6_chinchilla": 2.060272864446213,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 2.151,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.526
+            },
+            {
+              "step": 240,
+              "loss": 2.401
+            },
+            {
+              "step": 360,
+              "loss": 2.3
+            },
+            {
+              "step": 480,
+              "loss": 2.227
+            },
+            {
+              "step": 600,
+              "loss": 2.207
+            },
+            {
+              "step": 720,
+              "loss": 2.132
+            },
+            {
+              "step": 840,
+              "loss": 2.167
+            },
+            {
+              "step": 960,
+              "loss": 2.134
+            },
+            {
+              "step": 1080,
+              "loss": 2.252
+            },
+            {
+              "step": 1200,
+              "loss": 2.177
+            },
+            {
+              "step": 1320,
+              "loss": 2.135
+            },
+            {
+              "step": 1440,
+              "loss": 2.151
+            }
+          ],
+          "step_law": {
+            "L_inf": 2.0531535373904215,
+            "A": 12.434130053845472,
+            "alpha": 0.6767803079402988,
+            "rmse": 0.03805232613926348,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.0884147748271733,
+          "delta": -0.0625852251728265
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 2.084,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.477
+            },
+            {
+              "step": 240,
+              "loss": 2.333
+            },
+            {
+              "step": 360,
+              "loss": 2.213
+            },
+            {
+              "step": 480,
+              "loss": 2.087
+            },
+            {
+              "step": 600,
+              "loss": 2.117
+            },
+            {
+              "step": 720,
+              "loss": 2.044
+            },
+            {
+              "step": 840,
+              "loss": 2.06
+            },
+            {
+              "step": 960,
+              "loss": 2.059
+            },
+            {
+              "step": 1080,
+              "loss": 2.187
+            },
+            {
+              "step": 1200,
+              "loss": 2.143
+            },
+            {
+              "step": 1320,
+              "loss": 2.139
+            },
+            {
+              "step": 1440,
+              "loss": 2.084
+            }
+          ],
+          "step_law": {
+            "L_inf": 2.0172252589029283,
+            "A": 21.649999999999988,
+            "alpha": 0.8069187409893166,
+            "rmse": 0.05459484996906997,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.0371006180550433,
+          "delta": -0.0468993819449568
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.753,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.742
+            },
+            {
+              "step": 240,
+              "loss": 2.565
+            },
+            {
+              "step": 360,
+              "loss": 2.362
+            },
+            {
+              "step": 480,
+              "loss": 2.141
+            },
+            {
+              "step": 600,
+              "loss": 2.075
+            },
+            {
+              "step": 720,
+              "loss": 2.023
+            },
+            {
+              "step": 840,
+              "loss": 1.935
+            },
+            {
+              "step": 960,
+              "loss": 1.87
+            },
+            {
+              "step": 1080,
+              "loss": 1.914
+            },
+            {
+              "step": 1200,
+              "loss": 1.817
+            },
+            {
+              "step": 1320,
+              "loss": 1.855
+            },
+            {
+              "step": 1440,
+              "loss": 1.753
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.8765000000000001,
+            "A": 8.21370616931201,
+            "alpha": 0.3004483662926185,
+            "rmse": 0.053547188267304535,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.484198910378863,
+          "delta": -0.2688010896211368
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.331,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.106
+            },
+            {
+              "step": 240,
+              "loss": 2.794
+            },
+            {
+              "step": 360,
+              "loss": 2.663
+            },
+            {
+              "step": 480,
+              "loss": 2.598
+            },
+            {
+              "step": 600,
+              "loss": 2.528
+            },
+            {
+              "step": 720,
+              "loss": 2.422
+            },
+            {
+              "step": 840,
+              "loss": 2.446
+            },
+            {
+              "step": 960,
+              "loss": 2.42
+            },
+            {
+              "step": 1080,
+              "loss": 2.449
+            },
+            {
+              "step": 1200,
+              "loss": 2.47
+            },
+            {
+              "step": 1320,
+              "loss": 2.337
+            },
+            {
+              "step": 1440,
+              "loss": 2.331
+            }
+          ],
+          "step_law": {
+            "L_inf": 2.0853141267700686,
+            "A": 12.607862492946397,
+            "alpha": 0.5249651100881372,
+            "rmse": 0.03524546263092114,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.218585644425632,
+          "delta": -0.11241435557436796
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 1.792,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.302
+            },
+            {
+              "step": 240,
+              "loss": 2.131
+            },
+            {
+              "step": 360,
+              "loss": 2.022
+            },
+            {
+              "step": 480,
+              "loss": 1.967
+            },
+            {
+              "step": 600,
+              "loss": 1.939
+            },
+            {
+              "step": 720,
+              "loss": 1.869
+            },
+            {
+              "step": 840,
+              "loss": 1.862
+            },
+            {
+              "step": 960,
+              "loss": 1.855
+            },
+            {
+              "step": 1080,
+              "loss": 1.861
+            },
+            {
+              "step": 1200,
+              "loss": 1.843
+            },
+            {
+              "step": 1320,
+              "loss": 1.807
+            },
+            {
+              "step": 1440,
+              "loss": 1.792
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.4716088046748423,
+            "A": 5.0121563451910855,
+            "alpha": 0.3743043822499783,
+            "rmse": 0.014050556901764414,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.6671277934648587,
+          "delta": -0.1248722065351413
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 3.102,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.954
+            },
+            {
+              "step": 240,
+              "loss": 3.638
+            },
+            {
+              "step": 360,
+              "loss": 3.516
+            },
+            {
+              "step": 480,
+              "loss": 3.5
+            },
+            {
+              "step": 600,
+              "loss": 3.424
+            },
+            {
+              "step": 720,
+              "loss": 3.242
+            },
+            {
+              "step": 840,
+              "loss": 3.296
+            },
+            {
+              "step": 960,
+              "loss": 3.195
+            },
+            {
+              "step": 1080,
+              "loss": 3.339
+            },
+            {
+              "step": 1200,
+              "loss": 3.268
+            },
+            {
+              "step": 1320,
+              "loss": 3.115
+            },
+            {
+              "step": 1440,
+              "loss": 3.102
+            }
+          ],
+          "step_law": {
+            "L_inf": 2.0793817547161635,
+            "A": 5.378040225532052,
+            "alpha": 0.2217778114498389,
+            "rmse": 0.05935581055882644,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.8662094455257088,
+          "delta": -0.2357905544742911
+        }
+      }
+    },
+    {
+      "id": 4,
+      "run_name": "probe_open-web-math",
+      "tag": "onehot_open-web-math",
+      "weights": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "macro_curve_6_measured": 2.1878333333333333,
+      "macro_curve_6_chinchilla": 1.96483068751212,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 2.017,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.662
+            },
+            {
+              "step": 240,
+              "loss": 2.494
+            },
+            {
+              "step": 360,
+              "loss": 2.435
+            },
+            {
+              "step": 480,
+              "loss": 2.36
+            },
+            {
+              "step": 600,
+              "loss": 2.279
+            },
+            {
+              "step": 720,
+              "loss": 2.271
+            },
+            {
+              "step": 840,
+              "loss": 2.214
+            },
+            {
+              "step": 960,
+              "loss": 2.202
+            },
+            {
+              "step": 1080,
+              "loss": 2.176
+            },
+            {
+              "step": 1200,
+              "loss": 2.161
+            },
+            {
+              "step": 1320,
+              "loss": 2.102
+            },
+            {
+              "step": 1440,
+              "loss": 2.017
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.008500000000003,
+            "A": 3.8415507045624344,
+            "alpha": 0.17244171274077896,
+            "rmse": 0.0324412470657854,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.870400570054211,
+          "delta": -0.1465994299457889
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 2.001,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.669
+            },
+            {
+              "step": 240,
+              "loss": 2.493
+            },
+            {
+              "step": 360,
+              "loss": 2.332
+            },
+            {
+              "step": 480,
+              "loss": 2.254
+            },
+            {
+              "step": 600,
+              "loss": 2.189
+            },
+            {
+              "step": 720,
+              "loss": 2.152
+            },
+            {
+              "step": 840,
+              "loss": 2.142
+            },
+            {
+              "step": 960,
+              "loss": 2.111
+            },
+            {
+              "step": 1080,
+              "loss": 2.059
+            },
+            {
+              "step": 1200,
+              "loss": 2.063
+            },
+            {
+              "step": 1320,
+              "loss": 2.037
+            },
+            {
+              "step": 1440,
+              "loss": 2.001
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.0177739978738878,
+            "A": 4.482048194634675,
+            "alpha": 0.20723231209380993,
+            "rmse": 0.01580407313886226,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7616140896770247,
+          "delta": -0.23938591032297518
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.746,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.601
+            },
+            {
+              "step": 240,
+              "loss": 2.465
+            },
+            {
+              "step": 360,
+              "loss": 2.349
+            },
+            {
+              "step": 480,
+              "loss": 2.297
+            },
+            {
+              "step": 600,
+              "loss": 2.145
+            },
+            {
+              "step": 720,
+              "loss": 2.047
+            },
+            {
+              "step": 840,
+              "loss": 1.938
+            },
+            {
+              "step": 960,
+              "loss": 1.876
+            },
+            {
+              "step": 1080,
+              "loss": 1.901
+            },
+            {
+              "step": 1200,
+              "loss": 1.829
+            },
+            {
+              "step": 1320,
+              "loss": 1.825
+            },
+            {
+              "step": 1440,
+              "loss": 1.746
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.8730000000002166,
+            "A": 6.546859635131583,
+            "alpha": 0.2642302246988696,
+            "rmse": 0.07490811890843548,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.5359838601614313,
+          "delta": -0.2100161398385687
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.59,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.318
+            },
+            {
+              "step": 240,
+              "loss": 3.103
+            },
+            {
+              "step": 360,
+              "loss": 3.029
+            },
+            {
+              "step": 480,
+              "loss": 2.949
+            },
+            {
+              "step": 600,
+              "loss": 2.805
+            },
+            {
+              "step": 720,
+              "loss": 2.764
+            },
+            {
+              "step": 840,
+              "loss": 2.741
+            },
+            {
+              "step": 960,
+              "loss": 2.707
+            },
+            {
+              "step": 1080,
+              "loss": 2.697
+            },
+            {
+              "step": 1200,
+              "loss": 2.706
+            },
+            {
+              "step": 1320,
+              "loss": 2.668
+            },
+            {
+              "step": 1440,
+              "loss": 2.59
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.2950000013057374,
+            "A": 4.644076485968419,
+            "alpha": 0.17181331155881469,
+            "rmse": 0.029448941522794436,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.342647515100082,
+          "delta": -0.2473524848999178
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 1.917,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.454
+            },
+            {
+              "step": 240,
+              "loss": 2.301
+            },
+            {
+              "step": 360,
+              "loss": 2.214
+            },
+            {
+              "step": 480,
+              "loss": 2.166
+            },
+            {
+              "step": 600,
+              "loss": 2.088
+            },
+            {
+              "step": 720,
+              "loss": 2.05
+            },
+            {
+              "step": 840,
+              "loss": 2.023
+            },
+            {
+              "step": 960,
+              "loss": 2.004
+            },
+            {
+              "step": 1080,
+              "loss": 2.011
+            },
+            {
+              "step": 1200,
+              "loss": 1.991
+            },
+            {
+              "step": 1320,
+              "loss": 1.961
+            },
+            {
+              "step": 1440,
+              "loss": 1.917
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.9585000133519693,
+            "A": 3.4202406657891027,
+            "alpha": 0.17151595409322784,
+            "rmse": 0.0148355674013274,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7320559192250988,
+          "delta": -0.1849440807749012
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 2.856,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.959
+            },
+            {
+              "step": 240,
+              "loss": 3.674
+            },
+            {
+              "step": 360,
+              "loss": 3.593
+            },
+            {
+              "step": 480,
+              "loss": 3.306
+            },
+            {
+              "step": 600,
+              "loss": 3.198
+            },
+            {
+              "step": 720,
+              "loss": 3.173
+            },
+            {
+              "step": 840,
+              "loss": 3.135
+            },
+            {
+              "step": 960,
+              "loss": 3.015
+            },
+            {
+              "step": 1080,
+              "loss": 3.049
+            },
+            {
+              "step": 1200,
+              "loss": 3.108
+            },
+            {
+              "step": 1320,
+              "loss": 2.96
+            },
+            {
+              "step": 1440,
+              "loss": 2.856
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.428000000000016,
+            "A": 7.230149167566146,
+            "alpha": 0.21536193925121336,
+            "rmse": 0.062338052525591124,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.5462821708548717,
+          "delta": -0.30971782914512813
+        }
+      }
+    },
+    {
+      "id": 5,
+      "run_name": "probe_algebraic-stack",
+      "tag": "onehot_algebraic-stack",
+      "weights": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      "macro_curve_6_measured": 2.226833333333333,
+      "macro_curve_6_chinchilla": 2.023029744637937,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 2.107,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.695
+            },
+            {
+              "step": 240,
+              "loss": 2.529
+            },
+            {
+              "step": 360,
+              "loss": 2.425
+            },
+            {
+              "step": 480,
+              "loss": 2.323
+            },
+            {
+              "step": 600,
+              "loss": 2.278
+            },
+            {
+              "step": 720,
+              "loss": 2.265
+            },
+            {
+              "step": 840,
+              "loss": 2.184
+            },
+            {
+              "step": 960,
+              "loss": 2.202
+            },
+            {
+              "step": 1080,
+              "loss": 2.199
+            },
+            {
+              "step": 1200,
+              "loss": 2.207
+            },
+            {
+              "step": 1320,
+              "loss": 2.182
+            },
+            {
+              "step": 1440,
+              "loss": 2.107
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.596413791323459,
+            "A": 4.389302235065804,
+            "alpha": 0.2873391491138799,
+            "rmse": 0.024835641446899207,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.9602335341867283,
+          "delta": -0.1467664658132719
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 1.985,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.739
+            },
+            {
+              "step": 240,
+              "loss": 2.552
+            },
+            {
+              "step": 360,
+              "loss": 2.413
+            },
+            {
+              "step": 480,
+              "loss": 2.245
+            },
+            {
+              "step": 600,
+              "loss": 2.181
+            },
+            {
+              "step": 720,
+              "loss": 2.147
+            },
+            {
+              "step": 840,
+              "loss": 2.103
+            },
+            {
+              "step": 960,
+              "loss": 2.103
+            },
+            {
+              "step": 1080,
+              "loss": 2.092
+            },
+            {
+              "step": 1200,
+              "loss": 2.055
+            },
+            {
+              "step": 1320,
+              "loss": 2.053
+            },
+            {
+              "step": 1440,
+              "loss": 1.985
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.0482098816552239,
+            "A": 5.305025810585276,
+            "alpha": 0.23608927598185517,
+            "rmse": 0.03040130133254796,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.733818862751341,
+          "delta": -0.2511811372486592
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.767,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.615
+            },
+            {
+              "step": 240,
+              "loss": 2.531
+            },
+            {
+              "step": 360,
+              "loss": 2.411
+            },
+            {
+              "step": 480,
+              "loss": 2.246
+            },
+            {
+              "step": 600,
+              "loss": 2.073
+            },
+            {
+              "step": 720,
+              "loss": 2.017
+            },
+            {
+              "step": 840,
+              "loss": 1.94
+            },
+            {
+              "step": 960,
+              "loss": 1.842
+            },
+            {
+              "step": 1080,
+              "loss": 1.875
+            },
+            {
+              "step": 1200,
+              "loss": 1.846
+            },
+            {
+              "step": 1320,
+              "loss": 1.887
+            },
+            {
+              "step": 1440,
+              "loss": 1.767
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.8835000000000108,
+            "A": 6.935623591169013,
+            "alpha": 0.274440658179957,
+            "rmse": 0.0794725129869972,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.5263721697213164,
+          "delta": -0.2406278302786835
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.623,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.342
+            },
+            {
+              "step": 240,
+              "loss": 3.133
+            },
+            {
+              "step": 360,
+              "loss": 3.015
+            },
+            {
+              "step": 480,
+              "loss": 2.874
+            },
+            {
+              "step": 600,
+              "loss": 2.827
+            },
+            {
+              "step": 720,
+              "loss": 2.785
+            },
+            {
+              "step": 840,
+              "loss": 2.775
+            },
+            {
+              "step": 960,
+              "loss": 2.753
+            },
+            {
+              "step": 1080,
+              "loss": 2.737
+            },
+            {
+              "step": 1200,
+              "loss": 2.696
+            },
+            {
+              "step": 1320,
+              "loss": 2.704
+            },
+            {
+              "step": 1440,
+              "loss": 2.623
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.9187900602995498,
+            "A": 5.152380584461155,
+            "alpha": 0.2672909103745452,
+            "rmse": 0.022899759489143714,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.426900147451227,
+          "delta": -0.19609985254877316
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 1.953,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.478
+            },
+            {
+              "step": 240,
+              "loss": 2.328
+            },
+            {
+              "step": 360,
+              "loss": 2.226
+            },
+            {
+              "step": 480,
+              "loss": 2.135
+            },
+            {
+              "step": 600,
+              "loss": 2.099
+            },
+            {
+              "step": 720,
+              "loss": 2.068
+            },
+            {
+              "step": 840,
+              "loss": 2.033
+            },
+            {
+              "step": 960,
+              "loss": 2.029
+            },
+            {
+              "step": 1080,
+              "loss": 2.023
+            },
+            {
+              "step": 1200,
+              "loss": 2.01
+            },
+            {
+              "step": 1320,
+              "loss": 2.009
+            },
+            {
+              "step": 1440,
+              "loss": 1.953
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.5105386730845047,
+            "A": 4.175338112958464,
+            "alpha": 0.30323695323399225,
+            "rmse": 0.01622518687210577,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.8120787535706406,
+          "delta": -0.14092124642935944
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 2.926,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.963
+            },
+            {
+              "step": 240,
+              "loss": 3.665
+            },
+            {
+              "step": 360,
+              "loss": 3.444
+            },
+            {
+              "step": 480,
+              "loss": 3.31
+            },
+            {
+              "step": 600,
+              "loss": 3.209
+            },
+            {
+              "step": 720,
+              "loss": 3.165
+            },
+            {
+              "step": 840,
+              "loss": 3.132
+            },
+            {
+              "step": 960,
+              "loss": 3.121
+            },
+            {
+              "step": 1080,
+              "loss": 3.086
+            },
+            {
+              "step": 1200,
+              "loss": 3.047
+            },
+            {
+              "step": 1320,
+              "loss": 3.046
+            },
+            {
+              "step": 1440,
+              "loss": 2.926
+            }
+          ],
+          "step_law": {
+            "L_inf": 2.117138886382557,
+            "A": 8.153596139550496,
+            "alpha": 0.3086961027280996,
+            "rmse": 0.030361832868182795,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.678775000146367,
+          "delta": -0.24722499985363333
+        }
+      }
+    },
+    {
+      "id": 6,
+      "run_name": "probe_wiki",
+      "tag": "onehot_wiki",
+      "weights": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "macro_curve_6_measured": 2.171,
+      "macro_curve_6_chinchilla": 1.9760864567775747,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 2.057,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.636
+            },
+            {
+              "step": 240,
+              "loss": 2.465
+            },
+            {
+              "step": 360,
+              "loss": 2.3
+            },
+            {
+              "step": 480,
+              "loss": 2.228
+            },
+            {
+              "step": 600,
+              "loss": 2.189
+            },
+            {
+              "step": 720,
+              "loss": 2.137
+            },
+            {
+              "step": 840,
+              "loss": 2.149
+            },
+            {
+              "step": 960,
+              "loss": 2.108
+            },
+            {
+              "step": 1080,
+              "loss": 2.094
+            },
+            {
+              "step": 1200,
+              "loss": 2.092
+            },
+            {
+              "step": 1320,
+              "loss": 2.093
+            },
+            {
+              "step": 1440,
+              "loss": 2.057
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.7609164348150246,
+            "A": 7.342477984329424,
+            "alpha": 0.4408588113264761,
+            "rmse": 0.019554416331153488,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.9217972650975175,
+          "delta": -0.13520273490248247
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 1.877,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.564
+            },
+            {
+              "step": 240,
+              "loss": 2.405
+            },
+            {
+              "step": 360,
+              "loss": 2.155
+            },
+            {
+              "step": 480,
+              "loss": 2.127
+            },
+            {
+              "step": 600,
+              "loss": 2.073
+            },
+            {
+              "step": 720,
+              "loss": 2.018
+            },
+            {
+              "step": 840,
+              "loss": 2.084
+            },
+            {
+              "step": 960,
+              "loss": 1.961
+            },
+            {
+              "step": 1080,
+              "loss": 1.985
+            },
+            {
+              "step": 1200,
+              "loss": 1.984
+            },
+            {
+              "step": 1320,
+              "loss": 1.961
+            },
+            {
+              "step": 1440,
+              "loss": 1.877
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.5012555605649642,
+            "A": 6.591113980145871,
+            "alpha": 0.37812505418546033,
+            "rmse": 0.0404513561184662,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7499938340233692,
+          "delta": -0.12700616597663084
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.654,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.543
+            },
+            {
+              "step": 240,
+              "loss": 2.386
+            },
+            {
+              "step": 360,
+              "loss": 2.223
+            },
+            {
+              "step": 480,
+              "loss": 2.112
+            },
+            {
+              "step": 600,
+              "loss": 2.053
+            },
+            {
+              "step": 720,
+              "loss": 1.971
+            },
+            {
+              "step": 840,
+              "loss": 1.932
+            },
+            {
+              "step": 960,
+              "loss": 1.853
+            },
+            {
+              "step": 1080,
+              "loss": 1.818
+            },
+            {
+              "step": 1200,
+              "loss": 1.766
+            },
+            {
+              "step": 1320,
+              "loss": 1.817
+            },
+            {
+              "step": 1440,
+              "loss": 1.654
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.8270000000000027,
+            "A": 6.279131877253417,
+            "alpha": 0.26140622761821075,
+            "rmse": 0.05227081827290254,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.4786264560891966,
+          "delta": -0.1753735439108033
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.407,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.122
+            },
+            {
+              "step": 240,
+              "loss": 2.954
+            },
+            {
+              "step": 360,
+              "loss": 2.784
+            },
+            {
+              "step": 480,
+              "loss": 2.668
+            },
+            {
+              "step": 600,
+              "loss": 2.641
+            },
+            {
+              "step": 720,
+              "loss": 2.6
+            },
+            {
+              "step": 840,
+              "loss": 2.529
+            },
+            {
+              "step": 960,
+              "loss": 2.458
+            },
+            {
+              "step": 1080,
+              "loss": 2.47
+            },
+            {
+              "step": 1200,
+              "loss": 2.499
+            },
+            {
+              "step": 1320,
+              "loss": 2.457
+            },
+            {
+              "step": 1440,
+              "loss": 2.407
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.2035000000227394,
+            "A": 4.8095860337220335,
+            "alpha": 0.18959835328312458,
+            "rmse": 0.028162762810902405,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.1334997047240085,
+          "delta": -0.2735002952759915
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 1.817,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.371
+            },
+            {
+              "step": 240,
+              "loss": 2.244
+            },
+            {
+              "step": 360,
+              "loss": 2.11
+            },
+            {
+              "step": 480,
+              "loss": 2.047
+            },
+            {
+              "step": 600,
+              "loss": 1.986
+            },
+            {
+              "step": 720,
+              "loss": 1.939
+            },
+            {
+              "step": 840,
+              "loss": 1.924
+            },
+            {
+              "step": 960,
+              "loss": 1.877
+            },
+            {
+              "step": 1080,
+              "loss": 1.875
+            },
+            {
+              "step": 1200,
+              "loss": 1.878
+            },
+            {
+              "step": 1320,
+              "loss": 1.859
+            },
+            {
+              "step": 1440,
+              "loss": 1.817
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.908500000001076,
+            "A": 3.7374051222245,
+            "alpha": 0.19317855758467783,
+            "rmse": 0.01749550377683415,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.6090995283356897,
+          "delta": -0.20790047166431025
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 3.214,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 4.49
+            },
+            {
+              "step": 240,
+              "loss": 4.074
+            },
+            {
+              "step": 360,
+              "loss": 3.723
+            },
+            {
+              "step": 480,
+              "loss": 3.588
+            },
+            {
+              "step": 600,
+              "loss": 3.521
+            },
+            {
+              "step": 720,
+              "loss": 3.546
+            },
+            {
+              "step": 840,
+              "loss": 3.409
+            },
+            {
+              "step": 960,
+              "loss": 3.286
+            },
+            {
+              "step": 1080,
+              "loss": 3.384
+            },
+            {
+              "step": 1200,
+              "loss": 3.388
+            },
+            {
+              "step": 1320,
+              "loss": 3.23
+            },
+            {
+              "step": 1440,
+              "loss": 3.214
+            }
+          ],
+          "step_law": {
+            "L_inf": 2.642189743376486,
+            "A": 16.275860182796112,
+            "alpha": 0.4528885264391587,
+            "rmse": 0.05544238396136644,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.9635019523956676,
+          "delta": -0.25049804760433236
+        }
+      }
+    },
+    {
+      "id": 7,
+      "run_name": "ref_lgbstart",
+      "tag": "ref_lgbstart",
+      "weights": [
+        0.5528505096102141,
+        0.21178482308348515,
+        0.08723935826031831,
+        0.08163337756774411,
+        0.041786239404329344,
+        0.013571059505826967,
+        0.01113463256808213
+      ],
+      "macro_curve_6_measured": 2.0353333333333334,
+      "macro_curve_6_chinchilla": 1.8439694772783735,
+      "families": {
+        "arc_challenge": {
+          "measured_step": 1440,
+          "measured": 1.908,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.584
+            },
+            {
+              "step": 240,
+              "loss": 2.48
+            },
+            {
+              "step": 360,
+              "loss": 2.317
+            },
+            {
+              "step": 480,
+              "loss": 2.184
+            },
+            {
+              "step": 600,
+              "loss": 2.138
+            },
+            {
+              "step": 720,
+              "loss": 2.046
+            },
+            {
+              "step": 840,
+              "loss": 2.01
+            },
+            {
+              "step": 960,
+              "loss": 2.03
+            },
+            {
+              "step": 1080,
+              "loss": 2.052
+            },
+            {
+              "step": 1200,
+              "loss": 2.04
+            },
+            {
+              "step": 1320,
+              "loss": 1.982
+            },
+            {
+              "step": 1440,
+              "loss": 1.908
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.9540000000000001,
+            "A": 4.565449967408985,
+            "alpha": 0.20975355549295185,
+            "rmse": 0.043633323478859884,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.6953051169985751,
+          "delta": -0.2126948830014248
+        },
+        "arc_easy": {
+          "measured_step": 1440,
+          "measured": 1.871,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.601
+            },
+            {
+              "step": 240,
+              "loss": 2.404
+            },
+            {
+              "step": 360,
+              "loss": 2.207
+            },
+            {
+              "step": 480,
+              "loss": 2.103
+            },
+            {
+              "step": 600,
+              "loss": 2.059
+            },
+            {
+              "step": 720,
+              "loss": 2.056
+            },
+            {
+              "step": 840,
+              "loss": 2.029
+            },
+            {
+              "step": 960,
+              "loss": 2.063
+            },
+            {
+              "step": 1080,
+              "loss": 2.025
+            },
+            {
+              "step": 1200,
+              "loss": 2.051
+            },
+            {
+              "step": 1320,
+              "loss": 1.938
+            },
+            {
+              "step": 1440,
+              "loss": 1.871
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.6387921312690692,
+            "A": 9.013799400698383,
+            "alpha": 0.46462549771320477,
+            "rmse": 0.044834782198918705,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.7995286839100175,
+          "delta": -0.07147131608998247
+        },
+        "mmlu_humanities": {
+          "measured_step": 1440,
+          "measured": 1.439,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.406
+            },
+            {
+              "step": 240,
+              "loss": 2.229
+            },
+            {
+              "step": 360,
+              "loss": 2.15
+            },
+            {
+              "step": 480,
+              "loss": 2.058
+            },
+            {
+              "step": 600,
+              "loss": 1.977
+            },
+            {
+              "step": 720,
+              "loss": 1.91
+            },
+            {
+              "step": 840,
+              "loss": 1.74
+            },
+            {
+              "step": 960,
+              "loss": 1.633
+            },
+            {
+              "step": 1080,
+              "loss": 1.616
+            },
+            {
+              "step": 1200,
+              "loss": 1.626
+            },
+            {
+              "step": 1320,
+              "loss": 1.554
+            },
+            {
+              "step": 1440,
+              "loss": 1.439
+            }
+          ],
+          "step_law": {
+            "L_inf": 0.7195000000000006,
+            "A": 7.345522533861659,
+            "alpha": 0.2918414442461949,
+            "rmse": 0.09753137082190154,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.3050545857994007,
+          "delta": -0.13394541420059936
+        },
+        "mmlu_other": {
+          "measured_step": 1440,
+          "measured": 2.305,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.042
+            },
+            {
+              "step": 240,
+              "loss": 2.881
+            },
+            {
+              "step": 360,
+              "loss": 2.709
+            },
+            {
+              "step": 480,
+              "loss": 2.593
+            },
+            {
+              "step": 600,
+              "loss": 2.522
+            },
+            {
+              "step": 720,
+              "loss": 2.478
+            },
+            {
+              "step": 840,
+              "loss": 2.426
+            },
+            {
+              "step": 960,
+              "loss": 2.466
+            },
+            {
+              "step": 1080,
+              "loss": 2.463
+            },
+            {
+              "step": 1200,
+              "loss": 2.429
+            },
+            {
+              "step": 1320,
+              "loss": 2.37
+            },
+            {
+              "step": 1440,
+              "loss": 2.305
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.321055037572128,
+            "A": 4.836940120048326,
+            "alpha": 0.2133773402062155,
+            "rmse": 0.03603781704701135,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.0821601534688257,
+          "delta": -0.2228398465311745
+        },
+        "mmlu_social_sciences": {
+          "measured_step": 1440,
+          "measured": 1.729,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 2.32
+            },
+            {
+              "step": 240,
+              "loss": 2.176
+            },
+            {
+              "step": 360,
+              "loss": 2.061
+            },
+            {
+              "step": 480,
+              "loss": 1.939
+            },
+            {
+              "step": 600,
+              "loss": 1.892
+            },
+            {
+              "step": 720,
+              "loss": 1.856
+            },
+            {
+              "step": 840,
+              "loss": 1.812
+            },
+            {
+              "step": 960,
+              "loss": 1.831
+            },
+            {
+              "step": 1080,
+              "loss": 1.828
+            },
+            {
+              "step": 1200,
+              "loss": 1.81
+            },
+            {
+              "step": 1320,
+              "loss": 1.793
+            },
+            {
+              "step": 1440,
+              "loss": 1.729
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.1154649907065812,
+            "A": 4.288001165770703,
+            "alpha": 0.262144760335377,
+            "rmse": 0.026986850148198616,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 1.5576196974045087,
+          "delta": -0.17138030259549142
+        },
+        "mmlu_stem": {
+          "measured_step": 1440,
+          "measured": 2.96,
+          "curve_points": [
+            {
+              "step": 120,
+              "loss": 3.892
+            },
+            {
+              "step": 240,
+              "loss": 3.741
+            },
+            {
+              "step": 360,
+              "loss": 3.494
+            },
+            {
+              "step": 480,
+              "loss": 3.396
+            },
+            {
+              "step": 600,
+              "loss": 3.298
+            },
+            {
+              "step": 720,
+              "loss": 3.166
+            },
+            {
+              "step": 840,
+              "loss": 3.022
+            },
+            {
+              "step": 960,
+              "loss": 3.169
+            },
+            {
+              "step": 1080,
+              "loss": 3.153
+            },
+            {
+              "step": 1200,
+              "loss": 3.048
+            },
+            {
+              "step": 1320,
+              "loss": 3.007
+            },
+            {
+              "step": 1440,
+              "loss": 2.96
+            }
+          ],
+          "step_law": {
+            "L_inf": 1.4800000000021212,
+            "A": 6.449688905285861,
+            "alpha": 0.1995432681898717,
+            "rmse": 0.06322603408940365,
+            "n_points": 12
+          },
+          "chinchilla_step": 5806,
+          "chinchilla": 2.624148626088914,
+          "delta": -0.335851373911086
+        }
+      }
+    }
+  ]
+}

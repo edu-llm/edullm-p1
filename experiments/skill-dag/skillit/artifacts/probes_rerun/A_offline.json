@@ -1,0 +1,219 @@
+{
+  "formula": "A_ij = max(0, L_j(ref_lgbstart) - L_i_j) at Chinchilla step",
+  "reference": "ref_lgbstart",
+  "reference_losses": {
+    "arc_challenge": 1.6953051169985751,
+    "arc_easy": 1.7995286839100175,
+    "mmlu_humanities": 1.3050545857994007,
+    "mmlu_other": 2.0821601534688257,
+    "mmlu_social_sciences": 1.5576196974045087,
+    "mmlu_stem": 2.624148626088914
+  },
+  "chinchilla_step": 5806,
+  "chinchilla_losses": {
+    "ref_lgbstart": {
+      "arc_challenge": 1.6953051169985751,
+      "arc_easy": 1.7995286839100175,
+      "mmlu_humanities": 1.3050545857994007,
+      "mmlu_other": 2.0821601534688257,
+      "mmlu_social_sciences": 1.5576196974045087,
+      "mmlu_stem": 2.624148626088914
+    },
+    "probe_dclm": {
+      "arc_challenge": 1.7011208895579086,
+      "arc_easy": 1.7759204857030984,
+      "mmlu_humanities": 1.3689040251709492,
+      "mmlu_other": 2.0018866074110373,
+      "mmlu_social_sciences": 1.481695277209191,
+      "mmlu_stem": 2.6922638330541524
+    },
+    "probe_arxiv": {
+      "arc_challenge": 1.8573240176341068,
+      "arc_easy": 1.7574635792759397,
+      "mmlu_humanities": 1.5272871283933018,
+      "mmlu_other": 2.3690728936243963,
+      "mmlu_social_sciences": 1.7072364384055034,
+      "mmlu_stem": 2.527521522823972
+    },
+    "probe_starcoder": {
+      "arc_challenge": 2.2459142459534007,
+      "arc_easy": 2.285284187375277,
+      "mmlu_humanities": 1.5465912658298437,
+      "mmlu_other": 2.596053777160172,
+      "mmlu_social_sciences": 1.9519229191180454,
+      "mmlu_stem": 3.065144512635438
+    },
+    "probe_pes2o": {
+      "arc_challenge": 2.0884147748271733,
+      "arc_easy": 2.0371006180550433,
+      "mmlu_humanities": 1.484198910378863,
+      "mmlu_other": 2.218585644425632,
+      "mmlu_social_sciences": 1.6671277934648587,
+      "mmlu_stem": 2.8662094455257088
+    },
+    "probe_open-web-math": {
+      "arc_challenge": 1.870400570054211,
+      "arc_easy": 1.7616140896770247,
+      "mmlu_humanities": 1.5359838601614313,
+      "mmlu_other": 2.342647515100082,
+      "mmlu_social_sciences": 1.7320559192250988,
+      "mmlu_stem": 2.5462821708548717
+    },
+    "probe_algebraic-stack": {
+      "arc_challenge": 1.9602335341867283,
+      "arc_easy": 1.733818862751341,
+      "mmlu_humanities": 1.5263721697213164,
+      "mmlu_other": 2.426900147451227,
+      "mmlu_social_sciences": 1.8120787535706406,
+      "mmlu_stem": 2.678775000146367
+    },
+    "probe_wiki": {
+      "arc_challenge": 1.9217972650975175,
+      "arc_easy": 1.7499938340233692,
+      "mmlu_humanities": 1.4786264560891966,
+      "mmlu_other": 2.1334997047240085,
+      "mmlu_social_sciences": 1.6090995283356897,
+      "mmlu_stem": 2.9635019523956676
+    }
+  },
+  "domain_order": [
+    "dclm",
+    "arxiv",
+    "starcoder",
+    "pes2o",
+    "open-web-math",
+    "algebraic-stack",
+    "wiki"
+  ],
+  "family_order": [
+    "arc_challenge",
+    "arc_easy",
+    "mmlu_humanities",
+    "mmlu_other",
+    "mmlu_social_sciences",
+    "mmlu_stem"
+  ],
+  "A": [
+    [
+      0.0,
+      0.023608198206919173,
+      0.0,
+      0.08027354605778836,
+      0.07592442019531775,
+      0.0
+    ],
+    [
+      0.0,
+      0.042065104634077866,
+      0.0,
+      0.0,
+      0.0,
+      0.09662710326494217
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.037914594232992815,
+      0.0,
+      0.0,
+      0.0,
+      0.07786645523404223
+    ],
+    [
+      0.0,
+      0.06570982115867663,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.04953484988664836,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "rows_by_domain": {
+    "dclm": {
+      "arc_challenge": 0.0,
+      "arc_easy": 0.023608198206919173,
+      "mmlu_humanities": 0.0,
+      "mmlu_other": 0.08027354605778836,
+      "mmlu_social_sciences": 0.07592442019531775,
+      "mmlu_stem": 0.0
+    },
+    "arxiv": {
+      "arc_challenge": 0.0,
+      "arc_easy": 0.042065104634077866,
+      "mmlu_humanities": 0.0,
+      "mmlu_other": 0.0,
+      "mmlu_social_sciences": 0.0,
+      "mmlu_stem": 0.09662710326494217
+    },
+    "starcoder": {
+      "arc_challenge": 0.0,
+      "arc_easy": 0.0,
+      "mmlu_humanities": 0.0,
+      "mmlu_other": 0.0,
+      "mmlu_social_sciences": 0.0,
+      "mmlu_stem": 0.0
+    },
+    "pes2o": {
+      "arc_challenge": 0.0,
+      "arc_easy": 0.0,
+      "mmlu_humanities": 0.0,
+      "mmlu_other": 0.0,
+      "mmlu_social_sciences": 0.0,
+      "mmlu_stem": 0.0
+    },
+    "open-web-math": {
+      "arc_challenge": 0.0,
+      "arc_easy": 0.037914594232992815,
+      "mmlu_humanities": 0.0,
+      "mmlu_other": 0.0,
+      "mmlu_social_sciences": 0.0,
+      "mmlu_stem": 0.07786645523404223
+    },
+    "algebraic-stack": {
+      "arc_challenge": 0.0,
+      "arc_easy": 0.06570982115867663,
+      "mmlu_humanities": 0.0,
+      "mmlu_other": 0.0,
+      "mmlu_social_sciences": 0.0,
+      "mmlu_stem": 0.0
+    },
+    "wiki": {
+      "arc_challenge": 0.0,
+      "arc_easy": 0.04953484988664836,
+      "mmlu_humanities": 0.0,
+      "mmlu_other": 0.0,
+      "mmlu_social_sciences": 0.0,
+      "mmlu_stem": 0.0
+    }
+  },
+  "npy": "A_offline.npy",
+  "shape": [
+    7,
+    6
+  ],
+  "eta_default": 0.2,
+  "w_default": 1.0
+}

@@ -436,6 +436,11 @@ def init_wandb(args: argparse.Namespace, meta: dict, out_dir: Path):
 
         import wandb
 
+        # OLMo's Trainer.close() calls wandb.finish(quiet=...), which newer wandb rejects; that
+        # crashed ref_lgbstart after its final eval and checkpoint. Drop the argument.
+        _finish = wandb.finish
+        wandb.finish = lambda *a, quiet=None, **k: _finish(*a, **k)
+
         id_file = out_dir / "wandb_run_id.txt"
         # wandb.util.generate_id was removed from newer wandb releases, so make the id here.
         run_id = id_file.read_text().strip() if id_file.exists() else secrets.token_hex(4)

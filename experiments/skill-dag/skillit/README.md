@@ -80,7 +80,21 @@ at the trained model's \(N_{\text{non-emb}} = 76{,}296{,}576\):
 
 The rows for arXiv, StarCoder and Algebraic Stack are all zeros, and so are the columns for ARC Challenge and MMLU Social Sciences: no single domain beats the probe trained on the LightGBM starting mixture on those skills at Chinchilla scale. OpenWebMath and pes2o carry most of the edges. Density: 8 of 42 cells (19%) are nonzero.
 
-**Rerun, and status of this matrix.** The first 128 items of each validation split turned out not to be representative. Scoring the eight probes' step-1451 checkpoints on every item of those splits ([`probe_subset_sensitivity.py`](probe_subset_sensitivity.py); results in [`artifacts/probe_subset_sensitivity/`](artifacts/probe_subset_sensitivity/report.txt)) puts the in-run subset at z = +4.6 on MMLU humanities and z = −4.2 on social sciences against random 128-item subsets of the same split. At step 1451, with the measured losses and no extrapolation, the matrix on every item has 3 nonzero cells (OpenWebMath → ARC Challenge, ARC Easy and MMLU STEM) against 5 on the in-run subset; the edges outside those three change with the choice of items. The 7 one-hot probes were therefore rerun with every item of the test split ([`../domain_probes/`](../domain_probes/README.md), 1440 steps). The matrix above, and the Offline probe arm that used it, come from the earlier probes and have **not been rebuilt**: rebuilding needs a reference run at the refit LightGBM optimum, which has not been trained (the refit moved that optimum, see [`../mixlaw/README.md`](../mixlaw/README.md#earlier-fit-versus-refit)).
+**Rerun, and status of this matrix.** The first 128 items of each validation split turned out not to be representative. Scoring the eight probes' step-1451 checkpoints on every item of those splits ([`probe_subset_sensitivity.py`](probe_subset_sensitivity.py); results in [`artifacts/probe_subset_sensitivity/`](artifacts/probe_subset_sensitivity/report.txt)) puts the in-run subset at z = +4.6 on MMLU humanities and z = −4.2 on social sciences against random 128-item subsets of the same split. At step 1451, with the measured losses and no extrapolation, the matrix on every item has 3 nonzero cells (OpenWebMath → ARC Challenge, ARC Easy and MMLU STEM) against 5 on the in-run subset; the edges outside those three change with the choice of items. The 7 one-hot probes, and a reference probe `ref_lgbstart` at the same LightGBM starting mixture (`LGB-min1pct`), were therefore rerun with every item of the test split ([`../domain_probes/`](../domain_probes/README.md), 1440 steps).
+
+**Rebuilt matrix** (rerun probes against `ref_lgbstart`, Chinchilla step 5806; [`artifacts/probes_rerun/`](artifacts/probes_rerun/A_offline.json), `build_adjacency.py --reference-run ref_lgbstart`):
+
+| domain \\ family | arc_challenge | arc_easy | mmlu_humanities | mmlu_other | mmlu_social_sciences | mmlu_stem |
+|------------------|--------------:|---------:|----------------:|-----------:|---------------------:|----------:|
+| dclm | 0.000 | 0.024 | 0.000 | 0.080 | 0.076 | 0.000 |
+| arxiv | 0.000 | 0.042 | 0.000 | 0.000 | 0.000 | 0.097 |
+| starcoder | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| pes2o | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| open-web-math | 0.000 | 0.038 | 0.000 | 0.000 | 0.000 | 0.078 |
+| algebraic-stack | 0.000 | 0.066 | 0.000 | 0.000 | 0.000 | 0.000 |
+| wiki | 0.000 | 0.050 | 0.000 | 0.000 | 0.000 | 0.000 |
+
+It has 9 nonzero cells against 8, and 4 of them are shared with the matrix above (DCLM, OpenWebMath and Wikipedia → ARC Easy; OpenWebMath → MMLU STEM); the correlation between the two is 0.29. New edges: DCLM → MMLU Other and Social Sciences, arXiv → ARC Easy and MMLU STEM, Algebraic Stack → ARC Easy. Dropped: pes2o → ARC Easy and MMLU STEM, OpenWebMath → MMLU Other, Wikipedia → MMLU Humanities. The 370M Offline probe arm ran with the matrix above (`artifacts/probes_full/`), not this one, and was not rerun.
 
 ### Online mixing-law derivative
 

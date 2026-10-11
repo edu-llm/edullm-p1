@@ -1,5 +1,5 @@
 {
- "description": "31 DataDecide-60M domain-mixture runs: 7 one-hot Skill-It probes, then the 24 MixLaw pilots (weights from mixlaw/mixtures.json). One trainer (train_60m.py), one set of settings.",
+ "description": "32 DataDecide-60M domain-mixture runs: 7 one-hot Skill-It probes, the 24 mixture probes (weights from mixlaw/mixtures.json), then one reference probe at the LightGBM starting mixture of the 370M Skill-It arms (LGB-min1pct in mixlaw/validation_mixtures_10b.json), the reference of the probe matrix. One trainer (train_60m.py), one set of settings.",
  "dataset": {
   "id": "pretrain/olmo-127b",
   "version": "v1"
@@ -461,6 +461,20 @@
     0.05,
     0.35,
     0.0094
+   ]
+  },
+  {
+   "name": "ref_lgbstart",
+   "kind": "reference",
+   "tag": "LGB-min1pct",
+   "weights": [
+    0.5528505096102141,
+    0.21178482308348515,
+    0.08723935826031831,
+    0.08163337756774411,
+    0.041786239404329344,
+    0.013571059505826967,
+    0.01113463256808213
    ]
   }
  ]

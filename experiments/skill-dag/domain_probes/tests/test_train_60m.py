@@ -10,13 +10,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import train_60m as t  # noqa: E402
 
 
-def test_registry_has_31_runs_one_hots_first():
+def test_registry_one_hots_then_pilots_then_reference():
     reg = t.load_registry()
     names = [r["name"] for r in reg["runs"]]
-    assert len(names) == 31
+    assert len(names) == 32
     assert names[:7] == [f"onehot_{d}" for d in reg["domains"]]
-    assert names[7:] == [f"mix{i:02d}" for i in range(1, 25)]
-    assert not any("lgb" in n for n in names)
+    assert names[7:31] == [f"mix{i:02d}" for i in range(1, 25)]
+    assert names[31] == "ref_lgbstart"
     for r in reg["runs"][:7]:
         assert sorted(r["weights"]) == [0.0] * 6 + [1.0]
     st = reg["settings"]
@@ -30,6 +30,13 @@ def test_pilot_weights_match_mixlaw_mixtures():
     mix = json.loads((Path(__file__).resolve().parents[2] / "mixlaw" / "mixtures.json").read_text())
     pilots = [r for r in reg["runs"] if r["kind"] == "pilot"]
     assert [p["weights"] for p in pilots] == [m["weights"] for m in mix["mixtures"]]
+
+
+def test_reference_is_the_370m_lightgbm_start_mixture():
+    reg = t.load_registry()
+    vm = json.loads((Path(__file__).resolve().parents[2] / "mixlaw" / "validation_mixtures_10b.json").read_text())
+    lgb = next(m for m in vm["mixtures"] if m["run_name"] == "LGB-min1pct")
+    assert t.get_run(reg, "ref_lgbstart")["weights"] == lgb["weights"]
 
 
 def test_schedule_is_10_80_10():

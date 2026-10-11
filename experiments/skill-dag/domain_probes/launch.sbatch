@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launcher for the 31 domain-probe runs on one FarmShare L40S each.
+# Launcher for the domain-probe runs in runs.json (31 runs plus the ref_lgbstart reference, index 31) on one FarmShare L40S each.
 #
 #   MODE=smoke  sbatch --job-name=domsmoke ... launch.sbatch   # 60-step check, picks the microbatch
 #   MODE=array  sbatch --job-name=domprobe --array=0-30%1 ... launch.sbatch

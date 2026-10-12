@@ -129,7 +129,8 @@ Because \(A\) depends on \(r\), a single printed derivative matrix is a snapshot
 the reference point has to be stated. Both matrices here refer to the same mixture,
 `LGB-min1pct`, the LightGBM-optimized mixture both arms start from: the offline
 matrix compares each one-hot probe with the probe trained on that mixture, and the
-derivative matrix is the one the derivative arm used at its first update (step 500).
+derivative matrix is taken at those starting weights. The arm trains on them unchanged until its
+first update at step 500, so this is also the matrix that update used.
 Run [`compare_offline_online_A.py`](compare_offline_online_A.py) to regenerate it.
 
 | Derivative matrix, evaluated at `LGB-min1pct` | Density | Pearson \(r\) vs offline probe \(A\) | Edge-presence disagreements |

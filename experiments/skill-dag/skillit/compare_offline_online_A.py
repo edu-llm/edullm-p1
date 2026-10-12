@@ -4,8 +4,8 @@
 The online matrix is a *snapshot*: ``A_ij = max(0, -t_ij (L_j(r) - c_j))`` depends
 on the mixture ``r`` it is evaluated at, and the derivative arm recomputes it at the
 current weights on every update. It is evaluated here at ``LGB-min1pct``, the
-LightGBM-optimized mixture both Skill-It arms start from (the matrix the derivative arm
-uses at its first update, step 500, and the one Figure IV plots). The offline matrix is
+LightGBM-optimized mixture both Skill-It arms start from (the weights are unchanged until
+the derivative arm's first update at step 500, so that update uses this matrix; Figure IV plots it). The offline matrix is
 the probe arm's: each one-hot probe's extrapolated loss compared with the probe trained
 on the same LightGBM mixture (``build_adjacency.py --reference-run probe_lgb_start``),
 so both panels refer to the same mixture.

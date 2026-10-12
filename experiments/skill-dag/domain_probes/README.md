@@ -4,7 +4,7 @@ One trainer ([`train_60m.py`](train_60m.py)), one launcher ([`launch.sbatch`](la
 one list of runs ([`runs.json`](runs.json)) produce every 60M run in the skill-dag experiments:
 
 - **24 mixture probes** `mix01`–`mix24`, the designed mixtures of [`../mixlaw/`](../mixlaw/README.md#mixture-sampling)
-  (weights in [`../mixlaw/mixtures.json`](../mixlaw/mixtures.json)). The mixing-law and LightGBM models are fit on them.
+  (weights in [`../mixlaw/mixtures.json`](../mixlaw/mixtures.json)). The mixing-law and LightGBM regressions are fit on them.
 - **7 one-hot probes** `onehot_<domain>`, 100% of one domain each. The Skill-It probe matrix
   ([`../skillit/`](../skillit/README.md)) compares them with a reference run.
 - **1 reference probe** `ref_lgbstart` at `LGB-min1pct`, the LightGBM starting mixture of the two 370M Skill-It arms

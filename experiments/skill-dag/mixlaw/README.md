@@ -81,7 +81,7 @@ after all 2384 steps had trained and the step-2384 eval had been logged.
 
 ## Proxy probes (DataDecide-60M)
 
-24 designed mixtures over the same 7 domains, each trained as a **DataDecide-60M** proxy and scored on OLMo-ladder task-loss (bits-per-byte). The 24 mixture probes and the 7 one-hot probes of the Skill-It matrix come from one trainer and one launcher, [`../domain_probes/`](../domain_probes/README.md). Models are fit on **Chinchilla-extrapolated** family losses (step 5806, tokens/param = 20).
+24 designed mixtures over the same 7 domains, each trained as a **DataDecide-60M** proxy and scored on OLMo-ladder task-loss (bits-per-byte). The 24 mixture probes and the 7 one-hot probes of the Skill-It matrix come from one trainer and one launcher, [`../domain_probes/`](../domain_probes/README.md). Regressions are fit on **Chinchilla-extrapolated** family losses (step 5806, tokens/param = 20).
 
 **This section describes the rerun of the mixture probes.** The 370M arms above were trained at the optima of an earlier fit, whose probes ran 1451 steps on different hardware and an older data path and scored only the first 128 items of each validation split. That prefix is not representative of the split, so all 31 probes were rerun with every item of the test split ([why, and the setup](../domain_probes/README.md)). The 370M runs were not repeated; [Earlier fit versus refit](#earlier-fit-versus-refit) compares the two sets of optima.
 
@@ -186,9 +186,9 @@ Weights sum to 1.
 
 ---
 
-## Model fits
+## Regression fits
 
-Two models map 7-domain weights → six Chinchilla-extrapolated losses.
+Two regressions map 7-domain weights → six Chinchilla-extrapolated losses.
 
 | | Mixing law | LightGBM |
 |---|---|---|
@@ -295,12 +295,12 @@ LOO grid (144 configs): hand-picked default macro LOO RMSE 0.0466 → selected 0
 
 ### Mixture optima and near-optimal candidates
 
-Model optima plus nearby mixtures (within +0.04 bpb of that model’s optimum and ≥ 8 pp ($L_\infty$) from the optimum). None exactly match a probe point.
+Regression optima plus nearby mixtures (within +0.04 bpb of that model’s optimum and ≥ 8 pp ($L_\infty$) from the optimum). None exactly match a probe point.
 
 #### Table I: the four 370M mixtures
 
-The 370M arms were trained at the optima of the earlier fit. Table I scores them with the refit models and adds the refit optima. The predicted
-macro is each model's Chinchilla-extrapolated 60M prediction, so the two columns are on different scales. The models disagree on
+The 370M arms were trained at the optima of the earlier fit. Table I scores them with the refit regressions and adds the refit optima. The predicted
+macro is each regression's Chinchilla-extrapolated 60M prediction, so the two columns are on different scales. The regressions disagree on
 the natural mixture: the mixing law predicts it better than every probe and than its own 1%-floor optimum below (the natural mixture
 puts less than 1% on wiki, which the floor forbids), while LightGBM predicts it behind its own optimum.
 
@@ -313,7 +313,7 @@ puts less than 1% on wiki, which the floor forbids), while LightGBM predicts it 
 | refit MixLaw optimum | 1.7191 | 1.8027 | 0.940 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 |
 | refit LightGBM optimum | 1.7863 | 1.7690 | 0.551 | 0.179 | 0.159 | 0.019 | 0.033 | 0.050 | 0.010 |
 
-**Selection rule.** Both models are minimized with a 1% per-domain floor,
+**Selection rule.** Both regressions are minimized with a 1% per-domain floor,
 so every domain stays in the mixture, and the 30% Wikipedia cap
 (`MIXTURE_OPT_CONSTRAINTS` in `mixlaw_common.py`). The row labelled "optimum"
 in each table below is that minimizer. The refit MixLaw
@@ -321,7 +321,7 @@ optimum puts 94% of the mixture in DCLM and every other domain at the 1% floor, 
 DCLM weight across the 24 probes, so it extrapolates far beyond the probe grid. (The earlier fit's MixLaw optimum, the one trained at 370M, held arXiv,
 StarCoder and Algebraic Stack at the floor and put Wikipedia at the 30% cap, beyond the 12.2% maximum across the probes.)
 
-The LightGBM model is piecewise constant, so its minimum is a region, not a
+The LightGBM regression is piecewise constant, so its minimum is a region, not a
 point: near-opt 1 below predicts 1.7683 (the optimum: 1.7690) while moving up to
 7.0 pp of weight per domain, and all eight near-optimal mixtures lie within
 0.0050 bpb of the optimum, against a macro LOO RMSE of 0.0395. Its argmin is weakly
@@ -357,7 +357,7 @@ identified. Treat the specific LightGBM weight vector accordingly.
 
 ### Random-simplex plausibility
 
-1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Both models predict the Chinchilla-extrapolated loss, so they are compared against the probes' Chinchilla-extrapolated macro range, **1.7567 - 1.9930 bpb** (the raw observed probe range, 1.9768 - 2.1857 bpb, is on a different basis).
+1000 mixtures ~ Dirichlet(1,…,1) on the 7-simplex (seed 42). Both regressions predict the Chinchilla-extrapolated loss, so they are compared against the probes' Chinchilla-extrapolated macro range, **1.7567 - 1.9930 bpb** (the raw observed probe range, 1.9768 - 2.1857 bpb, is on a different basis).
 
 | Metric | Mixing law | LightGBM |
 |--------|-----------:|---------:|
@@ -371,7 +371,7 @@ identified. Treat the specific LightGBM weight vector accordingly.
 | Mixtures with macro > 3 bpb | 0 | 0 |
 | Mixtures with macro > 5 bpb | 0 | 0 |
 
-Off-hull predictions stay bounded. The best measured probe (`mix06`) has an extrapolated macro of 1.7567. The mixing law's optimum is predicted 0.0376 bpb below it, less than the mixing law's macro LOO RMSE (0.0422); LightGBM's optimum is predicted at 1.7690, not below that probe. A claimed gain of a model optimum over the best measured probe is **not distinguishable from LOO error** at 60M scale, hence the 370M validation.
+Off-hull predictions stay bounded. The best measured probe (`mix06`) has an extrapolated macro of 1.7567. The mixing law's optimum is predicted 0.0376 bpb below it, less than the mixing law's macro LOO RMSE (0.0422); LightGBM's optimum is predicted at 1.7690, not below that probe. A claimed gain of a regression optimum over the best measured probe is **not distinguishable from LOO error** at 60M scale, hence the 370M validation.
 
 ### Probe mixtures ranked by predicted macro (top 12)
 
@@ -392,9 +392,9 @@ Off-hull predictions stay bounded. The best measured probe (`mix06`) has an extr
 
 ### Earlier fit versus refit
 
-The earlier fit used probes of 1451 steps scored on the first 128 items of each validation split; the refit uses the 1440-step reruns scored on every test item. Both fit the same two models to the same 24 mixtures. Optima under the same constraints (1% floor, 30% Wikipedia cap):
+The earlier fit used probes of 1451 steps scored on the first 128 items of each validation split; the refit uses the 1440-step reruns scored on every test item. Both fit the same two regressions to the same 24 mixtures. Optima under the same constraints (1% floor, 30% Wikipedia cap):
 
-| Model | Fit | pred. macro | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
+| Regression | Fit | pred. macro | dclm | arxiv | starcoder | pes2o | open-web-math | algebraic-stack | wiki |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | MixLaw | earlier | 1.7984 | 0.556 | 0.010 | 0.010 | 0.092 | 0.023 | 0.010 | 0.300 |
 | MixLaw | refit | 1.7191 | 0.940 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 | 0.010 |
@@ -424,7 +424,7 @@ Recipe domain weights for the four 370M mixtures that were trained (`validation_
 - **Olmo-mix-1124 (control)** — hold mix fixed at the natural Olmo-mix-1124 corpus proportions (very DCLM-heavy); run at data seeds 42 and 69 and reported as their average.
 - **Data Mixing Laws paper** — hold domain mix fixed at the Data Mixing Laws paper proportions (Probe 01). That paper's published optimal split (CommonCrawl 0.1250, C4 0.2500, GitHub 0.1406, arXiv 0.2500, Books 0.0938, StackExchange 0.1250, Wikipedia 0.0156) is mapped onto our domains by semantic category: CommonCrawl + C4 → DCLM, GitHub → StarCoder, Books → pes2o, StackExchange → OpenWebMath (0.0635) + Algebraic Stack (0.0615), arXiv and Wikipedia directly.
 - **MixLaw** — train the 1%-floor MixLaw optimum. Method from [Ye et al., Data Mixing Laws](https://arxiv.org/abs/2403.16952).
-- **LightGBM** — train the 1%-floor LightGBM optimum. Method from [Liu et al., RegMix](https://arxiv.org/abs/2407.01492) (regression / tree model over mixture probes).
+- **LightGBM** — train the 1%-floor LightGBM optimum. Method from [Liu et al., RegMix](https://arxiv.org/abs/2407.01492) (tree regression over mixture probes).
 
 ---
 
@@ -466,7 +466,7 @@ shared generator.
 
 Lower is better. All three optimized static mixtures finish **behind** the
 Olmo-mix-1124 control. The two fitted-law arms were both minimized under a 1% per-domain floor and the 30%
-Wikipedia cap (one rule for every model), and neither beats the control.
+Wikipedia cap (one rule for every regression), and neither beats the control.
 
 **Seed-variance reference.** The two control seeds differ by 0.0105 bpb
 (seed 42 minus seed 69, 95% CI [+0.0023, +0.0193], $p = 0.0095$). They differ
@@ -552,7 +552,7 @@ At this scale and budget, **neither mixing-law nor LightGBM optimization over th
 under the matched one-epoch 370M budget: the MixLaw optimum finishes clearly behind
 the two-seed control, as does the Data Mixing Laws paper mixture, and the LightGBM
 optimum finishes behind it by a margin comparable to the control-seed difference.
-Two features of the design may matter and were not isolated here: the models'
+Two features of the design may matter and were not isolated here: the regressions'
 predicted gains over the best measured probe are not distinguishable from their
 leave-one-out error at 60M scale (see Random-simplex plausibility; the refit gives the same picture), and the MixLaw
 optimum trained at 370M, from the earlier fit, puts Wikipedia at the 30% cap, beyond the 12.2% maximum across the probes (the refit MixLaw optimum instead sits at 94% DCLM).

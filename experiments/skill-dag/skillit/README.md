@@ -98,7 +98,7 @@ It has 9 nonzero cells against 8, and 4 of them are shared with the matrix above
 
 ### Online mixing-law derivative
 
-Reuse the parametric MixLaw model per family \(j\):
+Reuse the parametric MixLaw regression per family \(j\):
 
 \[
 L_j(r) = c_j + k_j \exp\!\Big(\sum_i t_{ij} r_i\Big)

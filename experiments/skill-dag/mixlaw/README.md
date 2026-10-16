@@ -83,7 +83,7 @@ after all 2384 steps had trained and the step-2384 eval had been logged.
 
 24 designed mixtures over the same 7 domains, each trained as a **DataDecide-60M** proxy and scored on OLMo-ladder task-loss (bits-per-byte). The 24 mixture probes and the 7 one-hot probes of the Skill-It matrix come from one trainer and one launcher, [`../domain_probes/`](../domain_probes/README.md). Regressions are fit on **Chinchilla-extrapolated** family losses (step 5806, tokens/param = 20).
 
-**This section describes the rerun of the mixture probes.** The 370M arms above were trained at the optima of an earlier fit, whose probes ran 1451 steps on different hardware and an older data path and scored only the first 128 items of each validation split. That prefix is not representative of the split, so all 31 probes were rerun with every item of the test split ([why, and the setup](../domain_probes/README.md)). The 370M runs were not repeated; [Earlier fit versus refit](#earlier-fit-versus-refit) compares the two sets of optima.
+**This section describes the rerun of the mixture probes.** The 370M arms above were trained at the optima of an earlier fit, whose probes ran 1451 steps on different hardware and an older data path and scored only the first 128 items of each validation split. That prefix is not representative of the split, so all 32 probes (the 24 mixture probes, the 7 one-hot probes and the reference probe `ref_lgbstart`) were rerun with every item of the test split ([why, and the setup](../domain_probes/README.md)). The 370M runs were not repeated; [Earlier fit versus refit](#earlier-fit-versus-refit) compares the two sets of optima.
 
 ### Proxy architecture
 

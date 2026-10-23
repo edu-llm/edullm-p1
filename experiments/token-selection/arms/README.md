@@ -66,9 +66,6 @@ check, and the 2360-step ladder.
   against the mean and standard deviation of tokens at its own position from the
   model's own immediately preceding training step (`AttentionPositionBaseline`, no
   smoothing), falling back to the uniform-attention prior only on a run's first step.
-  The pre-production diagnostic `farmshare/attention_diagnostic.py`, run against a
-  trained checkpoint, puts every position bin between 56.8% and 63.6% keep rate under
-  this score.
 - **BLADE.** The reference's own training term is selection-weighted (Wang et al.
   2026, Sec. 2.2), scored against the *outgoing* reference before it is overwritten by
   the sync. Syncs run at steps 0/400/800/1200/1600/2000, so BLADE selects at the same

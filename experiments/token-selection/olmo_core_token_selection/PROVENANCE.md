@@ -60,10 +60,7 @@ FarmShare directories verified against this repository's
   immediately preceding training step (`AttentionPositionBaseline`, no extra
   forward pass, no smoothing), with the uniform-attention prior used only on a
   run's first step. Trained attention is recency-biased, so a uniform-attention
-  normalizer alone leaves the score position-confounded; the pre-production
-  diagnostic `farmshare/attention_diagnostic.py`, run against a trained
-  checkpoint, puts every position bin between 56.8% and 63.6% keep rate under
-  this score.
+  normalizer alone leaves the score position-confounded.
 - **BLADE** (`blade.py`). Syncs at steps 0/400/800/1200/1600/2000 (`tau=400`,
   `K=75`), so it selects from step 0 at the same 60% budget as every other arm.
   The reference's own training term is selection-weighted (Wang et al. 2026,

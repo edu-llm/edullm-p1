@@ -1,7 +1,7 @@
 # Token selection 370M on FarmShare (4 × L40S)
 
 Every arm below runs on one 4×L40S node, through
-`token_selection_entrypoint.py`. There is no RunPod path and no AWS/S3 code in
+`token_selection_entrypoint.py`. There is no RunPod path in
 this tree; corpora are pinned local FarmShare directories, verified once and
 bound into `ready.json` by `stage_local.py`, and the reference checkpoint is
 trained by the `instruct-reference` arm below, not downloaded.

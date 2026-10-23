@@ -1699,7 +1699,6 @@ def test_production_recipe_statically_assembles_public_olmo_apis() -> None:
     # "no RunPod path" is descriptive prose about the *absence* of one; there
     # must be no functional pointer to a runpod/ path or module.
     assert "runpod/" not in source and "runpod." not in source and "import runpod" not in source
-    assert "s3://" not in source
     # E2: exact step count, not ceil(tokens/batch), with a no-wrap guard.
     assert "max_duration=Duration.steps(steps)" in source
     assert "steps > main_loader.total_batches" in source

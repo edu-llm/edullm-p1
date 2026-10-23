@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Laptop-side submit: sync code, push the W&B session, stage inputs, launch training.
 #
-# No AWS session is pushed: staging is local file verification only.
+# Staging is local file verification only.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -53,8 +53,8 @@ dedup, no upsampling. Domains: `general`, `math`, `code`, `science`, `chat`
 Published (v3) object layout: each `<split>.npy` is byte-split into 1 GiB
 (`1_073_741_824`-byte) shards named `tokens/<source>/<domain>/<split>-NNNNN.u32le.bin`
 (`publish_refhq_new.py: split_npy_to_shards`); see `outputs.json`'s
-`v3_objects` per output (derived directly from the verified `.npy` bytes, not
-re-fetched from S3 -- the rebuild only depends on public HF data).
+`v3_objects` per output (derived directly from the verified `.npy` bytes; the
+rebuild only depends on public HF data).
 
 ## As-built quirks (recorded, not "fixed")
 

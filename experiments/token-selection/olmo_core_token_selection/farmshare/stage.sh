@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bind the local, pinned FarmShare corpus directories into ready.json.
 #
-# No download and no AWS: STAGE_MODE=corpora (the default) just verifies the
+# No download: STAGE_MODE=corpora (the default) just verifies the
 # pinned source files exist and records their sizes. STAGE_MODE=references
 # additionally materializes the reference checkpoint trained by the
 # instruct-reference arm; run it only after that arm has finished.

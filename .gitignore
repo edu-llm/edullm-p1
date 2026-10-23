@@ -9,7 +9,6 @@ logs/
 .local-sample-v1/
 .local-sample-v2/
 .raw-import-stage/
-.aws-smoke-test/
 .terraform/
 *.tfstate
 *.tfstate.*
@@ -17,9 +16,6 @@ logs/
 .local-sample-v4/
 .local-sample-v5/
 .local-sample-v6/
-aws-session.env
-aws-session.env.*
-.aws-session.env.*
 .tmp/
 farmshare.env
 .cursor/

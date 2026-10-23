@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Download one OLMo-mix shard from Hugging Face into local scratch.
 
-Used as a Slurm array worker. Does not touch AWS.
+Used as a Slurm array worker.
 """
 
 from __future__ import annotations

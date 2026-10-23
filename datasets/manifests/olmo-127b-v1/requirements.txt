@@ -2,9 +2,8 @@
 #   /usr/bin/python3.12 -m venv venv && venv/bin/pip install -r requirements.txt
 #
 # Exact versions of the venv that ran the real (working) FarmShare tokenize job
-# (olmohq-topup-20260728-185642/venv), minus AWS-only packages (boto3, botocore,
-# s3transfer, jmespath) that rebuild.py never imports -- this rebuild reads
-# public Hugging Face Hub data only, no S3/AWS of any kind.
+# (olmohq-topup-20260728-185642/venv), minus packages that rebuild.py never
+# imports -- this rebuild reads public Hugging Face Hub data only.
 annotated-doc==0.0.5
 anyio==4.14.2
 certifi==2026.7.22

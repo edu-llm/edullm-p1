@@ -9,9 +9,6 @@ Protocol:
 * Persist ``wandb_run_id.txt`` under the progress/output dir for resume.
 * Log train metrics, task-loss eval metrics (+ artifact), and complete
   checkpoint directories (+ model artifact).
-
-S3 is input-only: it may stage published training data and bootstrap references
-at run start, but is never used for checkpoints, progress, evals, or resume.
 """
 
 from __future__ import annotations
@@ -508,7 +505,7 @@ def wandb_log_directory_artifact(
     aliases: Optional[Sequence[str]] = None,
     strict: bool = False,
 ) -> Any | None:
-    """Upload a local progress/eval directory without any S3 side channel."""
+    """Upload a local progress/eval directory."""
     source = Path(path)
     if run is None or _wandb is None:
         if strict:

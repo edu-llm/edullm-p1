@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the local, no-S3 input manifest every token-selection arm reads from.
+"""Build the local input manifest every token-selection arm reads from.
 
 Two modes, run in order:
 
@@ -16,8 +16,7 @@ Two modes, run in order:
                       symbolic reference contract name. Run this only after
                       that arm's training has finished.
 
-Every path here is local; there is no boto3, no S3 URI, and no edullm_data
-import in this file or anywhere else in this tree.
+Every path here is local.
 """
 
 from __future__ import annotations

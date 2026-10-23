@@ -2,9 +2,8 @@
 
 Every arm below runs through the same entrypoint, the same
 ``TokenWeightedTrainModule``, and the same FarmShare 4xL40S hardware contract
-(``PRODUCTION_WORLD_SIZE`` in ``recipe.py``). There is no RunPod path and no
-AWS/S3 code anywhere in this tree: corpora are read from local FarmShare
-paths staged by ``farmshare/stage_local.py``, bound by the per-file sha256
+(``PRODUCTION_WORLD_SIZE`` in ``recipe.py``). There is no RunPod path in this
+tree: corpora are read from local FarmShare paths staged by ``farmshare/stage_local.py``, bound by the per-file sha256
 recorded in this repository's ``datasets/manifests/<corpus>/outputs.json``.
 """
 
@@ -29,7 +28,7 @@ REFHQ_INSTRUCT = "pretrain/refhq-instruct"
 
 # Symbolic reference contract, resolved to a local, materialized .pt file by
 # farmshare/stage_local.py once instruct-reference has produced the
-# checkpoint. Nothing here is an S3 URI.
+# checkpoint.
 INSTRUCT_REFERENCE_CONTRACT = "instruct-reference-370m/checkpoints/step940"
 # Symbolic contract for the offline per-instance reference-loss table (see
 # token_selection_370m/reference_scores.py), resolved to a local directory by

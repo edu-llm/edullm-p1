@@ -1,8 +1,7 @@
 """Local-scratch and W&B durability primitives for token-selection runs.
 
-S3 is deliberately absent from this module. Training data and immutable
-bootstrap references may be staged from S3 at run start; checkpoints, progress,
-evals, durable markers, and resume state remain on runtime scratch and W&B.
+Checkpoints, progress, evals, durable markers, and resume state remain on
+runtime scratch and W&B.
 """
 
 from __future__ import annotations

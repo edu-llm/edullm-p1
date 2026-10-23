@@ -4,7 +4,7 @@
 Corpora are read from a local manifest (``ready.json``) staged onto FarmShare
 scratch by ``farmshare/stage_local.py`` from the local corpus directories
 pinned in ``datasets/manifests/<corpus>/outputs.json``. There is no RunPod
-path, no S3, and no ``edullm_data`` anywhere in this tree.
+path in this tree.
 """
 
 from __future__ import annotations

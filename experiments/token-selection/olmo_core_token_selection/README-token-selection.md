@@ -10,7 +10,7 @@ global batch 4,194,304 tokens. Optimization is SkipStepAdamW at peak LR
 parameters/fp32 reductions, and compilation enabled.
 
 Every run trains on FarmShare, through `token_selection_entrypoint.py` (see
-`.edullm/farmshare/`). There is no RunPod path, no AWS/S3 code, and no
+`.edullm/farmshare/`). There is no RunPod path and no
 separate submission platform anywhere in this tree: corpora are pinned
 local FarmShare directories, and the reference checkpoint
 (`instruct-reference`) is trained by this branch's own arms, not

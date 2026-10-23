@@ -243,19 +243,17 @@ layout-rule check: local, then confirmed on FarmShare against the live
   was never exercised and the currently-published bytes are unaffected. The
   rest of the deployed script (shard/val-cut math, `sorted(domains)` join
   order, 1 GiB shard cap, 0.15% val fraction) is otherwise identical to the
-  repo's version; the only other differences are AWS STS session-refresh
-  plumbing (`RefreshingS3`/`RefreshingBoto3S3`, needed because the ~255 GB
-  publish outlasts a 1-hour STS token) that this rebuild has no use for
-  (rebuild.py never touches AWS/S3). This verification does not depend on
-  the deployed script at all -- it checks the actual published bytes -- so
+  repo's version; the only other difference is session-refresh plumbing for
+  the ~255 GB publish that this rebuild has no use for. This verification does
+  not depend on the deployed script at all -- it checks the actual published bytes -- so
   it settles the question either way regardless of this discrepancy.
 - `datasets/olmo/tokenize_olmo_shard.py` differs from the FarmShare copy that
   ran (`fs_tokenize_olmo_shard.py`, pulled during the earlier audit) only in
   line endings (sha256 differs, diff shows no content change); the tokenize
   logic itself is identical.
-- The publish run resumed mid-`dclm` and mid-`pes2o` (S3 `ExpiredToken` /
-  `HeadObject` 400 errors across jobs 1669864 -> 1670701, restarting the AWS
-  session each time). Resume was designed to be byte-exact but was
+- The publish run resumed mid-`dclm` and mid-`pes2o` (expired-credential
+  errors across jobs 1669864 -> 1670701, restarting the session each time).
+  Resume was designed to be byte-exact but was
   unverified before this check; since this rebuild re-derives every source
   file's tokens independently from public HF data and compares against the
   actual published bytes (not against the publish job's own bookkeeping),

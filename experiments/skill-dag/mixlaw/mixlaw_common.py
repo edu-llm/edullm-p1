@@ -91,7 +91,7 @@ BYTES_PER_TOKEN = 4
 # --- OLMoHQ / olmo-mix domain pool ---------------------------------------------
 # DataDecide-60M training stages a peak working pool from the published,
 # validated edullm-data corpus (see EDULLM_DATA_DATASET_ID). Domain labels are
-# ``entry.labels.source``. Never train from ``s3://edullm-datasets/``.
+# ``entry.labels.source``.
 DOMAINS: tuple[str, ...] = (
     "dclm",
     "arxiv",

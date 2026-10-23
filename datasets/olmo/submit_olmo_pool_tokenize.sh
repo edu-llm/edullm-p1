@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Dolma2-tokenize an OLMo-mix pool that a submit_olmo_mix_sample.sh run already
 # downloaded to local scratch; write tokenized/ and plan/tokenized_manifest.json
-# next to it. Does not touch AWS -- SRC_RUN_DIR is that sampling run's RUN_DIR.
+# next to it. SRC_RUN_DIR is that sampling run's RUN_DIR.
 set -Eeuo pipefail
 
 SUNET="${SUNET:-nzhao2}"

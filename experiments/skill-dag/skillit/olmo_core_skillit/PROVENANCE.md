@@ -83,6 +83,16 @@ folders as the program.
   file's `A` (LF SHA-256 of the file
   `b0f99a7310ee18dd1d25976f835fe19b56a45cfb4e518dc666e994dd45f6f762`, which the
   patched recipe's `offline_a_source_sha256` records).
+- **As-run probe files (not vendored).** The two files the reported probe run
+  (`probe-lgbref-20261003`) executed have these SHA-256s: `skillit_recipe.json`
+  `4338c5e8e34c8d5c320b58dd8ec0c603e8c9c5c74cc0a641295cd835497d38de` and
+  `skillit_math.py` `a66077a9a0a01b7409c94bc3ef0147d3c11747889c98c4e9860c4bc6435717d4`.
+  Both are reproduced exactly by replaying the committed chain in a scratch copy:
+  apply `farmshare/patch_static_validation_arms.py` to the recipe and math files as
+  of commit `6bfeebf^` (with the `mixlaw/` inputs from that commit), then
+  `farmshare/patch_probe_matrix.py` with `artifacts/probes_full/A_offline.json`. The
+  patch scripts check their inputs, so they refuse the vendored files in this
+  directory, which commits `6bfeebf` and `3820df5` edited after vendoring.
 
 ## What is included, and why
 

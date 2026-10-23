@@ -8,16 +8,20 @@ dynamic-reweighting results is available from this repository alone.
 
 | Field | Value |
 | --- | --- |
-| Source | `OLMo-core/.edullm/` in the two FarmShare run folders below |
-| Probe run folder | `/scratch/users/nzhao2/agent-runs/skillit-370m-probe-rerun-20260918-011120` |
-| Derivative run folder | `/scratch/users/nzhao2/agent-runs/skillit-370m-deriv-20260916-124719` |
+| Source | `OLMo-core/.edullm/` in the two FarmShare run folders marked "copied from" below |
+| Original probe run folder (copied from; deleted from scratch on 2026-10-23) | `/scratch/users/nzhao2/agent-runs/skillit-370m-probe-rerun-20260918-011120` |
+| Derivative run folder (copied from) | `/scratch/users/nzhao2/agent-runs/skillit-370m-deriv-20260916-124719` |
+| Reported probe run folder (Slurm job 1771665) | `/scratch/users/nzhao2/agent-runs/probe-lgbref-20261003`, staged from the `static-validation-20260926-210344` bundle with only `skillit_recipe.json` and `skillit_math.py` changed (the offline matrix and two checksum pins; see "Inputs the recipe pins") |
 | Upstream repo | `https://github.com/edu-llm/OLMo-core` |
 | Nearest upstream commit | `f2ded0b6ba6c6a617d48b346c6e4faab0ad15b5a` on `edullm/skillit-370m` (2026-08-03) |
 | Copied on | 2026-09-24 |
 
-The two run folders hold identical code: every file under `OLMo-core/.edullm/`,
-the launch scripts in `scripts/` and the data manifest `manifest/ready.json`
-have the same SHA-256 in both.
+When the files were copied (2026-09-24), the two "copied from" run folders held
+identical code: every file under `OLMo-core/.edullm/`, the launch scripts in
+`scripts/` and the data manifest `manifest/ready.json` have the same SHA-256 in
+both. The original probe folder has since been deleted from scratch; the probe arm
+reported in the paper is the later rerun in `probe-lgbref-20261003` (see the table
+above and "Inputs the recipe pins").
 
 The run copies had Windows (CRLF) line endings from being synced off a laptop.
 The files here are converted to LF and are otherwise byte-identical to them. The

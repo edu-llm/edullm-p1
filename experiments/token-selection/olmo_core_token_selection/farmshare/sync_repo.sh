@@ -31,11 +31,11 @@ ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" \
 
 tar -C "${LOCAL_REPO}" -czf - pyproject.toml src .edullm | \
   ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" \
-    "tar -xzf - -C '${RUN_DIR}/OLMo-core'"
+    "tar -xzmf - -C '${RUN_DIR}/OLMo-core'"
 
 tar -C "${LOCAL_REPO}/.edullm/farmshare" -czf - . | \
   ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" \
-    "tar -xzf - -C '${RUN_DIR}/scripts'"
+    "tar -xzmf - -C '${RUN_DIR}/scripts'"
 
 ssh -S "${SOCK}" -o BatchMode=yes "${HOST}" \
   "printf '%s' '${COMMIT}' > '${RUN_DIR}/OLMo-core/.edullm/GIT_COMMIT' && \
